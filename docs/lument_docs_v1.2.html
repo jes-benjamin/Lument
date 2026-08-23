@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lument Engine v1.2.0 开发者文档</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #1c2333;
+    --bg-hover: #21262d;
+    --border-color: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --accent: #58a6ff;
+    --accent-dim: #1f6feb;
+    --accent-glow: rgba(88, 166, 255, 0.15);
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --pink: #f778ba;
+    --code-bg: #0d1117;
+    --sidebar-width: 280px;
+    --header-height: 60px;
+}
+html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.7;
+    font-size: 15px;
+    overflow-x: hidden;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+header {
+    position: fixed; top: 0; left: 0; right: 0; height: var(--header-height);
+    background: rgba(13, 17, 23, 0.95); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color); z-index: 1000;
+    display: flex; align-items: center; padding: 0 24px; gap: 20px;
+}
+.logo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; color: var(--text-primary); text-decoration: none; white-space: nowrap; }
+.logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--purple)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #fff; flex-shrink: 0; }
+.version-badge { background: var(--bg-tertiary); color: var(--accent); font-size: 12px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border-color); font-weight: 600; }
+.search-box { flex: 1; max-width: 400px; position: relative; }
+.search-box input { width: 100%; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 12px 8px 36px; border-radius: 8px; font-size: 13px; outline: none; transition: border-color 0.2s; }
+.search-box input:focus { border-color: var(--accent); }
+.search-box input::placeholder { color: var(--text-muted); }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; }
+.header-links { display: flex; gap: 16px; align-items: center; }
+.header-links a { color: var(--text-secondary); text-decoration: none; font-size: 13px; transition: color 0.2s; }
+.header-links a:hover { color: var(--accent); }
+.menu-toggle { display: none; background: none; border: none; color: var(--text-primary); font-size: 20px; cursor: pointer; padding: 4px; }
+
+.sidebar { position: fixed; top: var(--header-height); left: 0; width: var(--sidebar-width); height: calc(100vh - var(--header-height)); background: var(--bg-secondary); border-right: 1px solid var(--border-color); overflow-y: auto; padding: 16px 0; z-index: 900; transition: transform 0.3s ease; }
+.sidebar-section { margin-bottom: 8px; }
+.sidebar-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); padding: 8px 24px; margin-top: 8px; }
+.sidebar a { display: flex; align-items: center; gap: 8px; padding: 7px 24px; color: var(--text-secondary); text-decoration: none; font-size: 13px; transition: all 0.15s; border-left: 3px solid transparent; }
+.sidebar a:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sidebar a.active { color: var(--accent); background: var(--accent-glow); border-left-color: var(--accent); font-weight: 600; }
+.sidebar a .nav-icon { font-size: 14px; opacity: 0.7; width: 18px; text-align: center; }
+.sidebar a .new-tag { background: var(--green); color: #fff; font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 700; margin-left: auto; }
+
+.main { margin-left: var(--sidebar-width); margin-top: var(--header-height); padding: 40px 48px 80px; max-width: 1100px; }
+.main h1 { font-size: 32px; font-weight: 800; margin-bottom: 8px; background: linear-gradient(135deg, var(--text-primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.main h2 { font-size: 24px; font-weight: 700; margin-top: 48px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
+.main h3 { font-size: 18px; font-weight: 600; margin-top: 32px; margin-bottom: 12px; color: var(--accent); }
+.main h4 { font-size: 15px; font-weight: 600; margin-top: 20px; margin-bottom: 8px; color: var(--text-primary); }
+.main p { margin-bottom: 12px; color: var(--text-secondary); }
+.main ul, .main ol { margin-bottom: 12px; padding-left: 24px; color: var(--text-secondary); }
+.main li { margin-bottom: 4px; }
+.main strong { color: var(--text-primary); }
+.main a { color: var(--accent); text-decoration: none; }
+.main a:hover { text-decoration: underline; }
+
+code { font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace; background: var(--bg-tertiary); color: var(--purple); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+pre { background: var(--code-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px 20px; overflow-x: auto; margin-bottom: 16px; position: relative; }
+pre code { background: none; color: var(--text-primary); padding: 0; font-size: 13px; line-height: 1.6; }
+.copy-btn { position: absolute; top: 8px; right: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-muted); padding: 4px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; opacity: 0; transition: opacity 0.2s; }
+pre:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.tk-keyword { color: var(--pink); }
+.tk-string { color: #a5d6ff; }
+.tk-comment { color: var(--text-muted); font-style: italic; }
+.tk-number { color: #79c0ff; }
+.tk-function { color: var(--green); }
+.tk-constant { color: var(--orange); }
+.tk-property { color: var(--purple); }
+.tk-type { color: var(--accent); }
+
+table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+th { background: var(--bg-tertiary); color: var(--accent); font-weight: 600; text-align: left; padding: 10px 14px; border: 1px solid var(--border-color); white-space: nowrap; }
+td { padding: 10px 14px; border: 1px solid var(--border-color); color: var(--text-secondary); vertical-align: top; }
+tr:nth-child(even) td { background: var(--bg-secondary); }
+td code { font-size: 12px; }
+
+.callout { background: var(--accent-glow); border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0; padding: 14px 18px; margin-bottom: 16px; }
+.callout.warning { background: rgba(210, 153, 34, 0.1); border-left-color: var(--orange); }
+.callout.tip { background: rgba(63, 185, 80, 0.1); border-left-color: var(--green); }
+.callout-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; color: var(--text-primary); }
+.callout p { margin-bottom: 0; color: var(--text-secondary); }
+
+.module-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; transition: border-color 0.2s, transform 0.2s; }
+.module-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.module-card h4 { margin-top: 0; color: var(--accent); }
+.module-card p { margin-bottom: 0; }
+.module-card .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; margin-left: 8px; }
+.badge-new { background: rgba(63, 185, 80, 0.2); color: var(--green); }
+.badge-existing { background: rgba(139, 148, 158, 0.2); color: var(--text-secondary); }
+.badge-enhanced { background: rgba(210, 153, 34, 0.2); color: var(--orange); }
+
+.api-block { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+.api-header { padding: 12px 18px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px; }
+.api-header .api-name { font-family: 'Cascadia Code', monospace; font-size: 14px; color: var(--green); font-weight: 600; }
+.api-header .api-type { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+.api-type-c { background: rgba(88, 166, 255, 0.15); color: var(--accent); }
+.api-type-js { background: rgba(247, 120, 186, 0.15); color: var(--pink); }
+.api-body { padding: 14px 18px; }
+.api-body p { margin-bottom: 8px; }
+.api-params { font-size: 13px; }
+.api-params td:first-child { font-family: monospace; color: var(--purple); white-space: nowrap; }
+
+.const-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.const-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px; }
+.const-card .const-name { font-family: monospace; font-size: 13px; color: var(--orange); margin-bottom: 4px; }
+.const-card .const-values { font-family: monospace; font-size: 12px; color: var(--text-secondary); }
+
+.quick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.quick-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; text-decoration: none; transition: all 0.2s; display: block; }
+.quick-card:hover { border-color: var(--accent); background: var(--bg-tertiary); transform: translateY(-3px); }
+.quick-card .card-icon { font-size: 28px; margin-bottom: 10px; }
+.quick-card h4 { color: var(--text-primary); margin-bottom: 4px; }
+.quick-card p { font-size: 13px; margin-bottom: 0; }
+
+footer { margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border-color); color: var(--text-muted); font-size: 13px; text-align: center; }
+
+@media (max-width: 900px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; padding: 24px 20px 60px; }
+    .menu-toggle { display: block; }
+    .search-box { max-width: 200px; }
+    .header-links { display: none; }
+}
+@media (max-width: 600px) {
+    .main h1 { font-size: 24px; }
+    .main h2 { font-size: 20px; }
+    .const-grid { grid-template-columns: 1fr; }
+    .quick-grid { grid-template-columns: 1fr; }
+}
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.main > * { animation: fadeIn 0.4s ease; }
+
+.new-module-tag { font-size: 12px; color: var(--green); background: rgba(63,185,80,0.15); padding: 2px 8px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+    <button class="menu-toggle" onclick="toggleSidebar()">&#9776;</button>
+    <a href="#top" class="logo">
+        <span class="logo-icon">L</span>
+        <span>Lument Engine</span>
+        <span class="version-badge">v1.2.0</span>
+    </a>
+    <div class="search-box">
+        <span class="search-icon">&#128269;</span>
+        <input type="text" id="searchInput" placeholder="搜索文档..." oninput="searchDocs()">
+    </div>
+    <div class="header-links">
+        <a href="#quick-start">快速上手</a>
+        <a href="#api-reference">API 参考</a>
+        <a href="#examples">示例</a>
+    </div>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">入门</div>
+        <a href="#overview"><span class="nav-icon">&#128218;</span> 引擎概览</a>
+        <a href="#architecture"><span class="nav-icon">&#128208;</span> 架构设计</a>
+        <a href="#quick-start"><span class="nav-icon">&#9889;</span> 快速上手</a>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">核心模块</div>
+        <a href="#core-api"><span class="nav-icon">&#9881;</span> 核心 API</a>
+        <a href="#rendering"><span class="nav-icon">&#127912;</span> 2D 场景渲染</a>
+        <a href="#ecs"><span class="nav-icon">&#129518;</span> ECS 实体系统</a>
+        <a href="#ui"><span class="nav-icon">&#128187;</span> UI 系统</a>
+        <a href="#storage"><span class="nav-icon">&#128190;</span> 存储系统</a>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">v1.2 新增模块</div>
+        <a href="#physics"><span class="nav-icon">&#9881;</span> 2D 物理模拟 <span class="new-tag">NEW</span></a>
+        <a href="#audio"><span class="nav-icon">&#127925;</span> 增强音频系统 <span class="new-tag">NEW</span></a>
+        <a href="#network"><span class="nav-icon">&#127760;</span> 网络模块 <span class="new-tag">NEW</span></a>
+        <a href="#ai"><span class="nav-icon">&#129504;</span> AI 模块 <span class="new-tag">NEW</span></a>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">参考</div>
+        <a href="#constants"><span class="nav-icon">&#128220;</span> 常量速查</a>
+        <a href="#examples"><span class="nav-icon">&#128221;</span> 完整示例</a>
+        <a href="#changelog"><span class="nav-icon">&#128340;</span> 更新日志</a>
+    </div>
+</nav>
+
+<main class="main" id="top">
+
+<h1>Lument Engine v1.2.0</h1>
+<p style="font-size: 17px; color: var(--text-secondary);">跨平台 2D 游戏引擎 — C ABI 核心 + Web Runtime，支持物理模拟、增强音频、网络通信与 AI 深度开发</p>
+
+<div class="quick-grid">
+    <a href="#physics" class="quick-card">
+        <div class="card-icon">&#9881;</div>
+        <h4>2D 物理模拟</h4>
+        <p>刚体物理、碰撞检测、自定义阻尼、重力控制</p>
+    </a>
+    <a href="#audio" class="quick-card">
+        <div class="card-icon">&#127925;</div>
+        <h4>增强音频系统</h4>
+        <p>MP3/WAV/OGG 支持、3D 空间音频、淡入淡出</p>
+    </a>
+    <a href="#network" class="quick-card">
+        <div class="card-icon">&#127760;</div>
+        <h4>网络模块</h4>
+        <p>HTTP/WebSocket、JSON 工具、数据同步</p>
+    </a>
+    <a href="#ai" class="quick-card">
+        <div class="card-icon">&#129504;</div>
+        <h4>AI 模块</h4>
+        <p>行为树、状态机、A* 寻路、Agent 接口</p>
+    </a>
+</div>
+
+<h2 id="overview">引擎概览</h2>
+<p>Lument Engine 是一款轻量级跨平台 2D 游戏引擎，采用 C ABI 核心设计，支持 Web、Android、Desktop（Linux/Windows/macOS）多平台部署。v1.2.0 版本新增物理模拟、增强音频、网络通信和 AI 四大模块。</p>
+
+<table>
+    <tr><th>项目</th><th>值</th></tr>
+    <tr><td>版本号</td><td><code>1.2.0</code></td></tr>
+    <tr><td>C ABI 头文件</td><td><code>lument.h</code></td></tr>
+    <tr><td>Web Runtime</td><td><code>lument.js</code></td></tr>
+    <tr><td>构建系统</td><td>CMake</td></tr>
+    <tr><td>支持平台</td><td>Web / Android / Desktop (Linux / Windows / macOS)</td></tr>
+    <tr><td>语言绑定</td><td>C/C++ / JavaScript / Python / Java</td></tr>
+</table>
+
+<h3>模块总览</h3>
+<div class="module-card"><h4>核心引擎 <code>lument_core.cpp</code> <span class="badge badge-existing">已有</span></h4><p>引擎生命周期管理、帧循环、平台检测、性能统计</p></div>
+<div class="module-card"><h4>渲染系统 <code>lument_renderer.cpp</code> <span class="badge badge-enhanced">增强</span></h4><p>2D 绘制基础 + 场景色彩色调控制、清晰度控制、光线渲染、图片接入、离屏渲染目标</p></div>
+<div class="module-card"><h4>ECS 实体系统 <code>lument_ecs.cpp</code> <span class="badge badge-existing">已有</span></h4><p>实体组件系统，支持 Transform、Sprite、Collider、Script 等组件</p></div>
+<div class="module-card"><h4>UI 系统 <code>lument_ui.cpp</code> <span class="badge badge-existing">已有</span></h4><p>轻量应用开发 UI 组件：按钮、输入框、列表、滑块、标签栏等</p></div>
+<div class="module-card"><h4>音频系统 <code>lument_audio.cpp</code> <span class="badge badge-enhanced">增强</span></h4><p>基础音频播放 + 增强音频：格式自动识别、3D 空间音频、分组控制、淡入淡出</p></div>
+<div class="module-card"><h4>2D 物理模拟 <code>lument_physics.cpp</code> <span class="badge badge-new">新增</span></h4><p>刚体物理、AABB/圆形碰撞、自定义阻尼函数、重力控制、射线检测</p></div>
+<div class="module-card"><h4>网络模块 <code>lument_network.cpp</code> <span class="badge badge-new">新增</span></h4><p>HTTP 请求（GET/POST/PUT/DELETE）、WebSocket、JSON 工具、数据同步</p></div>
+<div class="module-card"><h4>AI 模块 <code>lument_ai.cpp</code> <span class="badge badge-new">新增</span></h4><p>行为树、有限状态机、A* 寻路、黑板系统、AI Agent 接口</p></div>
+
+<h2 id="architecture">架构设计</h2>
+<p>Lument Engine 采用分层架构设计，C ABI 核心层提供统一接口，上层通过语言绑定支持多语言调用：</p>
+<pre><code>+-----------------------------------------------+
+|              应用层 (Game / App)              |
++----------+----------+----------+--------------+
+|   JS     |  Python  |   Java   |    C/C++     |
+| Runtime  | Binding  | Binding  |   Direct     |
++----------+----------+----------+--------------+
+|              C ABI (lument.h)                 |
++-----------------------------------------------+
+|  Core | Renderer | ECS | Physics | Audio | .. |
++-----------------------------------------------+
+|    OpenGL ES  |  WebGL  |  Canvas2D  | Vulkan |
++-----------------------------------------------+</code></pre>
+
+<div class="callout tip">
+    <div class="callout-title">设计原则</div>
+    <p>低开销、高性能、跨平台。所有 API 通过 C ABI 暴露，确保不同语言绑定的行为一致性。Web Runtime (<code>lument.js</code>) 提供与 C++ 核心一致的接口，实现一次开发、多平台运行。</p>
+</div>
+
+<h2 id="quick-start">快速上手</h2>
+<h3>初始化引擎</h3>
+<pre><code><span class="tk-comment">// Web 平台初始化</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">init</span>({
+    <span class="tk-property">platform</span>: <span class="tk-constant">Lument</span>.<span class="tk-constant">PLATFORM</span>.<span class="tk-constant">WEB</span>,
+    <span class="tk-property">width</span>: <span class="tk-number">480</span>,
+    <span class="tk-property">height</span>: <span class="tk-number">540</span>,
+    <span class="tk-property">targetFPS</span>: <span class="tk-number">60</span>
+});
+
+<span class="tk-comment">// 主循环</span>
+<span class="tk-keyword">function</span> <span class="tk-function">render</span>() {
+    <span class="tk-constant">Lument</span>.<span class="tk-function">beginFrame</span>();
+    <span class="tk-constant">Lument</span>.<span class="tk-function">clear</span>({ <span class="tk-property">r</span>: <span class="tk-number">0</span>, <span class="tk-property">g</span>: <span class="tk-number">0</span>, <span class="tk-property">b</span>: <span class="tk-number">0</span>, <span class="tk-property">a</span>: <span class="tk-number">255</span> });
+    <span class="tk-comment">// 游戏逻辑与渲染...</span>
+    <span class="tk-constant">Lument</span>.<span class="tk-function">endFrame</span>();
+    <span class="tk-function">requestAnimationFrame</span>(render);
+}
+<span class="tk-function">render</span>();</code></pre>
+
+<h3>C++ 平台初始化</h3>
+<pre><code><span class="tk-type">LumentConfig</span> config = {};
+config.<span class="tk-property">platform</span>    = <span class="tk-constant">LUMENT_PLATFORM_DESKTOP</span>;
+config.<span class="tk-property">rendererType</span> = <span class="tk-constant">LUMENT_RENDERER_OPENGL</span>;
+config.<span class="tk-property">width</span>        = <span class="tk-number">480</span>;
+config.<span class="tk-property">height</span>       = <span class="tk-number">540</span>;
+config.<span class="tk-property">targetFPS</span>    = <span class="tk-number">60.0f</span>;
+
+<span class="tk-function">lument_init</span>(&amp;config);
+
+<span class="tk-keyword">while</span> (<span class="tk-function">lument_is_running</span>()) {
+    <span class="tk-function">lument_begin_frame</span>();
+    <span class="tk-function">lument_clear</span>({<span class="tk-number">0</span>, <span class="tk-number">0</span>, <span class="tk-number">0</span>, <span class="tk-number">255</span>});
+    <span class="tk-comment">// 绘制逻辑...</span>
+    <span class="tk-function">lument_end_frame</span>();
+}
+<span class="tk-function">lument_shutdown</span>();</code></pre>
+
+<h2 id="core-api">核心 API</h2>
+<h3>引擎生命周期</h3>
+<div class="api-block"><div class="api-header"><span class="api-name">lument_init(config)</span><span class="api-type api-type-c">C ABI</span><span class="api-type api-type-js">JS</span></div><div class="api-body"><p>初始化引擎，传入配置参数。返回 0 表示成功。</p></div></div>
+<div class="api-block"><div class="api-header"><span class="api-name">lument_shutdown()</span><span class="api-type api-type-c">C ABI</span></div><div class="api-body"><p>关闭引擎，释放所有资源。</p></div></div>
+<div class="api-block"><div class="api-header"><span class="api-name">lument_begin_frame() / lument_end_frame()</span><span class="api-type api-type-c">C ABI</span></div><div class="api-body"><p>帧循环标记。<code>begin_frame</code> 计算 deltaTime 并清空渲染统计；<code>end_frame</code> 提交渲染批次、交换缓冲、执行帧率限制。</p></div></div>
+<div class="api-block"><div class="api-header"><span class="api-name">lument_get_delta_time()</span><span class="api-type api-type-c">C ABI</span></div><div class="api-body"><p>返回上一帧耗时（毫秒）。用于物理步进和动画插值。</p></div></div>
+<div class="api-block"><div class="api-header"><span class="api-name">lument_get_stats(stats)</span><span class="api-type api-type-c">C ABI</span></div><div class="api-body"><p>获取引擎运行统计信息（fps、frameTime、drawCalls、entityCount、memoryUsed）。</p></div></div>
+
+<h3>输入系统</h3>
+<table>
+    <tr><th>函数</th><th>说明</th></tr>
+    <tr><td><code>key_down(key)</code></td><td>检测按键是否持续按下</td></tr>
+    <tr><td><code>key_pressed(key)</code></td><td>检测按键是否在当前帧刚按下（边沿触发）</td></tr>
+    <tr><td><code>get_touch_count() / get_touch(index, pos)</code></td><td>多点触控支持</td></tr>
+    <tr><td><code>get_joystick_x() / get_joystick_y()</code></td><td>虚拟摇杆输入 (-1.0 ~ 1.0)</td></tr>
+</table>
+
+<h3>工具函数</h3>
+<table>
+    <tr><th>函数</th><th>说明</th></tr>
+    <tr><td><code>get_time_ms()</code></td><td>获取毫秒级时间戳</td></tr>
+    <tr><td><code>random() / random_range(min, max)</code></td><td>随机数生成</td></tr>
+    <tr><td><code>log(message)</code></td><td>输出日志</td></tr>
+</table>
+
+<h2 id="rendering">2D 场景渲染</h2>
+<p>v1.1 引入的场景级渲染增强，支持全局色彩调整、清晰度控制、动态光源、图片接入和离屏渲染。</p>
+
+<h3>色彩色调控制</h3>
+<table>
+    <tr><th>函数</th><th>参数</th><th>说明</th></tr>
+    <tr><td><code>setSceneTint(tint)</code></td><td><code>{r,g,b,a}</code></td><td>色调叠加色，通过 multiply 混合叠加到整个场景</td></tr>
+    <tr><td><code>setSceneBrightness(v)</code></td><td><code>0.0~2.0</code></td><td>亮度调整，1.0=原始</td></tr>
+    <tr><td><code>setSceneContrast(v)</code></td><td><code>0.0~2.0</code></td><td>对比度调整，1.0=原始</td></tr>
+    <tr><td><code>setSceneSaturation(v)</code></td><td><code>0.0~2.0</code></td><td>饱和度调整，1.0=原始</td></tr>
+    <tr><td><code>setSceneHueShift(v)</code></td><td><code>0~360</code></td><td>色相偏移（度），0=无偏移</td></tr>
+    <tr><td><code>setSceneGrayscale(v)</code></td><td><code>0.0~1.0</code></td><td>灰度混合比例</td></tr>
+    <tr><td><code>setSceneSepia(v)</code></td><td><code>0.0~1.0</code></td><td>棕褐色效果比例</td></tr>
+    <tr><td><code>setSceneInvert(v)</code></td><td><code>0.0~1.0</code></td><td>反色比例</td></tr>
+    <tr><td><code>resetSceneColor()</code></td><td>-</td><td>重置所有色彩参数为默认值</td></tr>
+</table>
+
+<pre><code><span class="tk-comment">// 日落氛围</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">setSceneTint</span>({ <span class="tk-property">r</span>: <span class="tk-number">255</span>, <span class="tk-property">g</span>: <span class="tk-number">140</span>, <span class="tk-property">b</span>: <span class="tk-number">60</span>, <span class="tk-property">a</span>: <span class="tk-number">180</span> });
+<span class="tk-constant">Lument</span>.<span class="tk-function">setSceneBrightness</span>(<span class="tk-number">1.1</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">setSceneContrast</span>(<span class="tk-number">1.2</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">setSceneSaturation</span>(<span class="tk-number">1.3</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">setVignette</span>(<span class="tk-number">0.4</span>, <span class="tk-number">0.7</span>);
+
+<span class="tk-comment">// 夜晚氛围</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">setSceneBrightness</span>(<span class="tk-number">0.5</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">setSceneContrast</span>(<span class="tk-number">1.3</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">setSceneTint</span>({ <span class="tk-property">r</span>: <span class="tk-number">40</span>, <span class="tk-property">g</span>: <span class="tk-number">60</span>, <span class="tk-property">b</span>: <span class="tk-number">120</span>, <span class="tk-property">a</span>: <span class="tk-number">200</span> });
+<span class="tk-constant">Lument</span>.<span class="tk-function">setAmbientLight</span>({ <span class="tk-property">r</span>: <span class="tk-number">50</span>, <span class="tk-property">g</span>: <span class="tk-number">50</span>, <span class="tk-property">b</span>: <span class="tk-number">100</span>, <span class="tk-property">a</span>: <span class="tk-number">255</span> }, <span class="tk-number">0.3</span>);</code></pre>
+
+<h3>清晰度与后期效果</h3>
+<table>
+    <tr><th>函数</th><th>参数</th><th>说明</th></tr>
+    <tr><td><code>setSceneSharpness(v)</code></td><td><code>-1.0~1.0</code></td><td>锐化程度，正值锐化，负值柔化</td></tr>
+    <tr><td><code>setSceneBlur(radius)</code></td><td><code>0.0+</code></td><td>高斯模糊半径（像素），0=关闭</td></tr>
+    <tr><td><code>setSceneBloom(intensity, threshold)</code></td><td><code>0~1, 0~1</code></td><td>泛光效果</td></tr>
+    <tr><td><code>setVignette(intensity, radius)</code></td><td><code>0~1, 0~1</code></td><td>暗角效果</td></tr>
+    <tr><td><code>setFog(color, density, start, end)</code></td><td>见说明</td><td>雾效</td></tr>
+    <tr><td><code>applySceneEffects()</code></td><td>-</td><td>应用所有场景效果到当前帧</td></tr>
+</table>
+
+<h3>光线渲染</h3>
+<p>支持三种光源类型：点光源（POINT）、方向光（DIRECTIONAL）、聚光灯（SPOT），以及环境光。</p>
+<pre><code><span class="tk-comment">// 添加暖色点光源（如火把）</span>
+<span class="tk-keyword">const</span> lightId = <span class="tk-constant">Lument</span>.<span class="tk-function">addLight</span>(
+    <span class="tk-constant">Lument</span>.<span class="tk-constant">LIGHT</span>.<span class="tk-constant">POINT</span>, <span class="tk-number">240</span>, <span class="tk-number">300</span>, <span class="tk-number">200</span>,
+    { <span class="tk-property">r</span>: <span class="tk-number">255</span>, <span class="tk-property">g</span>: <span class="tk-number">200</span>, <span class="tk-property">b</span>: <span class="tk-number">100</span>, <span class="tk-property">a</span>: <span class="tk-number">255</span> }, <span class="tk-number">0.8</span>
+);
+
+<span class="tk-comment">// 火把闪烁效果</span>
+<span class="tk-keyword">function</span> <span class="tk-function">update</span>() {
+    <span class="tk-keyword">const</span> flicker = <span class="tk-number">0.7</span> + <span class="tk-function">Math</span>.<span class="tk-function">sin</span>(<span class="tk-function">Date</span>.<span class="tk-function">now</span>() * <span class="tk-number">0.01</span>) * <span class="tk-number">0.2</span> + <span class="tk-function">Math</span>.<span class="tk-function">random</span>() * <span class="tk-number">0.1</span>;
+    <span class="tk-constant">Lument</span>.<span class="tk-function">setLightIntensity</span>(lightId, flicker);
+}
+
+<span class="tk-comment">// 月光方向光</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">addLight</span>(<span class="tk-constant">Lument</span>.<span class="tk-constant">LIGHT</span>.<span class="tk-constant">DIRECTIONAL</span>, <span class="tk-number">0</span>, <span class="tk-number">0</span>, <span class="tk-number">0</span>,
+    { <span class="tk-property">r</span>: <span class="tk-number">100</span>, <span class="tk-property">g</span>: <span class="tk-number">120</span>, <span class="tk-property">b</span>: <span class="tk-number">200</span>, <span class="tk-property">a</span>: <span class="tk-number">255</span> }, <span class="tk-number">0.4</span>);</code></pre>
+
+<div class="callout">
+    <div class="callout-title">渲染调用顺序</div>
+    <p>典型帧渲染流程：<code>clear</code> -> 绘制场景内容 -> <code>renderLights()</code> -> <code>applySceneEffects()</code> -> <code>endFrame</code></p>
+</div>
+
+<h3>图片接入</h3>
+<table>
+    <tr><th>函数</th><th>说明</th></tr>
+    <tr><td><code>loadImage(path, callback)</code></td><td>异步加载图片，回调返回 textureId 和尺寸</td></tr>
+    <tr><td><code>drawImageTiled(texId, dest, src, offsetX, offsetY)</code></td><td>平铺绘制图片</td></tr>
+    <tr><td><code>drawImageRotated(texId, cx, cy, angleDeg, scale, src)</code></td><td>旋转绘制图片</td></tr>
+    <tr><td><code>drawImageWithColor(texId, dest, src, color)</code></td><td>带色调绘制图片</td></tr>
+    <tr><td><code>drawImageRegion(texId, dest, src, color, rotation, tiled)</code></td><td>综合绘制（支持旋转+平铺）</td></tr>
+</table>
+
+<h3>离屏渲染目标</h3>
+<pre><code><span class="tk-keyword">const</span> rtId = <span class="tk-constant">Lument</span>.<span class="tk-function">createRenderTarget</span>(<span class="tk-number">480</span>, <span class="tk-number">540</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">setRenderTarget</span>(rtId);
+<span class="tk-constant">Lument</span>.<span class="tk-function">clear</span>({ <span class="tk-property">r</span>: <span class="tk-number">0</span>, <span class="tk-property">g</span>: <span class="tk-number">0</span>, <span class="tk-property">b</span>: <span class="tk-number">0</span>, <span class="tk-property">a</span>: <span class="tk-number">255</span> });
+<span class="tk-comment">// ... 在离屏画布上绘制 ...</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">setRenderTarget</span>(<span class="tk-number">0</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">drawRenderTarget</span>(rtId, { <span class="tk-property">x</span>: <span class="tk-number">0</span>, <span class="tk-property">y</span>: <span class="tk-number">0</span>, <span class="tk-property">w</span>: <span class="tk-number">480</span>, <span class="tk-property">h</span>: <span class="tk-number">540</span> });</code></pre>
+
+<h2 id="ecs">ECS 实体系统</h2>
+<p>实体组件系统（Entity Component System）提供灵活的游戏对象管理。</p>
+<table>
+    <tr><th>组件</th><th>标识</th><th>说明</th></tr>
+    <tr><td>Transform</td><td><code>LUMENT_COMP_TRANSFORM</code></td><td>位置 / 旋转 / 缩放</td></tr>
+    <tr><td>Sprite</td><td><code>LUMENT_COMP_SPRITE</code></td><td>精灵渲染</td></tr>
+    <tr><td>Physics</td><td><code>LUMENT_COMP_PHYSICS</code></td><td>物理体</td></tr>
+    <tr><td>Collider</td><td><code>LUMENT_COMP_COLLIDER</code></td><td>碰撞体</td></tr>
+    <tr><td>Script</td><td><code>LUMENT_COMP_SCRIPT</code></td><td>脚本组件（回调驱动）</td></tr>
+    <tr><td>Audio</td><td><code>LUMENT_COMP_AUDIO</code></td><td>音频源</td></tr>
+    <tr><td>Camera</td><td><code>LUMENT_COMP_CAMERA</code></td><td>摄像机</td></tr>
+    <tr><td>Text</td><td><code>LUMENT_COMP_TEXT</code></td><td>文本渲染</td></tr>
+    <tr><td>Animator</td><td><code>LUMENT_COMP_ANIMATOR</code></td><td>动画器</td></tr>
+</table>
+
+<pre><code><span class="tk-comment">// 创建实体并添加组件</span>
+<span class="tk-keyword">const</span> player = <span class="tk-constant">Lument</span>.<span class="tk-function">createEntity</span>();
+<span class="tk-constant">Lument</span>.<span class="tk-function">setPosition</span>(player, <span class="tk-number">240</span>, <span class="tk-number">100</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">setSprite</span>(player, textureId, <span class="tk-number">32</span>, <span class="tk-number">32</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">setSpriteColor</span>(player, { <span class="tk-property">r</span>: <span class="tk-number">255</span>, <span class="tk-property">g</span>: <span class="tk-number">255</span>, <span class="tk-property">b</span>: <span class="tk-number">255</span>, <span class="tk-property">a</span>: <span class="tk-number">255</span> });
+<span class="tk-constant">Lument</span>.<span class="tk-function">setCollider</span>(player, <span class="tk-number">32</span>, <span class="tk-number">32</span>);
+
+<span class="tk-comment">// 设置脚本回调</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">setScript</span>(player, <span class="tk-keyword">function</span>(<span class="tk-property">entity</span>, <span class="tk-property">dt</span>) {
+    <span class="tk-keyword">if</span> (<span class="tk-constant">Lument</span>.<span class="tk-function">keyDown</span>(<span class="tk-constant">Lument</span>.<span class="tk-constant">KEY</span>.<span class="tk-constant">LEFT</span>)) {
+        <span class="tk-keyword">const</span> pos = <span class="tk-constant">Lument</span>.<span class="tk-function">getPosition</span>(entity);
+        <span class="tk-constant">Lument</span>.<span class="tk-function">setPosition</span>(entity, pos.<span class="tk-property">x</span> - <span class="tk-number">100</span> * dt, pos.<span class="tk-property">y</span>);
+    }
+});</code></pre>
+
+<h2 id="ui">UI 系统</h2>
+<p>轻量级 UI 系统，支持容器、按钮、标签、输入框、列表、进度条、复选框、滑块等组件，并提供垂直/水平/网格/堆叠布局。</p>
+<table>
+    <tr><th>类型</th><th>常量</th><th>说明</th></tr>
+    <tr><td>容器</td><td><code>WIDGET_CONTAINER</code></td><td>可嵌套的布局容器</td></tr>
+    <tr><td>按钮</td><td><code>WIDGET_BUTTON</code></td><td>可点击按钮</td></tr>
+    <tr><td>文本标签</td><td><code>WIDGET_LABEL</code></td><td>静态文本</td></tr>
+    <tr><td>文本输入框</td><td><code>WIDGET_INPUT</code></td><td>可编辑文本输入</td></tr>
+    <tr><td>图片</td><td><code>WIDGET_IMAGE</code></td><td>图片 Widget</td></tr>
+    <tr><td>列表</td><td><code>WIDGET_LIST</code></td><td>列表 / 滚动视图</td></tr>
+    <tr><td>进度条</td><td><code>WIDGET_PROGRESS</code></td><td>进度条</td></tr>
+    <tr><td>复选框</td><td><code>WIDGET_CHECKBOX</code></td><td>复选框</td></tr>
+    <tr><td>滑块</td><td><code>WIDGET_SLIDER</code></td><td>滑块控件</td></tr>
+    <tr><td>标签栏</td><td><code>WIDGET_TABBAR</code></td><td>标签栏切换</td></tr>
+    <tr><td>导航栏</td><td><code>WIDGET_NAVBAR</code></td><td>导航栏</td></tr>
+</table>
+
+<pre><code><span class="tk-comment">// 创建按钮并绑定事件</span>
+<span class="tk-keyword">const</span> btn = <span class="tk-constant">Lument</span>.<span class="tk-function">uiCreateButton</span>(<span class="tk-string">"开始游戏"</span>, <span class="tk-number">160</span>, <span class="tk-number">200</span>, <span class="tk-number">160</span>, <span class="tk-number">48</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">uiSetColor</span>(btn, { <span class="tk-property">r</span>: <span class="tk-number">30</span>, <span class="tk-property">g</span>: <span class="tk-number">60</span>, <span class="tk-property">b</span>: <span class="tk-number">120</span>, <span class="tk-property">a</span>: <span class="tk-number">255</span> });
+<span class="tk-constant">Lument</span>.<span class="tk-function">uiOnEvent</span>(btn, <span class="tk-constant">Lument</span>.<span class="tk-constant">EVENT</span>.<span class="tk-constant">CLICK</span>, <span class="tk-keyword">function</span>(<span class="tk-property">widget</span>, <span class="tk-property">event</span>, <span class="tk-property">data</span>) {
+    <span class="tk-function">startGame</span>();
+});</code></pre>
+
+<h2 id="storage">存储系统</h2>
+<table>
+    <tr><th>函数</th><th>说明</th></tr>
+    <tr><td><code>save_data(key, data)</code></td><td>保存字符串数据到指定键</td></tr>
+    <tr><td><code>load_data(key)</code></td><td>读取指定键的数据</td></tr>
+    <tr><td><code>clear_data(key)</code></td><td>清除指定键的数据</td></tr>
+</table>
+
+<pre><code><span class="tk-constant">Lument</span>.<span class="tk-function">saveData</span>(<span class="tk-string">"player_level"</span>, <span class="tk-string">"5"</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">saveData</span>(<span class="tk-string">"player_score"</span>, <span class="tk-string">"1000"</span>);
+<span class="tk-keyword">const</span> level = <span class="tk-constant">Lument</span>.<span class="tk-function">loadData</span>(<span class="tk-string">"player_level"</span>);</code></pre>
+
+<h2 id="physics">2D 物理模拟 <span class="new-module-tag">v1.2 新增</span></h2>
+<p>完整的 2D 刚体物理引擎，支持静态体、动态体和运动学体，AABB 和圆形碰撞形状，自定义阻尼函数，以及射线检测和点查询。</p>
+
+<h3>物理世界</h3>
+<pre><code><span class="tk-comment">// 设置重力（默认 0, 9.8）</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsSetGravity</span>(<span class="tk-number">0</span>, <span class="tk-number">500</span>);  <span class="tk-comment">// 像素/秒²</span>
+
+<span class="tk-comment">// 设置迭代次数（影响精度与性能）</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsSetIterations</span>(<span class="tk-number">8</span>, <span class="tk-number">3</span>);
+
+<span class="tk-comment">// 重置物理世界</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsReset</span>();</code></pre>
+
+<h3>创建物理体</h3>
+<pre><code><span class="tk-comment">// 创建动态体</span>
+<span class="tk-keyword">const</span> bodyId = <span class="tk-constant">Lument</span>.<span class="tk-function">physicsCreateBody</span>({
+    <span class="tk-property">type</span>: <span class="tk-constant">Lument</span>.<span class="tk-constant">BODY</span>.<span class="tk-constant">DYNAMIC</span>,    <span class="tk-comment">// 静态/动态/运动学</span>
+    <span class="tk-property">mass</span>: <span class="tk-number">1.0</span>,
+    <span class="tk-property">restitution</span>: <span class="tk-number">0.5</span>,             <span class="tk-comment">// 弹性 0~1</span>
+    <span class="tk-property">friction</span>: <span class="tk-number">0.3</span>,                <span class="tk-comment">// 摩擦 0~1</span>
+    <span class="tk-property">linearDamping</span>: <span class="tk-number">0.1</span>,           <span class="tk-comment">// 线性阻尼</span>
+    <span class="tk-property">angularDamping</span>: <span class="tk-number">0.1</span>,          <span class="tk-comment">// 角阻尼</span>
+    <span class="tk-property">gravityScale</span>: <span class="tk-number">1.0</span>,            <span class="tk-comment">// 重力缩放</span>
+}, <span class="tk-number">100</span>, <span class="tk-number">200</span>);  <span class="tk-comment">// 初始位置</span>
+
+<span class="tk-comment">// 设置碰撞形状</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsSetShape</span>(bodyId, { <span class="tk-property">type</span>: <span class="tk-constant">Lument</span>.<span class="tk-constant">SHAPE</span>.<span class="tk-constant">AABB</span>, <span class="tk-property">w</span>: <span class="tk-number">32</span>, <span class="tk-property">h</span>: <span class="tk-number">32</span> });
+<span class="tk-comment">// 或圆形</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsSetShape</span>(bodyId, { <span class="tk-property">type</span>: <span class="tk-constant">Lument</span>.<span class="tk-constant">SHAPE</span>.<span class="tk-constant">CIRCLE</span>, <span class="tk-property">radius</span>: <span class="tk-number">16</span> });
+
+<span class="tk-comment">// 创建静态地面</span>
+<span class="tk-keyword">const</span> groundId = <span class="tk-constant">Lument</span>.<span class="tk-function">physicsCreateBody</span>({
+    <span class="tk-property">type</span>: <span class="tk-constant">Lument</span>.<span class="tk-constant">BODY</span>.<span class="tk-constant">STATIC</span>,
+    <span class="tk-property">mass</span>: <span class="tk-number">0</span>,
+    <span class="tk-property">friction</span>: <span class="tk-number">0.5</span>,
+}, <span class="tk-number">0</span>, <span class="tk-number">500</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsSetShape</span>(groundId, { <span class="tk-property">type</span>: <span class="tk-constant">Lument</span>.<span class="tk-constant">SHAPE</span>.<span class="tk-constant">AABB</span>, <span class="tk-property">w</span>: <span class="tk-number">480</span>, <span class="tk-property">h</span>: <span class="tk-number">40</span> });</code></pre>
+
+<h3>自定义阻尼函数</h3>
+<div class="callout tip">
+    <div class="callout-title">核心特性</div>
+    <p>自定义阻尼允许开发者完全控制速度衰减逻辑，可用于实现流体阻力、空气阻力等复杂物理效果。</p>
+</div>
+<pre><code><span class="tk-comment">// 自定义阻尼：速度越快阻尼越大</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsSetCustomDamping</span>(bodyId, <span class="tk-keyword">function</span>(<span class="tk-property">velocity</span>, <span class="tk-property">mass</span>, <span class="tk-property">dt</span>, <span class="tk-property">userData</span>) {
+    <span class="tk-comment">// 返回速度缩放系数 0~1</span>
+    <span class="tk-keyword">const</span> drag = <span class="tk-number">0.01</span>;
+    <span class="tk-keyword">return</span> <span class="tk-function">Math</span>.<span class="tk-function">max</span>(<span class="tk-number">0</span>, <span class="tk-number">1</span> - drag * velocity * dt);
+}, <span class="tk-keyword">null</span>);
+
+<span class="tk-comment">// 清除自定义阻尼，恢复默认线性阻尼</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsClearCustomDamping</span>(bodyId);</code></pre>
+
+<h3>施加力与冲量</h3>
+<pre><code><span class="tk-comment">// 施加力（持续力，影响加速度）</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsApplyForce</span>(bodyId, <span class="tk-number">0</span>, -<span class="tk-number">500</span>);  <span class="tk-comment">// 向上的力</span>
+
+<span class="tk-comment">// 施加冲量（瞬时速度变化）</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsApplyImpulse</span>(bodyId, <span class="tk-number">100</span>, -<span class="tk-number">200</span>);  <span class="tk-comment">// 跳跃</span>
+
+<span class="tk-comment">// 施加扭矩</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsApplyTorque</span>(bodyId, <span class="tk-number">50</span>);
+
+<span class="tk-comment">// 直接设置速度</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsSetVelocity</span>(bodyId, <span class="tk-number">100</span>, <span class="tk-number">0</span>);</code></pre>
+
+<h3>碰撞检测</h3>
+<pre><code><span class="tk-comment">// 两个体之间的碰撞检测</span>
+<span class="tk-keyword">const</span> collision = <span class="tk-constant">Lument</span>.<span class="tk-function">physicsCheckCollision</span>(bodyA, bodyB);
+<span class="tk-keyword">if</span> (collision) {
+    <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'碰撞点:'</span>, collision.<span class="tk-property">point</span>);
+    <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'法线:'</span>, collision.<span class="tk-property">normal</span>);
+    <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'穿透深度:'</span>, collision.<span class="tk-property">penetration</span>);
+}
+
+<span class="tk-comment">// 射线检测</span>
+<span class="tk-keyword">const</span> hit = <span class="tk-constant">Lument</span>.<span class="tk-function">physicsRaycast</span>(<span class="tk-number">0</span>, <span class="tk-number">0</span>, <span class="tk-number">480</span>, <span class="tk-number">540</span>);
+<span class="tk-keyword">if</span> (hit) {
+    <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'命中体:'</span>, hit.<span class="tk-property">bodyId</span>, <span class="tk-string">'位置:'</span>, hit.<span class="tk-property">point</span>);
+}
+
+<span class="tk-comment">// 碰撞回调</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsOnCollision</span>(<span class="tk-keyword">function</span>(<span class="tk-property">collision</span>, <span class="tk-property">userData</span>) {
+    <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'碰撞:'</span>, collision.<span class="tk-property">bodyA</span>, collision.<span class="tk-property">bodyB</span>);
+}, <span class="tk-keyword">null</span>);</code></pre>
+
+<h3>物理 API 完整列表</h3>
+<table>
+    <tr><th>函数</th><th>说明</th></tr>
+    <tr><td><code>physicsSetGravity(gx, gy)</code></td><td>设置重力加速度</td></tr>
+    <tr><td><code>physicsSetIterations(vel, pos)</code></td><td>设置速度/位置迭代次数</td></tr>
+    <tr><td><code>physicsStep(dt)</code></td><td>步进物理世界</td></tr>
+    <tr><td><code>physicsReset()</code></td><td>清空所有物理体</td></tr>
+    <tr><td><code>physicsCreateBody(def, x, y)</code></td><td>创建物理体</td></tr>
+    <tr><td><code>physicsSetShape(bodyId, shape)</code></td><td>设置碰撞形状</td></tr>
+    <tr><td><code>physicsSetCustomDamping(bodyId, func, data)</code></td><td>设置自定义阻尼函数</td></tr>
+    <tr><td><code>physicsApplyForce(bodyId, fx, fy)</code></td><td>施加力</td></tr>
+    <tr><td><code>physicsApplyImpulse(bodyId, ix, iy)</code></td><td>施加冲量</td></tr>
+    <tr><td><code>physicsApplyTorque(bodyId, torque)</code></td><td>施加扭矩</td></tr>
+    <tr><td><code>physicsCheckCollision(a, b)</code></td><td>检测两体碰撞</td></tr>
+    <tr><td><code>physicsRaycast(x1, y1, x2, y2)</code></td><td>射线检测</td></tr>
+    <tr><td><code>physicsPointQuery(x, y)</code></td><td>点查询</td></tr>
+    <tr><td><code>physicsOnCollision(callback, data)</code></td><td>注册碰撞回调</td></tr>
+    <tr><td><code>physicsGetPosition / GetVelocity / GetState</code></td><td>获取物理体状态</td></tr>
+</table>
+
+<h2 id="audio">增强音频系统 <span class="new-module-tag">v1.2 新增</span></h2>
+<p>自动识别 WAV/MP3/OGG 格式，支持 3D 空间音频、分组控制、淡入淡出、音调与声道调节。</p>
+
+<h3>加载音频</h3>
+<pre><code><span class="tk-comment">// 加载音效（自动识别格式：WAV/MP3/OGG）</span>
+<span class="tk-keyword">const</span> sfxId = <span class="tk-constant">Lument</span>.<span class="tk-function">loadSound</span>(<span class="tk-string">'assets/jump.mp3'</span>);
+
+<span class="tk-comment">// 加载背景音乐</span>
+<span class="tk-keyword">const</span> bgmId = <span class="tk-constant">Lument</span>.<span class="tk-function">loadMusic</span>(<span class="tk-string">'assets/bgm.ogg'</span>);
+
+<span class="tk-comment">// 查看支持的格式</span>
+<span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-constant">Lument</span>.<span class="tk-function">getSupportedFormats</span>());  <span class="tk-comment">// "WAV,MP3,OGG"</span></code></pre>
+
+<h3>播放控制</h3>
+<pre><code><span class="tk-comment">// 播放音效（返回实例ID）</span>
+<span class="tk-keyword">const</span> instId = <span class="tk-constant">Lument</span>.<span class="tk-function">playSound</span>(sfxId, <span class="tk-number">0.8</span>, <span class="tk-number">1.0</span>, <span class="tk-keyword">false</span>);
+<span class="tk-comment">// 参数：音源ID, 音量, 音调(1.0=正常), 是否循环</span>
+
+<span class="tk-comment">// 控制播放</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">pauseSound</span>(instId);
+<span class="tk-constant">Lument</span>.<span class="tk-function">resumeSound</span>(instId);
+<span class="tk-constant">Lument</span>.<span class="tk-function">stopSound</span>(instId);
+
+<span class="tk-comment">// 调整参数</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">setPitch</span>(instId, <span class="tk-number">1.5</span>);   <span class="tk-comment">// 音调</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">setPan</span>(instId, -<span class="tk-number">0.5</span>);    <span class="tk-comment">// 声道平衡 -1(左)~1(右)</span>
+
+<span class="tk-comment">// 淡入淡出</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">fadeIn</span>(instId, <span class="tk-number">2.0</span>);   <span class="tk-comment">// 2秒淡入</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">fadeOut</span>(instId, <span class="tk-number">1.5</span>);  <span class="tk-comment">// 1.5秒淡出</span></code></pre>
+
+<h3>3D 空间音频</h3>
+<pre><code><span class="tk-comment">// 设置听者位置和朝向</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">setAudioListener</span>(<span class="tk-number">240</span>, <span class="tk-number">270</span>, <span class="tk-number">0</span>, -<span class="tk-number">1</span>);
+
+<span class="tk-comment">// 播放3D音效（距离越远音量越小）</span>
+<span class="tk-keyword">const</span> instId = <span class="tk-constant">Lument</span>.<span class="tk-function">playSound3d</span>(
+    explosionId, <span class="tk-number">100</span>, <span class="tk-number">200</span>, <span class="tk-number">300</span>, <span class="tk-number">0.8</span>, <span class="tk-keyword">false</span>
+);</code></pre>
+
+<h3>音频分组</h3>
+<pre><code><span class="tk-constant">Lument</span>.<span class="tk-function">setMasterVolume</span>(<span class="tk-number">0.8</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">setGroupVolume</span>(<span class="tk-number">0</span>, <span class="tk-number">0.5</span>);  <span class="tk-comment">// 音效组</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">setGroupVolume</span>(<span class="tk-number">1</span>, <span class="tk-number">0.7</span>);  <span class="tk-comment">// 音乐组</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">stopGroup</span>(<span class="tk-number">1</span>);  <span class="tk-comment">// 停止所有音乐</span></code></pre>
+
+<h3>音频 API 完整列表</h3>
+<table>
+    <tr><th>函数</th><th>说明</th></tr>
+    <tr><td><code>loadSound(path)</code></td><td>加载音效文件</td></tr>
+    <tr><td><code>loadMusic(path)</code></td><td>加载背景音乐</td></tr>
+    <tr><td><code>playSound(id, vol, pitch, loop)</code></td><td>播放音频，返回实例 ID</td></tr>
+    <tr><td><code>stopSound / pauseSound / resumeSound(instId)</code></td><td>播放控制</td></tr>
+    <tr><td><code>setPitch(instId, pitch)</code></td><td>设置音调</td></tr>
+    <tr><td><code>setPan(instId, pan)</code></td><td>设置声道平衡 (-1~1)</td></tr>
+    <tr><td><code>fadeIn / fadeOut(instId, duration)</code></td><td>淡入淡出</td></tr>
+    <tr><td><code>setAudioListener(x, y, dirX, dirY)</code></td><td>设置听者位置和朝向</td></tr>
+    <tr><td><code>playSound3d(id, x, y, maxDist, vol, loop)</code></td><td>播放 3D 空间音效</td></tr>
+    <tr><td><code>setMasterVolume(vol)</code></td><td>设置主音量</td></tr>
+    <tr><td><code>setGroupVolume(groupId, vol)</code></td><td>设置分组音量</td></tr>
+    <tr><td><code>stopGroup(groupId)</code></td><td>停止分组所有音频</td></tr>
+</table>
+
+<h2 id="network">网络模块 <span class="new-module-tag">v1.2 新增</span></h2>
+<p>提供 HTTP 请求、WebSocket 通信和 JSON 工具，供厂商接入账户登录、游戏数据同步与上传。</p>
+
+<h3>HTTP 请求</h3>
+<pre><code><span class="tk-comment">// GET 请求</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">httpGet</span>(<span class="tk-string">'https://api.example.com/user'</span>, <span class="tk-keyword">function</span>(<span class="tk-property">resp</span>) {
+    <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'状态码:'</span>, resp.<span class="tk-property">statusCode</span>);
+    <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'响应:'</span>, resp.<span class="tk-property">body</span>);
+}, <span class="tk-keyword">null</span>);
+
+<span class="tk-comment">// POST 请求（账户登录）</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">httpPost</span>(<span class="tk-string">'https://api.example.com/login'</span>,
+    <span class="tk-function">JSON</span>.<span class="tk-function">stringify</span>({ <span class="tk-property">username</span>: <span class="tk-string">'player1'</span>, <span class="tk-property">password</span>: <span class="tk-string">'123'</span> }),
+    <span class="tk-keyword">function</span>(<span class="tk-property">resp</span>) {
+        <span class="tk-keyword">if</span> (resp.<span class="tk-property">statusCode</span> === <span class="tk-number">200</span>) {
+            <span class="tk-keyword">const</span> token = <span class="tk-constant">Lument</span>.<span class="tk-function">jsonParse</span>(resp.<span class="tk-property">body</span>, <span class="tk-string">'token'</span>);
+            <span class="tk-constant">Lument</span>.<span class="tk-function">httpSetAuthToken</span>(token);
+        }
+    }, <span class="tk-keyword">null</span>);
+
+<span class="tk-comment">// PUT / DELETE</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">httpPut</span>(url, body, callback, <span class="tk-keyword">null</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">httpDelete</span>(url, callback, <span class="tk-keyword">null</span>);</code></pre>
+
+<h3>请求配置</h3>
+<pre><code><span class="tk-comment">// 全局请求头</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">httpSetHeader</span>(<span class="tk-string">'Content-Type'</span>, <span class="tk-string">'application/json'</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">httpSetHeader</span>(<span class="tk-string">'X-Game-Version'</span>, <span class="tk-string">'1.0'</span>);
+
+<span class="tk-comment">// 超时设置</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">httpSetTimeout</span>(<span class="tk-number">15</span>);  <span class="tk-comment">// 秒</span>
+
+<span class="tk-comment">// 认证Token（自动添加 Authorization: Bearer xxx 头）</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">httpSetAuthToken</span>(<span class="tk-string">'eyJhbGciOi...'</span>);</code></pre>
+
+<h3>WebSocket</h3>
+<pre><code><span class="tk-keyword">const</span> wsId = <span class="tk-constant">Lument</span>.<span class="tk-function">wsConnect</span>(<span class="tk-string">'wss://api.example.com/ws'</span>, <span class="tk-keyword">function</span>(<span class="tk-property">event</span>, <span class="tk-property">data</span>, <span class="tk-property">length</span>) {
+    <span class="tk-keyword">switch</span> (event) {
+        <span class="tk-keyword">case</span> <span class="tk-constant">Lument</span>.<span class="tk-constant">WS</span>.<span class="tk-constant">OPEN</span>:    <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'连接已建立'</span>); <span class="tk-keyword">break</span>;
+        <span class="tk-keyword">case</span> <span class="tk-constant">Lument</span>.<span class="tk-constant">WS</span>.<span class="tk-constant">MESSAGE</span>: <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'收到消息:'</span>, data); <span class="tk-keyword">break</span>;
+        <span class="tk-keyword">case</span> <span class="tk-constant">Lument</span>.<span class="tk-constant">WS</span>.<span class="tk-constant">CLOSE</span>:   <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'连接已关闭'</span>); <span class="tk-keyword">break</span>;
+        <span class="tk-keyword">case</span> <span class="tk-constant">Lument</span>.<span class="tk-constant">WS</span>.<span class="tk-constant">ERROR</span>:   <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'连接错误'</span>); <span class="tk-keyword">break</span>;
+    }
+}, <span class="tk-keyword">null</span>);
+
+<span class="tk-constant">Lument</span>.<span class="tk-function">wsSendText</span>(wsId, <span class="tk-string">'Hello Server'</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">wsClose</span>(wsId);</code></pre>
+
+<h3>JSON 工具</h3>
+<pre><code><span class="tk-comment">// 解析JSON</span>
+<span class="tk-keyword">const</span> name = <span class="tk-constant">Lument</span>.<span class="tk-function">jsonParse</span>(jsonStr, <span class="tk-string">'name'</span>);
+<span class="tk-keyword">const</span> score = <span class="tk-constant">Lument</span>.<span class="tk-function">jsonGetNumber</span>(jsonStr, <span class="tk-string">'score'</span>, <span class="tk-number">0</span>);
+<span class="tk-keyword">const</span> active = <span class="tk-constant">Lument</span>.<span class="tk-function">jsonGetBool</span>(jsonStr, <span class="tk-string">'active'</span>, <span class="tk-keyword">false</span>);
+
+<span class="tk-comment">// 构建JSON</span>
+<span class="tk-keyword">const</span> json = <span class="tk-constant">Lument</span>.<span class="tk-function">jsonBuild</span>(<span class="tk-string">'name=player1\nscore=100\nlevel=5'</span>);
+<span class="tk-comment">// 结果: {"name":"player1","score":"100","level":"5"}</span></code></pre>
+
+<h3>数据同步</h3>
+<pre><code><span class="tk-comment">// 上传游戏数据</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">uploadData</span>(<span class="tk-string">'https://api.example.com/sync'</span>,
+    <span class="tk-function">JSON</span>.<span class="tk-function">stringify</span>({ <span class="tk-property">level</span>: <span class="tk-number">5</span>, <span class="tk-property">score</span>: <span class="tk-number">1000</span>, <span class="tk-property">items</span>: [<span class="tk-string">'sword'</span>, <span class="tk-string">'shield'</span>] }),
+    <span class="tk-keyword">function</span>(<span class="tk-property">resp</span>) {
+        <span class="tk-keyword">if</span> (resp.<span class="tk-property">statusCode</span> === <span class="tk-number">200</span>) <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'数据同步成功'</span>);
+    }, <span class="tk-keyword">null</span>);
+
+<span class="tk-comment">// 下载数据</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">downloadData</span>(<span class="tk-string">'https://api.example.com/save/player1'</span>, <span class="tk-keyword">function</span>(<span class="tk-property">resp</span>) {
+    <span class="tk-keyword">if</span> (resp.<span class="tk-property">statusCode</span> === <span class="tk-number">200</span>) {
+        <span class="tk-keyword">const</span> data = <span class="tk-function">JSON</span>.<span class="tk-function">parse</span>(resp.<span class="tk-property">body</span>);
+        <span class="tk-comment">// 恢复游戏存档</span>
+    }
+}, <span class="tk-keyword">null</span>);</code></pre>
+
+<h3>网络 API 完整列表</h3>
+<table>
+    <tr><th>函数</th><th>说明</th></tr>
+    <tr><td><code>httpRequest(method, url, body, headers, cb, data)</code></td><td>通用 HTTP 请求</td></tr>
+    <tr><td><code>httpGet / httpPost / httpPut / httpDelete</code></td><td>HTTP 快捷方法</td></tr>
+    <tr><td><code>httpCancel(requestId)</code></td><td>取消请求</td></tr>
+    <tr><td><code>httpSetHeader(key, value)</code></td><td>设置全局请求头</td></tr>
+    <tr><td><code>httpSetTimeout(seconds)</code></td><td>设置超时</td></tr>
+    <tr><td><code>httpSetAuthToken(token)</code></td><td>设置 Bearer Token</td></tr>
+    <tr><td><code>wsConnect(url, callback, data)</code></td><td>连接 WebSocket</td></tr>
+    <tr><td><code>wsSend / wsSendText(wsId, data)</code></td><td>发送消息</td></tr>
+    <tr><td><code>wsClose(wsId) / wsIsConnected(wsId)</code></td><td>关闭连接 / 检查状态</td></tr>
+    <tr><td><code>jsonParse / jsonGetNumber / jsonGetBool</code></td><td>JSON 解析工具</td></tr>
+    <tr><td><code>jsonBuild(pairs)</code></td><td>从 key=value 构建 JSON</td></tr>
+    <tr><td><code>uploadData(url, json, cb, data)</code></td><td>上传数据</td></tr>
+    <tr><td><code>downloadData(url, cb, data)</code></td><td>下载数据</td></tr>
+</table>
+
+<h2 id="ai">AI 模块 <span class="new-module-tag">v1.2 新增</span></h2>
+<p>提供行为树、有限状态机、A* 寻路、黑板系统和 AI Agent 接口，专为 AI 深度开发设计。</p>
+
+<h3>行为树</h3>
+<pre><code><span class="tk-comment">// 创建行为树</span>
+<span class="tk-keyword">const</span> treeId = <span class="tk-constant">Lument</span>.<span class="tk-function">aiCreateTree</span>();
+
+<span class="tk-comment">// 创建节点</span>
+<span class="tk-keyword">const</span> checkEnemy = <span class="tk-constant">Lument</span>.<span class="tk-function">aiCreateNode</span>(treeId, <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">NODE_CONDITION</span>,
+    <span class="tk-keyword">function</span>(<span class="tk-property">entity</span>, <span class="tk-property">dt</span>) {
+        <span class="tk-keyword">const</span> enemy = <span class="tk-function">findNearestEnemy</span>(entity, <span class="tk-number">200</span>);
+        <span class="tk-keyword">return</span> enemy ? <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">SUCCESS</span> : <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">FAILURE</span>;
+    }, <span class="tk-keyword">null</span>);
+
+<span class="tk-keyword">const</span> chaseEnemy = <span class="tk-constant">Lument</span>.<span class="tk-function">aiCreateNode</span>(treeId, <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">NODE_ACTION</span>,
+    <span class="tk-keyword">function</span>(<span class="tk-property">entity</span>, <span class="tk-property">dt</span>) {
+        <span class="tk-keyword">const</span> enemy = <span class="tk-function">findNearestEnemy</span>(entity, <span class="tk-number">200</span>);
+        <span class="tk-keyword">if</span> (!enemy) <span class="tk-keyword">return</span> <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">FAILURE</span>;
+        <span class="tk-function">moveTo</span>(entity, enemy);
+        <span class="tk-keyword">return</span> <span class="tk-function">distance</span>(entity, enemy) &lt; <span class="tk-number">10</span> ? <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">SUCCESS</span> : <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">RUNNING</span>;
+    }, <span class="tk-keyword">null</span>);
+
+<span class="tk-keyword">const</span> attackEnemy = <span class="tk-constant">Lument</span>.<span class="tk-function">aiCreateNode</span>(treeId, <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">NODE_ACTION</span>,
+    <span class="tk-keyword">function</span>(<span class="tk-property">entity</span>, <span class="tk-property">dt</span>) {
+        <span class="tk-function">attack</span>(entity);
+        <span class="tk-keyword">return</span> <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">SUCCESS</span>;
+    }, <span class="tk-keyword">null</span>);
+
+<span class="tk-comment">// 组装行为树</span>
+<span class="tk-keyword">const</span> selector = <span class="tk-constant">Lument</span>.<span class="tk-function">aiCreateNode</span>(treeId, <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">NODE_SELECTOR</span>, <span class="tk-keyword">null</span>, <span class="tk-keyword">null</span>);
+<span class="tk-keyword">const</span> sequence = <span class="tk-constant">Lument</span>.<span class="tk-function">aiCreateNode</span>(treeId, <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">NODE_SEQUENCE</span>, <span class="tk-keyword">null</span>, <span class="tk-keyword">null</span>);
+
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiAddChild</span>(sequence, chaseEnemy);
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiAddChild</span>(sequence, attackEnemy);
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiAddChild</span>(selector, checkEnemy);
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiAddChild</span>(selector, sequence);
+
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiSetEntity</span>(treeId, npcEntityId);
+
+<span class="tk-keyword">function</span> <span class="tk-function">update</span>() {
+    <span class="tk-constant">Lument</span>.<span class="tk-function">aiTick</span>(treeId, dt);
+}</code></pre>
+
+<h3>有限状态机</h3>
+<pre><code><span class="tk-keyword">const</span> fsmId = <span class="tk-constant">Lument</span>.<span class="tk-function">aiCreateFsm</span>();
+
+<span class="tk-keyword">const</span> patrolState = <span class="tk-constant">Lument</span>.<span class="tk-function">aiFsmAddState</span>(fsmId, <span class="tk-string">'巡逻'</span>,
+    <span class="tk-keyword">function</span>(<span class="tk-property">entity</span>, <span class="tk-property">dt</span>) { <span class="tk-function">patrol</span>(entity); }, <span class="tk-keyword">null</span>);
+
+<span class="tk-keyword">const</span> chaseState = <span class="tk-constant">Lument</span>.<span class="tk-function">aiFsmAddState</span>(fsmId, <span class="tk-string">'追击'</span>,
+    <span class="tk-keyword">function</span>(<span class="tk-property">entity</span>, <span class="tk-property">dt</span>) { <span class="tk-function">chaseTarget</span>(entity); }, <span class="tk-keyword">null</span>);
+
+<span class="tk-keyword">const</span> attackState = <span class="tk-constant">Lument</span>.<span class="tk-function">aiFsmAddState</span>(fsmId, <span class="tk-string">'攻击'</span>,
+    <span class="tk-keyword">function</span>(<span class="tk-property">entity</span>, <span class="tk-property">dt</span>) { <span class="tk-function">attackTarget</span>(entity); }, <span class="tk-keyword">null</span>);
+
+<span class="tk-comment">// 添加转换（条件返回SUCCESS时触发转换）</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiFsmAddTransition</span>(fsmId, patrolState, chaseState,
+    <span class="tk-keyword">function</span>(<span class="tk-property">e</span>) { <span class="tk-keyword">return</span> <span class="tk-function">canSeeEnemy</span>(e) ? <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">SUCCESS</span> : <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">FAILURE</span>; }, <span class="tk-keyword">null</span>);
+
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiFsmAddTransition</span>(fsmId, chaseState, attackState,
+    <span class="tk-keyword">function</span>(<span class="tk-property">e</span>) { <span class="tk-keyword">return</span> <span class="tk-function">inAttackRange</span>(e) ? <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">SUCCESS</span> : <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">FAILURE</span>; }, <span class="tk-keyword">null</span>);
+
+<span class="tk-keyword">function</span> <span class="tk-function">update</span>() {
+    <span class="tk-constant">Lument</span>.<span class="tk-function">aiFsmTick</span>(fsmId, dt);
+    <span class="tk-function">console</span>.<span class="tk-function">log</span>(<span class="tk-string">'当前状态:'</span>, <span class="tk-constant">Lument</span>.<span class="tk-function">aiFsmGetStateName</span>(fsmId));
+}</code></pre>
+
+<h3>A* 寻路</h3>
+<pre><code><span class="tk-comment">// 创建网格</span>
+<span class="tk-keyword">const</span> gridId = <span class="tk-constant">Lument</span>.<span class="tk-function">aiCreateGrid</span>(<span class="tk-number">48</span>, <span class="tk-number">54</span>, <span class="tk-number">10</span>);  <span class="tk-comment">// 宽, 高, 格子大小</span>
+
+<span class="tk-comment">// 设置障碍物</span>
+<span class="tk-keyword">for</span> (<span class="tk-keyword">const</span> wall <span class="tk-keyword">of</span> walls) {
+    <span class="tk-constant">Lument</span>.<span class="tk-function">aiGridSetBlocked</span>(gridId, wall.<span class="tk-property">x</span>, wall.<span class="tk-property">y</span>, <span class="tk-keyword">true</span>);
+}
+
+<span class="tk-comment">// 设置地形代价（沼泽等）</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiGridSetCost</span>(gridId, <span class="tk-number">5</span>, <span class="tk-number">10</span>, <span class="tk-number">3.0</span>);
+
+<span class="tk-comment">// 寻路</span>
+<span class="tk-keyword">const</span> path = <span class="tk-constant">Lument</span>.<span class="tk-function">aiFindPath</span>(gridId, <span class="tk-number">0</span>, <span class="tk-number">0</span>, <span class="tk-number">47</span>, <span class="tk-number">53</span>, <span class="tk-number">100</span>);
+<span class="tk-keyword">if</span> (path.<span class="tk-property">length</span> &gt; <span class="tk-number">0</span>) {
+    <span class="tk-keyword">for</span> (<span class="tk-keyword">const</span> node <span class="tk-keyword">of</span> path) {
+        <span class="tk-function">moveTo</span>(entity, node.<span class="tk-property">x</span> * <span class="tk-number">10</span>, node.<span class="tk-property">y</span> * <span class="tk-number">10</span>);
+    }
+}</code></pre>
+
+<h3>黑板系统</h3>
+<p>黑板系统是 AI 共享数据存储，允许多个 AI 实体之间共享状态信息。</p>
+<pre><code><span class="tk-keyword">const</span> bbId = <span class="tk-constant">Lument</span>.<span class="tk-function">aiCreateBlackboard</span>();
+
+<span class="tk-comment">// 写入数据</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiBbSetString</span>(bbId, <span class="tk-string">'target'</span>, <span class="tk-string">'enemy_1'</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiBbSetFloat</span>(bbId, <span class="tk-string">'health'</span>, <span class="tk-number">75.5</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiBbSetInt</span>(bbId, <span class="tk-string">'ammo'</span>, <span class="tk-number">30</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiBbSetBool</span>(bbId, <span class="tk-string">'inCombat'</span>, <span class="tk-keyword">true</span>);
+
+<span class="tk-comment">// 读取数据</span>
+<span class="tk-keyword">const</span> target = <span class="tk-constant">Lument</span>.<span class="tk-function">aiBbGetString</span>(bbId, <span class="tk-string">'target'</span>);
+<span class="tk-keyword">const</span> health = <span class="tk-constant">Lument</span>.<span class="tk-function">aiBbGetFloat</span>(bbId, <span class="tk-string">'health'</span>, <span class="tk-number">100</span>);</code></pre>
+
+<h3>AI Agent 接口</h3>
+<div class="callout warning">
+    <div class="callout-title">AI 深度开发接口</div>
+    <p>AI Agent 接口专为人工智能（如 LLM）深度开发设计，允许 AI 直接控制游戏实体、查询引擎状态并做出决策。</p>
+</div>
+<pre><code><span class="tk-comment">// 注册AI Agent</span>
+<span class="tk-keyword">const</span> agentId = <span class="tk-constant">Lument</span>.<span class="tk-function">aiRegisterAgent</span>(<span class="tk-string">'AI助手'</span>, <span class="tk-keyword">function</span>(<span class="tk-property">entity</span>, <span class="tk-property">dt</span>) {
+    <span class="tk-comment">// AI思考逻辑：查询引擎状态、做出决策</span>
+    <span class="tk-keyword">const</span> state = <span class="tk-function">JSON</span>.<span class="tk-function">parse</span>(<span class="tk-constant">Lument</span>.<span class="tk-function">aiAgentQuery</span>(<span class="tk-string">'status'</span>));
+
+    <span class="tk-keyword">if</span> (state.<span class="tk-property">physicsBodyCount</span> &gt; <span class="tk-number">10</span>) {
+        <span class="tk-comment">// 做出某种反应</span>
+    }
+
+    <span class="tk-comment">// 控制实体行为</span>
+    <span class="tk-constant">Lument</span>.<span class="tk-function">physicsApplyForce</span>(entity, <span class="tk-number">0</span>, -<span class="tk-number">500</span>);
+}, <span class="tk-keyword">null</span>);
+
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiAgentSetTarget</span>(agentId, targetEntityId);
+
+<span class="tk-keyword">function</span> <span class="tk-function">update</span>() {
+    <span class="tk-constant">Lument</span>.<span class="tk-function">aiAgentTick</span>(agentId, dt);
+}
+
+<span class="tk-comment">// 查询引擎状态（供AI分析）</span>
+<span class="tk-keyword">const</span> status = <span class="tk-constant">Lument</span>.<span class="tk-function">aiAgentQuery</span>(<span class="tk-string">'full_status'</span>);
+<span class="tk-comment">// 返回JSON: { engineVersion, entityCount, physicsBodyCount, lightCount, agents: [...] }</span></code></pre>
+
+<h3>AI API 完整列表</h3>
+<table>
+    <tr><th>函数</th><th>说明</th></tr>
+    <tr><td><code>aiCreateTree() / aiCreateNode(treeId, type, func, data)</code></td><td>创建行为树和节点</td></tr>
+    <tr><td><code>aiAddChild(parentId, childId) / aiSetEntity(treeId, entity)</code></td><td>组装行为树</td></tr>
+    <tr><td><code>aiTick(treeId, dt)</code></td><td>执行行为树</td></tr>
+    <tr><td><code>aiCreateFsm() / aiFsmAddState / aiFsmAddTransition</code></td><td>创建状态机</td></tr>
+    <tr><td><code>aiFsmTick(fsmId, dt) / aiFsmGetStateName(fsmId)</code></td><td>执行状态机</td></tr>
+    <tr><td><code>aiCreateGrid(w, h, cellSize)</code></td><td>创建寻路网格</td></tr>
+    <tr><td><code>aiGridSetBlocked / aiGridSetCost</code></td><td>设置障碍物和地形代价</td></tr>
+    <tr><td><code>aiFindPath(gridId, sx, sy, ex, ey, maxLen)</code></td><td>A* 寻路</td></tr>
+    <tr><td><code>aiCreateBlackboard()</code></td><td>创建黑板</td></tr>
+    <tr><td><code>aiBbSet / Get (Int/Float/String/Bool)</code></td><td>读写黑板数据</td></tr>
+    <tr><td><code>aiRegisterAgent(name, think, data)</code></td><td>注册 AI Agent</td></tr>
+    <tr><td><code>aiAgentSetTarget / aiAgentTick / aiAgentQuery</code></td><td>Agent 控制</td></tr>
+</table>
+
+<h2 id="constants">常量速查</h2>
+<div class="const-grid">
+    <div class="const-card"><div class="const-name">Lument.BODY</div><div class="const-values">{ STATIC: 0, DYNAMIC: 1, KINEMATIC: 2 }</div></div>
+    <div class="const-card"><div class="const-name">Lument.SHAPE</div><div class="const-values">{ AABB: 0, CIRCLE: 1 }</div></div>
+    <div class="const-card"><div class="const-name">Lument.AI</div><div class="const-values">{ SUCCESS: 0, FAILURE: 1, RUNNING: 2, NODE_ACTION: 0, NODE_CONDITION: 1, NODE_SEQUENCE: 2, NODE_SELECTOR: 3, NODE_PARALLEL: 4, NODE_DECORATOR: 5 }</div></div>
+    <div class="const-card"><div class="const-name">Lument.HTTP</div><div class="const-values">{ GET: 0, POST: 1, PUT: 2, DELETE: 3, PATCH: 4 }</div></div>
+    <div class="const-card"><div class="const-name">Lument.WS</div><div class="const-values">{ OPEN: 0, MESSAGE: 1, CLOSE: 2, ERROR: 3 }</div></div>
+    <div class="const-card"><div class="const-name">Lument.LIGHT</div><div class="const-values">{ POINT: 0, DIRECTIONAL: 1, SPOT: 2 }</div></div>
+    <div class="const-card"><div class="const-name">Lument.PLATFORM</div><div class="const-values">{ DESKTOP: 0, ANDROID: 1, IOS: 2, WEB: 3 }</div></div>
+    <div class="const-card"><div class="const-name">Lument.KEY</div><div class="const-values">{ NONE: 0, LEFT: 1, RIGHT: 2, UP: 3, DOWN: 4, ACTION: 5, CANCEL: 6, MENU: 7, MAX: 8 }</div></div>
+</div>
+
+<h2 id="examples">完整示例</h2>
+<h3>综合示例：带物理和 AI 的简单场景</h3>
+<pre><code><span class="tk-comment">// 初始化引擎</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">init</span>({ <span class="tk-property">platform</span>: <span class="tk-constant">Lument</span>.<span class="tk-constant">PLATFORM</span>.<span class="tk-constant">WEB</span>, <span class="tk-property">width</span>: <span class="tk-number">480</span>, <span class="tk-property">height</span>: <span class="tk-number">540</span>, <span class="tk-property">targetFPS</span>: <span class="tk-number">60</span> });
+
+<span class="tk-comment">// === 物理设置 ===</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsSetGravity</span>(<span class="tk-number">0</span>, <span class="tk-number">500</span>);
+
+<span class="tk-keyword">const</span> groundId = <span class="tk-constant">Lument</span>.<span class="tk-function">physicsCreateBody</span>(
+    { <span class="tk-property">type</span>: <span class="tk-constant">Lument</span>.<span class="tk-constant">BODY</span>.<span class="tk-constant">STATIC</span>, <span class="tk-property">mass</span>: <span class="tk-number">0</span>, <span class="tk-property">friction</span>: <span class="tk-number">0.5</span> }, <span class="tk-number">0</span>, <span class="tk-number">500</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsSetShape</span>(groundId, { <span class="tk-property">type</span>: <span class="tk-constant">Lument</span>.<span class="tk-constant">SHAPE</span>.<span class="tk-constant">AABB</span>, <span class="tk-property">w</span>: <span class="tk-number">480</span>, <span class="tk-property">h</span>: <span class="tk-number">40</span> });
+
+<span class="tk-keyword">const</span> playerBody = <span class="tk-constant">Lument</span>.<span class="tk-function">physicsCreateBody</span>(
+    { <span class="tk-property">type</span>: <span class="tk-constant">Lument</span>.<span class="tk-constant">BODY</span>.<span class="tk-constant">DYNAMIC</span>, <span class="tk-property">mass</span>: <span class="tk-number">1</span>, <span class="tk-property">restitution</span>: <span class="tk-number">0.2</span>, <span class="tk-property">friction</span>: <span class="tk-number">0.3</span> }, <span class="tk-number">240</span>, <span class="tk-number">100</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsSetShape</span>(playerBody, { <span class="tk-property">type</span>: <span class="tk-constant">Lument</span>.<span class="tk-constant">SHAPE</span>.<span class="tk-constant">AABB</span>, <span class="tk-property">w</span>: <span class="tk-number">24</span>, <span class="tk-property">h</span>: <span class="tk-number">32</span> });
+
+<span class="tk-comment">// === AI设置 ===</span>
+<span class="tk-keyword">const</span> fsmId = <span class="tk-constant">Lument</span>.<span class="tk-function">aiCreateFsm</span>();
+<span class="tk-keyword">const</span> idleState = <span class="tk-constant">Lument</span>.<span class="tk-function">aiFsmAddState</span>(fsmId, <span class="tk-string">'待机'</span>, <span class="tk-keyword">function</span>(<span class="tk-property">e</span>, <span class="tk-property">dt</span>) {}, <span class="tk-keyword">null</span>);
+<span class="tk-keyword">const</span> moveState = <span class="tk-constant">Lument</span>.<span class="tk-function">aiFsmAddState</span>(fsmId, <span class="tk-string">'移动'</span>, <span class="tk-keyword">function</span>(<span class="tk-property">e</span>, <span class="tk-property">dt</span>) {
+    <span class="tk-keyword">const</span> pos = <span class="tk-constant">Lument</span>.<span class="tk-function">physicsGetPosition</span>(playerBody);
+    <span class="tk-keyword">if</span> (pos) <span class="tk-constant">Lument</span>.<span class="tk-function">physicsApplyForce</span>(playerBody, <span class="tk-number">100</span>, <span class="tk-number">0</span>);
+}, <span class="tk-keyword">null</span>);
+
+<span class="tk-constant">Lument</span>.<span class="tk-function">aiFsmAddTransition</span>(fsmId, idleState, moveState, <span class="tk-keyword">function</span>(<span class="tk-property">e</span>, <span class="tk-property">dt</span>) {
+    <span class="tk-keyword">return</span> <span class="tk-constant">Lument</span>.<span class="tk-function">keyDown</span>(<span class="tk-constant">Lument</span>.<span class="tk-constant">KEY</span>.<span class="tk-constant">RIGHT</span>) ? <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">SUCCESS</span> : <span class="tk-constant">Lument</span>.<span class="tk-constant">AI</span>.<span class="tk-constant">FAILURE</span>;
+}, <span class="tk-keyword">null</span>);
+
+<span class="tk-comment">// === 音频设置 ===</span>
+<span class="tk-keyword">const</span> bgmId = <span class="tk-constant">Lument</span>.<span class="tk-function">loadMusic</span>(<span class="tk-string">'assets/bgm.ogg'</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">setGroupVolume</span>(<span class="tk-number">1</span>, <span class="tk-number">0.5</span>);
+<span class="tk-keyword">const</span> bgmInst = <span class="tk-constant">Lument</span>.<span class="tk-function">playSound</span>(bgmId, <span class="tk-number">0.5</span>, <span class="tk-number">1.0</span>, <span class="tk-keyword">true</span>);
+<span class="tk-constant">Lument</span>.<span class="tk-function">fadeIn</span>(bgmInst, <span class="tk-number">2.0</span>);
+
+<span class="tk-comment">// === 碰撞回调 ===</span>
+<span class="tk-constant">Lument</span>.<span class="tk-function">physicsOnCollision</span>(<span class="tk-keyword">function</span>(<span class="tk-property">col</span>) {
+    <span class="tk-keyword">if</span> (col.<span class="tk-property">bodyA</span> === playerBody || col.<span class="tk-property">bodyB</span> === playerBody) {
+        <span class="tk-constant">Lument</span>.<span class="tk-function">playSound</span>(jumpSfx, <span class="tk-number">0.3</span>, <span class="tk-number">1.2</span>, <span class="tk-keyword">false</span>);
+    }
+}, <span class="tk-keyword">null</span>);
+
+<span class="tk-comment">// === 主循环 ===</span>
+<span class="tk-keyword">function</span> <span class="tk-function">render</span>() {
+    <span class="tk-constant">Lument</span>.<span class="tk-function">beginFrame</span>();
+    <span class="tk-constant">Lument</span>.<span class="tk-function">aiFsmTick</span>(fsmId, <span class="tk-constant">Lument</span>.<span class="tk-function">getDeltaTime</span>() * <span class="tk-number">0.001</span>);
+
+    <span class="tk-keyword">const</span> pos = <span class="tk-constant">Lument</span>.<span class="tk-function">physicsGetPosition</span>(playerBody);
+    <span class="tk-keyword">if</span> (pos) {
+        <span class="tk-constant">Lument</span>.<span class="tk-function">drawRect</span>({ <span class="tk-property">x</span>: pos.<span class="tk-property">x</span>, <span class="tk-property">y</span>: pos.<span class="tk-property">y</span>, <span class="tk-property">w</span>: <span class="tk-number">24</span>, <span class="tk-property">h</span>: <span class="tk-number">32</span> },
+            { <span class="tk-property">r</span>: <span class="tk-number">100</span>, <span class="tk-property">g</span>: <span class="tk-number">200</span>, <span class="tk-property">b</span>: <span class="tk-number">255</span>, <span class="tk-property">a</span>: <span class="tk-number">255</span> }, <span class="tk-keyword">true</span>);
+    }
+
+    <span class="tk-constant">Lument</span>.<span class="tk-function">endFrame</span>();
+    <span class="tk-function">requestAnimationFrame</span>(render);
+}
+<span class="tk-function">render</span>();</code></pre>
+
+<h2 id="changelog">更新日志</h2>
+<h3>v1.2.0</h3>
+<ul>
+    <li><strong>新增</strong> 2D 物理模拟模块（刚体、碰撞检测、自定义阻尼、射线检测）</li>
+    <li><strong>新增</strong> 网络模块（HTTP 请求、WebSocket、JSON 工具、数据同步）</li>
+    <li><strong>新增</strong> AI 模块（行为树、状态机、A* 寻路、黑板系统、Agent 接口）</li>
+    <li><strong>增强</strong> 音频系统（格式自动识别、3D 空间音频、分组控制、淡入淡出）</li>
+    <li><strong>更新</strong> 完整开发者文档</li>
+</ul>
+<h3>v1.1.0</h3>
+<ul>
+    <li><strong>新增</strong> 2D 场景渲染增强（色彩色调、清晰度、暗角、雾效）</li>
+    <li><strong>新增</strong> 光线渲染系统（点光源、方向光、聚光灯）</li>
+    <li><strong>新增</strong> 图片接入接口（加载、平铺、旋转、色调绘制）</li>
+    <li><strong>新增</strong> 离屏渲染目标</li>
+</ul>
+<h3>v1.0.0</h3>
+<ul>
+    <li><strong>初始版本</strong> 核心引擎、渲染系统、ECS、UI 系统、音频基础、输入系统、存储系统</li>
+    <li><strong>支持</strong> Web / Android / Desktop 多平台</li>
+    <li><strong>提供</strong> C/C++ / JavaScript / Python / Java 语言绑定</li>
+</ul>
+
+<footer>
+    <p>Lument Engine v1.2.0 &mdash; 跨平台 2D 游戏引擎</p>
+    <p>C ABI 核心 + Web Runtime | CMake 构建 | 支持 Web / Android / Desktop</p>
+</footer>
+
+</main>
+
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+}
+
+const sections = document.querySelectorAll('main h2[id], main h1[id]');
+const navLinks = document.querySelectorAll('.sidebar a');
+
+function updateActiveNav() {
+    let current = '';
+    sections.forEach(section => {
+        const rect = section.getBoundingClientRect();
+        if (rect.top <= 100) current = section.id;
+    });
+    navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href').substring(1) === current) {
+            link.classList.add('active');
+        }
+    });
+}
+window.addEventListener('scroll', updateActiveNav);
+updateActiveNav();
+
+document.querySelectorAll('pre').forEach(pre => {
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = '\u590d\u5236';
+    btn.onclick = function() {
+        const code = pre.querySelector('code');
+        navigator.clipboard.writeText(code.textContent).then(() => {
+            btn.textContent = '\u5df2\u590d\u5236';
+            setTimeout(() => btn.textContent = '\u590d\u5236', 1500);
+        });
+    };
+    pre.appendChild(btn);
+});
+
+function searchDocs() {
+    const query = document.getElementById('searchInput').value.toLowerCase();
+    if (!query) {
+        document.querySelectorAll('.main > *').forEach(el => el.style.display = '');
+        return;
+    }
+    const elements = document.querySelectorAll('.main h2, .main h3, .main p, .main table, .main pre, .main .module-card, .main .api-block, .main .const-card, .main .quick-card, .main h4, .main ul, .main .callout');
+    let firstMatch = null;
+    elements.forEach(el => {
+        if (el.textContent.toLowerCase().includes(query)) {
+            el.style.display = '';
+            if (!firstMatch) firstMatch = el;
+        } else {
+            el.style.display = 'none';
+        }
+    });
+    if (firstMatch) firstMatch.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+document.querySelectorAll('.sidebar a').forEach(link => {
+    link.addEventListener('click', () => {
+        if (window.innerWidth <= 900) document.getElementById('sidebar').classList.remove('open');
+    });
+});
+</script>
+</body>
+</html>

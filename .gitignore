@@ -1,0 +1,48 @@
+# Build artifacts
+build/
+dist/
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+*.a
+*.lib
+*.dex
+*.apk
+*.ap_
+*.idsig
+*.class
+*.jar
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and temp
+*.log
+tmp/
+temp/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Node (if any)
+node_modules/
+npm-debug.log*

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>遮伞世界 - Umbrella World</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- 开头Logo动画 -->
+        <div id="splash-screen">
+            <div class="splash-logo">
+                <img src="images/studio-logo.png" alt="Studio Logo" class="splash-logo-img">
+            </div>
+            <div class="splash-powered">
+                <span class="splash-powered-text">Game Powered by</span>
+                <span class="splash-lument">
+                    <span class="splash-dot"></span>Lument
+                </span>
+            </div>
+        </div>
+        <canvas id="game-canvas"></canvas>
+        <canvas id="joystick-canvas" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; z-index:65; pointer-events:auto;"></canvas>
+        <div id="ui-overlay">
+            <div id="main-menu" class="screen">
+                <h1 class="game-title">遮 伞 世 界</h1>
+                <p class="game-subtitle">Umbrella World</p>
+                <p class="game-slogan">世界大雨滂沱，你的万里山河，不如别人头顶一伞。</p>
+                <div class="menu-buttons">
+                    <button id="btn-start" class="menu-btn">开始游戏</button>
+                    <button id="btn-continue" class="menu-btn">继续游戏</button>
+                    <button id="btn-achievements" class="menu-btn">成就 <span id="achievement-count" class="ach-count-tag">0 / 12</span></button>
+                    <button id="btn-about" class="menu-btn">关于游戏</button>
+                    <button id="btn-credits" class="menu-btn">制作组</button>
+                </div>
+                <div class="menu-powered">
+                    <span class="menu-powered-text">Game Powered by</span>
+                    <a href="https://lument.uzens.cc.cd" target="_blank" class="menu-lument-link">
+                        <span class="menu-lument">
+                            <span class="menu-lument-dot"></span>Lument
+                        </span>
+                    </a>
+                </div>
+                <div class="menu-demo-notice">此为游戏开发demo版本，不代表最终游戏质量</div>
+            </div>
+            <div id="about-screen" class="screen hidden">
+                <h2>关于游戏</h2>
+                <div class="about-text">
+                    <p>《遮伞世界》（Umbrella World）— 像素风剧情RPG。</p>
+                    <p>七大章节，七个结局（4真结局+3假结局）。</p>
+                    <p>场景：暴雨街道、学校走廊（含天台）、公司办公室、创业征程。</p>
+                    <p>在没有伞的世界里，你能走多远？</p>
+                </div>
+                <button id="btn-back-menu" class="menu-btn">返回</button>
+            </div>
+            <div id="achievements-screen" class="screen hidden">
+                <h2>成就殿堂</h2>
+                <div id="achievements-list" class="achievements-list"></div>
+                <button id="btn-achievements-back" class="menu-btn">返回</button>
+            </div>
+            <div id="credits-screen" class="screen hidden">
+                <h2>制作组名单</h2>
+                <div class="credits-scroll-container">
+                    <div class="credits-content">
+                        <div class="credits-section">
+                            <h3 class="credits-section-title">游戏设计</h3>
+                            <p class="credits-name">策划 / 剧本</p>
+                            <p class="credits-person">@jes_</p>
+                            <p class="credits-person">@一言君</p>
+                        </div>
+                        <div class="credits-section">
+                            <h3 class="credits-section-title">程序开发</h3>
+                            <p class="credits-name">引擎开发 / 游戏逻辑</p>
+                            <p class="credits-person">@jes_</p>
+                            <p class="credits-person">@淘桃</p>
+                            <p class="credits-name">Lument Engine</p>
+                            <p class="credits-person">跨平台 2D 游戏引擎 v1.2.0</p>
+                        </div>
+                        <div class="credits-section">
+                            <h3 class="credits-section-title">美术设计</h3>
+                            <p class="credits-name">像素美术 / 场景设计</p>
+                            <p class="credits-person">@淘桃</p>
+                        </div>
+                        <div class="credits-section">
+                            <h3 class="credits-section-title">音频制作</h3>
+                            <p class="credits-name">音效 / 背景音乐</p>
+                            <p class="credits-person">TRAE AI</p>
+                        </div>
+                        <div class="credits-section">
+                            <h3 class="credits-section-title">特别感谢</h3>
+                            <p class="credits-person">第一位试玩人员 @Misaka</p>
+                            <p class="credits-person">每一位在雨中行走的玩家</p>
+                            <p class="credits-person">每一把为别人撑起的伞</p>
+                            <p class="credits-person">Lument Engine 开源社区</p>
+                            <p class="credits-person">所有测试与反馈的伙伴们</p>
+                        </div>
+                        <div class="credits-end">
+                            <p>世界大雨滂沱</p>
+                            <p>你的万里山河</p>
+                            <p>不如别人头顶一伞</p>
+                            <p class="credits-logo">遮伞世界 · Umbrella World</p>
+                        </div>
+                    </div>
+                </div>
+                <button id="btn-credits-back" class="menu-btn">返回</button>
+            </div>
+            <div id="achievement-detail-overlay" class="achievement-detail-overlay hidden">
+                <div class="achievement-detail-box">
+                    <div class="achievement-detail-header">
+                        <div class="achievement-detail-icon" id="ach-detail-icon"></div>
+                        <div class="achievement-detail-title">
+                            <div id="ach-detail-name" class="ach-detail-name"></div>
+                            <div id="ach-detail-desc" class="ach-detail-desc"></div>
+                        </div>
+                    </div>
+                    <div id="ach-detail-info" class="achievement-detail-info"></div>
+                    <button id="btn-ach-detail-close" class="menu-btn">返回</button>
+                </div>
+            </div>
+            <div id="hud" class="hidden">
+                <div class="hud-top">
+                    <div class="hud-chapter" id="hud-chapter">第一章</div>
+                    <div class="hud-buffs" id="hud-buffs"></div>
+                </div>
+            </div>
+            <button id="btn-pause" class="pause-btn" style="display:none;">II</button>
+            <div id="pause-menu" class="screen hidden">
+                <h2>游戏暂停</h2>
+                <div class="menu-buttons">
+                    <button id="btn-resume" class="menu-btn">继续游戏</button>
+                    <button id="btn-pause-to-menu" class="menu-btn">返回主菜单</button>
+                </div>
+            </div>
+            <div id="dialogue-box" class="hidden">
+                <canvas id="portrait-canvas" width="96" height="96"></canvas>
+                <div class="dialogue-content">
+                    <div id="dialogue-name" class="dialogue-name"></div>
+                    <div id="dialogue-text" class="dialogue-text"></div>
+                    <div id="dialogue-choices" class="dialogue-choices"></div>
+                </div>
+                <div id="dialogue-prompt" class="dialogue-prompt hidden">▼</div>
+            </div>
+            <div id="chapter-title" class="hidden">
+                <h2 id="chapter-title-text"></h2>
+                <p id="chapter-title-sub"></p>
+            </div>
+            <div id="ending-screen" class="screen hidden">
+                <div class="ending-scroll-container">
+                    <div class="ending-scroll-content">
+                        <h2 id="ending-title"></h2>
+                        <p id="ending-text"></p>
+                        <div class="ending-spacer"></div>
+                    </div>
+                </div>
+                <div id="ending-achievement" class="ending-achievement hidden"></div>
+                <div id="ending-buttons" class="ending-buttons hidden">
+                    <button id="btn-ending-menu" class="menu-btn">返回主菜单</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Lument Runtime -->
+    <script src="../runtime/js/lument.js"></script>
+    <!-- Game Scripts -->
+    <script src="js/pixelart.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/joystick.js"></script>
+    <script src="js/dialogue.js"></script>
+    <script src="js/entities.js"></script>
+    <script src="js/world.js"></script>
+    <script src="js/story.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>

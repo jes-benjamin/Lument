@@ -1,0 +1,964 @@
+@font-face {
+    font-family: 'MinecraftAE';
+    src: url('../fonts/MinecraftAE.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #050508;
+    font-family: 'MinecraftAE', 'Microsoft YaHei', 'SimHei', monospace;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* 开头Logo动画 */
+#splash-screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #000;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.8s ease;
+}
+
+#splash-screen.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.splash-logo {
+    width: 150px;
+    max-width: 38vw;
+    opacity: 0;
+    transform: scale(0.85);
+    animation: splashFadeIn 1.2s ease forwards 0.3s;
+}
+
+.splash-logo-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    animation: logoBreathe 3s ease-in-out 1.5s infinite;
+}
+
+@keyframes splashFadeIn {
+    0% { opacity: 0; transform: scale(0.85); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes logoBreathe {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.03); opacity: 0.92; }
+}
+
+.splash-powered {
+    position: absolute;
+    bottom: 40px;
+    right: 40px;
+    text-align: right;
+    opacity: 0;
+    animation: splashFadeIn 1s ease forwards 1.5s;
+}
+
+.splash-powered-text {
+    display: block;
+    font-size: 14px;
+    color: #aaa;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+}
+
+.splash-lument {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 24px;
+    font-weight: bold;
+    color: #fff;
+    background: rgba(40, 44, 60, 0.6);
+    padding: 4px 12px 4px 8px;
+    border-radius: 2px;
+}
+
+.splash-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #7ab8ff 0%, #4a8eff 100%);
+    box-shadow: 0 0 6px rgba(122, 184, 255, 0.6);
+    animation: dotPulse 2s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.15); }
+}
+
+#game-canvas {
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    max-width: 100%;
+    max-height: 100%;
+    background: #0a0a14;
+}
+
+#ui-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 100; /* 高于摇杆画布(z-index:65)，创建独立层叠上下文 */
+}
+
+/* 屏幕通用 */
+.screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5, 5, 10, 0.96);
+    pointer-events: auto;
+    z-index: 100;
+}
+
+.hidden { display: none !important; }
+
+/* 主菜单 */
+.game-title {
+    font-family: 'MinecraftAE', monospace;
+    font-size: 3em;
+    color: #8a8a9a;
+    text-shadow: 3px 3px 0 #1a1a2a, 6px 6px 0 #0a0a14;
+    letter-spacing: 0.15em;
+    margin-bottom: 5px;
+}
+
+.game-subtitle {
+    font-family: 'MinecraftAE', monospace;
+    font-size: 1em;
+    color: #555566;
+    letter-spacing: 0.3em;
+    margin-bottom: 30px;
+}
+
+.game-slogan {
+    font-family: 'MinecraftAE', monospace;
+    font-size: 0.9em;
+    color: #4a4a55;
+    max-width: 600px;
+    text-align: center;
+    margin-bottom: 40px;
+    line-height: 1.8;
+}
+
+.menu-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 20px;
+    max-width: 420px;
+    width: 90%;
+}
+
+/* 主页 Powered by Lument */
+.menu-powered {
+    position: absolute;
+    bottom: 16px;
+    right: 20px;
+    text-align: right;
+    opacity: 0.6;
+    pointer-events: auto;
+}
+
+.menu-demo-notice {
+    position: absolute;
+    bottom: 16px;
+    left: 20px;
+    font-size: 10px;
+    color: #555566;
+    letter-spacing: 0.5px;
+    opacity: 0.5;
+}
+
+.menu-powered-text {
+    display: block;
+    font-size: 10px;
+    color: #667788;
+    margin-bottom: 2px;
+    letter-spacing: 1px;
+}
+
+.menu-lument-link {
+    text-decoration: none;
+    display: inline-block;
+}
+
+.menu-lument-link:hover {
+    opacity: 0.8;
+}
+
+.menu-lument {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    color: #aabbcc;
+}
+
+.menu-lument-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #7ab8ff 0%, #4a8eff 100%);
+    box-shadow: 0 0 4px rgba(122, 184, 255, 0.5);
+}
+
+.menu-btn {
+    padding: 12px 20px;
+    font-family: 'MinecraftAE', monospace;
+    font-size: 1em;
+    color: #8899aa;
+    background: linear-gradient(180deg, #1a1a28 0%, #0e0e18 100%);
+    border: 2px solid #2a2a3e;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+}
+
+.menu-btn:hover {
+    background: linear-gradient(180deg, #2a2a3e 0%, #1a1a28 100%);
+    border-color: #3a4a5a;
+    color: #aabbcc;
+}
+
+.menu-btn:active {
+    transform: scale(0.97);
+}
+
+/* 关于界面 */
+.about-text {
+    max-width: 500px;
+    text-align: center;
+    color: #555566;
+    line-height: 2;
+    margin: 20px 0 30px;
+    font-family: 'MinecraftAE', monospace;
+    font-size: 0.9em;
+}
+
+#about-screen h2 {
+    color: #777788;
+    margin-bottom: 15px;
+    font-family: 'MinecraftAE', monospace;
+}
+
+/* HUD */
+#hud {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 8px 12px;
+    pointer-events: none;
+    z-index: 50;
+}
+
+/* 暂停按钮 */
+.pause-btn {
+    position: absolute;
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    right: calc(10px + env(safe-area-inset-right, 0px));
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+    font-family: 'MinecraftAE', monospace;
+    color: #8899aa;
+    background: rgba(15, 18, 28, 0.9);
+    border: 2px solid #2a3a4a;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 150; /* 在ui-overlay层叠上下文内，高于其他UI元素 */
+    pointer-events: auto;
+    transition: all 0.15s;
+    padding: 0;
+    letter-spacing: 0.05em;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.pause-btn:hover {
+    background: rgba(25, 30, 45, 0.9);
+    border-color: #3a4a5a;
+    color: #aabbcc;
+}
+
+.pause-btn:active {
+    transform: scale(0.95);
+}
+
+/* 暂停菜单 */
+#pause-menu h2 {
+    color: #777788;
+    margin-bottom: 30px;
+    font-family: 'MinecraftAE', monospace;
+    font-size: 2em;
+}
+
+#pause-menu {
+    z-index: 200;
+}
+
+.hud-top {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.hud-chapter {
+    color: #667788;
+    font-size: 0.9em;
+    text-shadow: 1px 1px 0 #000;
+    flex: 1;
+    text-align: center;
+    font-family: 'MinecraftAE', monospace;
+}
+
+.hud-buffs {
+    display: flex;
+    gap: 6px;
+    font-size: 0.75em;
+}
+
+.hud-buff {
+    padding: 2px 6px;
+    background: rgba(20, 25, 40, 0.85);
+    border: 1px solid #2a3a4a;
+    border-radius: 2px;
+    color: #667788;
+    text-shadow: 1px 1px 0 #000;
+    font-family: 'MinecraftAE', monospace;
+}
+
+/* 对话框 - RPG风格 */
+#dialogue-box {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 700px;
+    display: flex;
+    gap: 12px;
+    padding: 15px;
+    background: linear-gradient(180deg, rgba(8, 10, 18, 0.98) 0%, rgba(5, 6, 12, 0.98) 100%);
+    border: 3px solid #2a3a4a;
+    border-radius: 4px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.8), inset 0 0 30px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+    z-index: 60;
+    image-rendering: pixelated;
+}
+
+#portrait-canvas {
+    width: 96px;
+    height: 96px;
+    image-rendering: pixelated;
+    border: 2px solid #1a2a3a;
+    border-radius: 2px;
+    flex-shrink: 0;
+    background: #050508;
+}
+
+.dialogue-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dialogue-name {
+    color: #6a8aaa;
+    font-size: 1em;
+    font-family: 'MinecraftAE', monospace;
+    text-shadow: 1px 1px 0 #000;
+    border-bottom: 1px solid #1a2a3a;
+    padding-bottom: 4px;
+}
+
+.dialogue-text {
+    color: #8899aa;
+    font-size: 0.95em;
+    line-height: 1.7;
+    min-height: 60px;
+    text-shadow: 1px 1px 0 #000;
+    font-family: 'MinecraftAE', monospace;
+}
+
+.dialogue-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.dialogue-choice {
+    padding: 6px 12px;
+    color: #556677;
+    background: rgba(15, 18, 28, 0.85);
+    border: 1px solid #1a2a3a;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.1s;
+    font-size: 0.9em;
+    font-family: 'MinecraftAE', monospace;
+}
+
+.dialogue-choice:hover, .dialogue-choice.selected {
+    color: #8899aa;
+    background: rgba(25, 30, 45, 0.9);
+    border-color: #2a4a5a;
+}
+
+.dialogue-prompt {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    color: #4a6a8a;
+    font-size: 1.2em;
+    animation: blink 0.8s infinite;
+    font-family: 'MinecraftAE', monospace;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+/* 章节标题 */
+#chapter-title {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 80;
+    pointer-events: none; /* 自动消失，无需交互 */
+}
+
+#chapter-title h2 {
+    color: #777788;
+    font-size: 2.2em;
+    font-family: 'MinecraftAE', monospace;
+    text-shadow: 2px 2px 0 #1a1a24;
+    margin-bottom: 10px;
+    animation: fadeIn 1.5s;
+}
+
+#chapter-title p {
+    color: #4a4a55;
+    font-size: 1em;
+    font-family: 'MinecraftAE', monospace;
+    animation: fadeIn 2.5s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* 结局画面 */
+/* 结局页面滚动容器 */
+.ending-scroll-container {
+    width: 100%;
+    max-width: 600px;
+    height: 68vh;
+    overflow: hidden;
+    position: relative;
+    margin: 0 auto 10px;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+}
+
+.ending-scroll-container.scroll-done {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ending-scroll-content {
+    position: absolute;
+    width: 100%;
+    top: 100%;
+    text-align: center;
+    animation: endingScrollUp var(--ending-duration, 40s) linear forwards;
+    padding: 20px 0;
+}
+
+.ending-scroll-content.scroll-done {
+    animation: none;
+    position: relative;
+    top: 0;
+}
+
+.ending-spacer {
+    height: 45vh;
+}
+
+#ending-screen h2 {
+    color: #777788;
+    font-size: 2.2em;
+    margin-bottom: 20px;
+    font-family: 'MinecraftAE', monospace;
+}
+
+#ending-screen p {
+    color: #555566;
+    font-size: 1em;
+    max-width: 500px;
+    margin: 0 auto 30px;
+    line-height: 2;
+    white-space: pre-line;
+    font-family: 'MinecraftAE', monospace;
+}
+
+@keyframes endingScrollUp {
+    0% { top: 100%; }
+    100% { top: 0; }
+}
+
+/* 成就系统 */
+#achievements-screen h2 {
+    color: #777788;
+    margin-bottom: 20px;
+    font-family: 'MinecraftAE', monospace;
+}
+
+.achievements-list {
+    width: 90%;
+    max-width: 500px;
+    max-height: 60vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 20px;
+    padding-right: 10px;
+}
+
+.achievement-progress {
+    color: #555566;
+    font-size: 0.9em;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #1a2a3a;
+    font-family: 'MinecraftAE', monospace;
+}
+
+.achievement-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px;
+    margin-bottom: 8px;
+    background: rgba(15, 18, 28, 0.6);
+    border: 1px solid #1a2a3a;
+    border-radius: 3px;
+    transition: all 0.2s;
+}
+
+.achievement-item:hover {
+    background: rgba(20, 28, 40, 0.9);
+    border-color: #3a5a6a;
+}
+
+.achievement-item:active {
+    transform: scale(0.98);
+}
+
+.achievement-item.unlocked {
+    background: rgba(25, 30, 45, 0.8);
+    border-color: #2a4a5a;
+}
+
+.achievement-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a1a28;
+    border: 2px solid #2a2a3e;
+    border-radius: 3px;
+    font-weight: bold;
+    color: #8899aa;
+    flex-shrink: 0;
+    font-family: 'MinecraftAE', monospace;
+}
+
+.achievement-info {
+    flex: 1;
+}
+
+.achievement-name {
+    color: #6a8aaa;
+    font-size: 1em;
+    margin-bottom: 3px;
+    font-family: 'MinecraftAE', monospace;
+}
+
+.achievement-desc {
+    color: #4a5a6a;
+    font-size: 0.8em;
+    line-height: 1.5;
+    font-family: 'MinecraftAE', monospace;
+}
+
+.achievement-item.unlocked .achievement-desc {
+    color: #556677;
+}
+
+.ach-count-tag {
+    background: rgba(40, 50, 70, 0.6);
+    padding: 0 5px;
+    border-radius: 2px;
+    font-size: 0.8em;
+    color: #667788;
+}
+
+/* 结局画面样式区分 */
+.true-ending h2 {
+    color: #8a9aaa;
+    text-shadow: 2px 2px 0 #1a1a2a;
+}
+
+.false-ending h2 {
+    color: #6a6a7a;
+    text-shadow: 2px 2px 0 #1a1a2a;
+}
+
+/* 结局场景主题 - 每个结局独特的背景氛围 */
+#ending-screen.scene-rain_street {
+    background: linear-gradient(to bottom, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+#ending-screen.scene-rain_street h2 { color: #7a8aaa; }
+
+#ending-screen.scene-ruined_office {
+    background: linear-gradient(to bottom, #1a1010 0%, #2a1515 50%, #1a0a0a 100%);
+}
+#ending-screen.scene-ruined_office h2 { color: #aa7a6a; }
+
+#ending-screen.scene-golden_throne {
+    background: linear-gradient(to bottom, #1a1505 0%, #2a2010 50%, #1a1500 100%);
+}
+#ending-screen.scene-golden_throne h2 { color: #c8a84e; text-shadow: 2px 2px 0 #2a1a00; }
+
+#ending-screen.scene-small_town {
+    background: linear-gradient(to bottom, #1a2a1a 0%, #2a3a2a 50%, #1a2515 100%);
+}
+#ending-screen.scene-small_town h2 { color: #8aba8a; }
+
+#ending-screen.scene-luxury_party {
+    background: linear-gradient(to bottom, #1a0a1a 0%, #2a1530 50%, #1a0a25 100%);
+}
+#ending-screen.scene-luxury_party h2 { color: #c8a8c8; text-shadow: 2px 2px 0 #2a0a2a; }
+
+#ending-screen.scene-prison_shadow {
+    background: linear-gradient(to bottom, #0a0a0a 0%, #151520 50%, #050510 100%);
+}
+#ending-screen.scene-prison_shadow h2 { color: #5a5a6a; }
+
+#ending-screen.scene-rooftop_storm {
+    background: linear-gradient(to bottom, #0a0a15 0%, #15152a 50%, #050510 100%);
+}
+#ending-screen.scene-rooftop_storm h2 { color: #4a4a6a; }
+
+/* 结局成就显示 */
+.ending-achievement {
+    background: rgba(10, 10, 20, 0.8);
+    border: 2px solid #3a3a4a;
+    border-radius: 4px;
+    padding: 14px 24px;
+    margin: 20px auto;
+    max-width: 460px;
+    color: #8899aa;
+    font-family: 'MinecraftAE', monospace;
+    font-size: 0.9em;
+    text-align: center;
+    line-height: 1.6;
+}
+
+.ending-achievement span {
+    color: #e8c860;
+    font-weight: bold;
+    font-size: 1.05em;
+}
+
+.ending-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+    animation: endingFadeIn 1s ease-out;
+}
+
+/* 结局成就和按钮的淡入动画 */
+#ending-achievement:not(.hidden) {
+    animation: endingFadeIn 1s ease-out;
+}
+
+#ending-buttons:not(.hidden) {
+    animation: endingFadeIn 0.8s ease-out;
+}
+
+@keyframes endingFadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.achievement-item.locked {
+    opacity: 0.5;
+}
+
+/* 成就详情弹窗 */
+.achievement-detail-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    animation: detailFadeIn 0.2s ease;
+}
+
+@keyframes detailFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.achievement-detail-box {
+    width: 86%;
+    max-width: 440px;
+    max-height: 80vh;
+    background: linear-gradient(180deg, #12121e 0%, #0a0a14 100%);
+    border: 3px solid #2a4a5a;
+    border-radius: 6px;
+    padding: 24px 28px;
+    box-shadow: 0 0 30px rgba(42, 74, 90, 0.3), inset 0 0 20px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow: hidden;
+}
+
+.achievement-detail-header {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #1a2a3a;
+}
+
+.achievement-detail-icon {
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a1a28;
+    border: 2px solid #3a4a5a;
+    border-radius: 4px;
+    font-weight: bold;
+    color: #aabbcc;
+    font-size: 1.4em;
+    flex-shrink: 0;
+    font-family: 'MinecraftAE', monospace;
+}
+
+.achievement-detail-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.ach-detail-name {
+    color: #8aafcc;
+    font-size: 1.15em;
+    font-family: 'MinecraftAE', monospace;
+    margin-bottom: 4px;
+}
+
+.ach-detail-desc {
+    color: #556677;
+    font-size: 0.85em;
+    font-family: 'MinecraftAE', monospace;
+}
+
+.achievement-detail-info {
+    color: #8899aa;
+    font-size: 0.9em;
+    line-height: 1.9;
+    font-family: 'MinecraftAE', monospace;
+    white-space: pre-line;
+    overflow-y: auto;
+    flex: 1;
+    padding-right: 6px;
+    text-shadow: 1px 1px 0 #000;
+}
+
+.achievement-detail-box .menu-btn {
+    align-self: center;
+    margin-top: 4px;
+}
+
+.achievement-detail-icon.locked {
+    color: #444455;
+    border-color: #2a2a3a;
+    background: #0e0e18;
+}
+
+.achievement-detail-info.locked-info {
+    color: #555566;
+    font-style: italic;
+}
+
+/* 制作组名单 */
+#credits-screen {
+    z-index: 110;
+}
+
+#credits-screen h2 {
+    color: #777788;
+    margin-bottom: 15px;
+    font-family: 'MinecraftAE', monospace;
+    flex-shrink: 0;
+}
+
+.credits-scroll-container {
+    width: 90%;
+    max-width: 500px;
+    height: 58vh;
+    overflow: hidden;
+    position: relative;
+    margin: 0 auto 20px;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 6%, black 94%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 6%, black 94%, transparent 100%);
+}
+
+.credits-content {
+    position: absolute;
+    width: 100%;
+    top: 100%;
+    text-align: center;
+    animation: creditsScrollUp 30s linear forwards;
+    padding: 20px 0;
+}
+
+@keyframes creditsScrollUp {
+    0% { top: 100%; }
+    100% { top: -100%; }
+}
+
+.credits-section {
+    margin-bottom: 32px;
+}
+
+.credits-section-title {
+    color: #6a8aaa;
+    font-size: 1.1em;
+    font-family: 'MinecraftAE', monospace;
+    margin-bottom: 10px;
+    letter-spacing: 0.15em;
+    border-bottom: 1px solid #1a2a3a;
+    padding-bottom: 6px;
+}
+
+.credits-name {
+    color: #4a5a6a;
+    font-size: 0.8em;
+    font-family: 'MinecraftAE', monospace;
+    margin-top: 8px;
+    margin-bottom: 2px;
+}
+
+.credits-person {
+    color: #8899aa;
+    font-size: 1em;
+    font-family: 'MinecraftAE', monospace;
+    margin-bottom: 4px;
+}
+
+.credits-end {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #1a2a3a;
+}
+
+.credits-end p {
+    color: #555566;
+    font-size: 0.9em;
+    font-family: 'MinecraftAE', monospace;
+    line-height: 2;
+    margin-bottom: 4px;
+}
+
+.credits-logo {
+    color: #6a8aaa !important;
+    font-size: 1.1em !important;
+    margin-top: 16px !important;
+    letter-spacing: 0.1em;
+}
+
+#credits-screen .menu-btn {
+    flex-shrink: 0;
+}
+
+/* 制作组名单滚动完成后可手动滚动 */
+.credits-scroll-container.scroll-done {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.credits-content.scroll-done {
+    animation: none;
+    position: relative;
+    top: 0;
+}
+
+@media (max-width: 768px) {
+    .game-title { font-size: 1.8em; }
+    .game-slogan { font-size: 0.75em; }
+    #portrait-canvas { width: 64px; height: 64px; }
+    .dialogue-text { font-size: 0.8em; }
+    .menu-btn { font-size: 0.85em; padding: 10px 40px; }
+}

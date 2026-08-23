@@ -1,0 +1,177 @@
+// ============================================================
+// build.gradle - Android library module for Lument JNI
+// ------------------------------------------------------------
+// This Gradle module produces an Android library (.aar) that
+// bundles:
+//
+//   1. Java classes  - the platform-agnostic engine bindings
+//      (com.lument.engine.*) from ../../bindings/java/src,
+//      plus the Android-specific wrapper
+//      (com.lument.engine.android.AndroidEngine) that lives
+//      at this module's root.
+//
+//   2. A native shared library liblument.so - built by
+//      CMake from the engine core sources + the JNI bridge
+//      (../../bindings/java/jni/CMakeLists.txt).  Java loads it
+//      via System.loadLibrary("lument") in Engine.java.
+//
+// USAGE (inside a host Android project):
+//
+//   settings.gradle:
+//       include ':lument'
+//       project(':lument').projectDir =
+//           new File(rootDir, 'path/to/Lument/platforms/android')
+//
+//   app/build.gradle:
+//       dependencies {
+//           implementation project(':lument')
+//       }
+//
+//   Then subclass AndroidEngine in your Activity (see its Javadoc).
+// ============================================================
+
+plugins {
+    id 'com.android.library' version '8.1.0'
+    id 'org.jetbrains.kotlin.android' version '1.9.0' apply false
+}
+
+android {
+    namespace = 'com.lument.engine'
+
+    // Android 14 (API 34); the engine's GLES2 backend and the
+    // GLSurfaceView API are stable from API 21 onward.
+    compileSdk = 34
+
+    defaultConfig {
+        // Lollipop (API 21) covers ~99% of active Android devices and
+        // is the minimum that ships a usable OpenGL ES 2.0 + NDK STL.
+        minSdk = 21
+        targetSdk = 34
+
+        // Consumer ProGuard rules: keep JNI native method declarations
+        // and the callback interface used by the ECS script trampoline.
+        consumerProguardFiles 'consumer-rules.pro'
+
+        externalNativeBuild {
+            cmake {
+                // Pass CMake arguments to the native build.
+                arguments \
+                    '-DANDROID_STL=c++_static',   // static C++ runtime; avoids .so duplication
+                    '-DANDROID_PLATFORM=android-21'
+
+                // Extra C++ flags for the JNI bridge translation unit.
+                cppFlags \
+                    '-std=c++17',
+                    '-fexceptions',   // JNI bridge uses try/catch for callback dispatch
+                    '-frtti'
+
+                // Build for the four common Android ABIs.  Host apps can
+                // narrow this list (e.g. arm64-v8a only) via
+                // android.defaultConfig.ndk.abiFilters in their own
+                // build.gradle.
+                abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
+            }
+        }
+
+        ndk {
+            // Pin the NDK version for reproducible builds.  AGP 8.1
+            // ships with NDK 25.1 by default; override in the host
+            // project's android.ndkVersion if needed.
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // Source sets.
+    //
+    // The Java sources live in two places:
+    //   1. ../../bindings/java/src  -> com.lument.engine.*  (core
+    //      platform-agnostic bindings: Engine, Renderer, Input,
+    //      Audio, ECS, SceneManager, Storage, LumentColor, LumentRect,
+    //      LumentVec2, LumentConfig, UpdateCallback)
+    //   2. . (this module root)     -> AndroidEngine.java, whose
+    //      declared package is com.lument.engine.android.  javac
+    //      resolves the package from the source declaration, not the
+    //      file path, so the file compiles correctly even though it
+    //      sits at the module root rather than under
+    //      com/lument/engine/android/.
+    // ----------------------------------------------------------------
+    sourceSets {
+        main {
+            java {
+                srcDirs = ['../../bindings/java/src']
+                srcDir '.'
+            }
+            // Let AGP's default manifest merging find a minimal
+            // AndroidManifest.xml if one is provided at
+            // src/main/AndroidManifest.xml; otherwise AGP generates a
+            // stub.  No special permissions are required because the
+            // engine manages its own GL surface within the host
+            // Activity.
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // External native build: delegates to CMake.
+    //
+    // The CMakeLists.txt builds a SINGLE liblument.so that
+    // contains the engine core + the JNI bridge (see the header
+    // comment in that file for why they must share one binary).
+    // ----------------------------------------------------------------
+    externalNativeBuild {
+        cmake {
+            path = file('../../bindings/java/jni/CMakeLists.txt')
+            // CMake 3.22.1 is the version bundled with NDK 25.
+            // Use a range to tolerate minor NDK upgrades.
+            version = '3.22.1+'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false   // library R8 is the host app's responsibility
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            // Pack the .so with debug symbols for native stack traces.
+            packagingOptions {
+                jniDebugEnabled = true
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    // Exclude conflicting duplicate files that the engine .so and the
+    // host app might both try to include.
+    packagingOptions {
+        // Avoid duplicate .so collision when the host app bundles its
+        // own native deps.
+        pickFirst 'lib/*/liblument.so'
+    }
+
+    // Lint: the engine's JNI native methods are resolved at runtime;
+    // suppress the "missing JNI registration" false positives.
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
+}
+
+// ----------------------------------------------------------------
+// Dependencies.
+//
+// The library has zero external Java/Kotlin dependencies:
+//   - The core bindings (com.lument.engine.*) use only JDK APIs.
+//   - AndroidEngine uses only Android framework APIs (Activity,
+//     GLSurfaceView, MotionEvent, AssetManager) available from
+//     compileSdk.
+//
+// Host apps add their own game-specific dependencies.
+// ----------------------------------------------------------------
+dependencies {
+    // No external dependencies.
+}
