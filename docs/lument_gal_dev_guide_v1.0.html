@@ -1,0 +1,1048 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>LumentGAL · 专用开发文档 v1.0</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  /* —— 字体 —— */
+  @font-face { font-family:'Outfit'; src:url('_shared/fonts/Outfit-Regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
+  @font-face { font-family:'Outfit'; src:url('_shared/fonts/Outfit-Bold.ttf')    format('truetype'); font-weight:700; font-display:swap; }
+  @font-face { font-family:'InstrumentSans'; src:url('_shared/fonts/InstrumentSans-Regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
+  @font-face { font-family:'JetBrainsMono'; src:url('_shared/fonts/JetBrainsMono-Regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
+  @font-face { font-family:'JetBrainsMono'; src:url('_shared/fonts/JetBrainsMono-Bold.ttf')    format('truetype'); font-weight:700; font-display:swap; }
+
+  :root{
+    --bg-0:#05070f; --bg-1:#0a0e1e; --bg-2:#121733;
+    --border: rgba(130,160,255,.22);
+    --border-strong: rgba(140,180,255,.38);
+    --accent:#8ab4ff; --accent-2:#b58dff; --ok:#7ef0b3; --warn:#ffcb6b; --danger:#ff8aa4;
+    --text:#e8ecff; --muted:#a3afd9; --dim:#6d7aa8;
+    --code-bg: rgba(10,14,34,.9);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:
+    radial-gradient(1400px 700px at 10% -10%, #1e265e 0%, transparent 55%),
+    radial-gradient(900px 500px at 110% 0%, #3e2a75 0%, transparent 60%),
+    linear-gradient(180deg, var(--bg-0) 0%, #070a18 100%);
+    color:var(--text);
+    font-family:'InstrumentSans','Outfit','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+    line-height:1.65; font-size:15px;
+  }
+  header.top{
+    position:sticky; top:0; z-index:50; backdrop-filter: blur(10px);
+    background: rgba(7,10,24,.72); border-bottom:1px solid var(--border);
+  }
+  .topInner{
+    max-width:1400px; margin:0 auto; padding:14px 24px;
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand .logo{
+    width:38px; height:38px; border-radius:12px;
+    background:
+      radial-gradient(14px 14px at 30% 30%, #fff 0%, rgba(255,255,255,0) 60%),
+      linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
+  }
+  .brand h1{ margin:0; font-size:18px; letter-spacing:.4px; font-family:'Outfit',sans-serif; }
+  .brand .ver{
+    font-size:11px; color:var(--muted); border:1px solid var(--border);
+    padding:2px 8px; border-radius:999px;
+  }
+  nav.tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  nav.tabs a{
+    color:var(--muted); text-decoration:none; font-size:13px;
+    padding:6px 12px; border-radius:10px; border:1px solid transparent;
+    transition: color .15s, background .15s, border-color .15s;
+  }
+  nav.tabs a:hover{ color:var(--text); background: rgba(138,180,255,.08); }
+  nav.tabs a.active{ color:var(--text); background: rgba(181,141,255,.12); border-color: rgba(181,141,255,.28); }
+
+  /* 2 栏布局 */
+  .layout{
+    max-width:1400px; margin:0 auto; padding:28px 24px 60px;
+    display:grid; grid-template-columns: 260px minmax(0,1fr); gap:28px;
+  }
+  @media (max-width: 980px){ .layout{ grid-template-columns: 1fr; } }
+
+  aside.toc{
+    position:sticky; top:78px; align-self:start;
+    background: rgba(14,18,40,.72); border:1px solid var(--border); border-radius:16px;
+    padding:16px; backdrop-filter: blur(8px);
+    max-height: calc(100vh - 96px); overflow:auto;
+  }
+  aside.toc h3{
+    margin: 4px 4px 10px; font-size: 12px; font-weight:700; letter-spacing:2px;
+    color: var(--accent-2); text-transform: uppercase;
+  }
+  aside.toc a{
+    display:block; padding: 6px 10px; border-radius: 8px; font-size:13px;
+    color: var(--muted); text-decoration:none; transition: all .12s ease;
+    border:1px solid transparent;
+  }
+  aside.toc a:hover{ color: var(--text); background: rgba(138,180,255,.08); }
+  aside.toc a.toc-l2{ padding-left: 22px; color: var(--dim); font-size:12.5px; }
+  aside.toc a.toc-l3{ padding-left: 34px; color: var(--dim); font-size:12px; opacity:.9; }
+
+  main{ min-width:0; }
+  section.doc {
+    background: rgba(14,18,40,.58); border:1px solid var(--border); border-radius:18px;
+    padding: 26px 30px 32px; margin-bottom: 20px; backdrop-filter: blur(8px);
+  }
+  h2.sec{
+    font-family:'Outfit',sans-serif; font-size:24px; letter-spacing:.3px; margin:0 0 6px;
+    padding-bottom: 10px; border-bottom:1px dashed var(--border);
+    display:flex; align-items:center; gap:10px;
+  }
+  h2.sec .n{
+    display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;
+    border-radius:10px; background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color:#0a0d1e; font-weight:800; font-size:14px;
+  }
+  h3.sub{ font-size:17px; margin: 22px 0 8px; color: var(--text); font-family:'Outfit',sans-serif; }
+  h4.min{ font-size:14px; margin: 14px 0 4px; color: var(--accent); }
+  p.lede{ color: var(--muted); margin: 0 0 18px; }
+  p{ margin: 6px 0 12px; }
+  a{ color: var(--accent); }
+  b{ color: var(--text); }
+  .muted{ color: var(--muted); }
+
+  /* 表格 */
+  table.tbl{ width:100%; border-collapse: collapse; font-size:13.5px; margin: 10px 0 16px; }
+  table.tbl th, table.tbl td{
+    border:1px solid var(--border); padding:8px 12px; text-align:left; vertical-align:top;
+  }
+  table.tbl th{ background: rgba(138,180,255,.08); color: var(--accent); font-weight:600; }
+  table.tbl tr:nth-child(even) td{ background: rgba(10,14,32,.35); }
+  table.tbl code{ font-size: 12.5px; }
+
+  /* 代码块 */
+  pre{
+    background: var(--code-bg);
+    border:1px solid var(--border-strong); border-radius: 12px;
+    padding: 14px 16px; overflow:auto;
+    font-family:'JetBrainsMono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size: 12.8px; line-height:1.55;
+  }
+  code{
+    font-family:'JetBrainsMono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size: 12.8px; padding: 1px 6px; border-radius: 6px;
+    background: rgba(10,14,34,.75); border:1px solid rgba(130,160,255,.14);
+    color: #cfe0ff;
+  }
+  pre code{ background: transparent; border:0; padding:0; }
+  .code-comment { color:#6d7aa8; }
+  .code-kw      { color:#c4b4ff; }
+  .code-str     { color:#ffd79a; }
+  .code-num     { color:#9de8ff; }
+  .code-fn      { color:#b6f0ce; }
+  .code-var     { color:#ffb4c9; }
+
+  /* 提示框 */
+  .tip,.warn,.danger{
+    border-radius:12px; padding: 12px 16px; margin: 12px 0 16px;
+    border-left:4px solid;
+  }
+  .tip    { background: rgba(126,240,179,.06); border-color: var(--ok);     color: var(--text); }
+  .warn   { background: rgba(255,203,107,.06); border-color: var(--warn);   color: var(--text); }
+  .danger { background: rgba(255,138,164,.08); border-color: var(--danger); color: var(--text); }
+  .tip    b:first-child, .warn b:first-child, .danger b:first-child{ margin-right:6px; }
+
+  /* 标签小徽章 */
+  .pill{
+    display:inline-block; padding: 2px 9px; border-radius: 999px;
+    background: rgba(181,141,255,.12); color: #d2b8ff;
+    border:1px solid rgba(181,141,255,.25); font-size: 11px; letter-spacing: .3px;
+    font-family:'JetBrainsMono',monospace;
+  }
+  .pill.blue   { background: rgba(138,180,255,.12); color: #bcd1ff; border-color: rgba(138,180,255,.3); }
+  .pill.green  { background: rgba(126,240,179,.1); color:#a9f2c9; border-color: rgba(126,240,179,.3); }
+  .pill.amber  { background: rgba(255,203,107,.12); color:#ffdea2; border-color: rgba(255,203,107,.3); }
+  .pill.red    { background: rgba(255,138,164,.12); color:#ffc0cd; border-color: rgba(255,138,164,.3); }
+
+  /* 两栏网格 */
+  .grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 720px){ .grid-2{ grid-template-columns: 1fr; } }
+  .card{
+    border:1px solid var(--border); border-radius:14px; padding: 14px 16px;
+    background: rgba(10,14,32,.4);
+  }
+  .card .t{
+    font-size:14px; font-weight:600; margin-bottom:6px; color: var(--accent);
+    display:flex; align-items:center; gap:8px;
+  }
+
+  /* Hero */
+  .hero{
+    background:
+      radial-gradient(700px 300px at 80% -10%, rgba(181,141,255,.25), transparent 60%),
+      radial-gradient(500px 260px at 10% 100%, rgba(138,180,255,.25), transparent 60%),
+      linear-gradient(180deg, rgba(14,18,40,.75), rgba(10,14,32,.55));
+    border:1px solid var(--border); border-radius: 18px; padding: 26px 28px 22px;
+    margin-bottom: 20px; backdrop-filter: blur(6px);
+  }
+  .hero h2{
+    margin: 0 0 6px; font-family:'Outfit',sans-serif; font-size:28px; letter-spacing:.5px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p{ margin:4px 0 10px; color: var(--muted); max-width: 820px; }
+  .hero .row{ display:flex; flex-wrap:wrap; gap:8px; margin-top: 10px; }
+  .hero .row a.btn{
+    appearance:none; display:inline-block; text-decoration:none; cursor:pointer;
+    color:#fff; font: inherit;
+    background: linear-gradient(180deg, #6f9eff 0%, #5b7dff 100%);
+    border:1px solid rgba(255,255,255,.18); border-radius: 12px; padding: 8px 14px; font-weight:600;
+  }
+  .hero .row a.btn.ghost{ background: transparent; color: var(--text); border-color: var(--border); }
+
+  footer{
+    max-width: 1400px; margin: 0 auto; padding: 16px 24px 40px;
+    color: var(--dim); font-size: 12.5px; text-align: center;
+  }
+  kbd.k{
+    display:inline-block; padding:1px 6px; font-size:11.5px;
+    border:1px solid var(--border); border-bottom-width:2px;
+    border-radius:6px; background: rgba(255,255,255,.04); color:var(--text);
+    font-family:'JetBrainsMono',monospace;
+  }
+  details.faq{
+    border:1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+    background: rgba(10,14,32,.35); margin-bottom: 8px;
+  }
+  details.faq summary{ cursor:pointer; font-weight:600; color: var(--text); padding: 2px 0; }
+  details.faq[open] summary{ margin-bottom: 6px; color: var(--accent); }
+  ul.chklist{ list-style:none; padding:0; margin: 8px 0 14px; }
+  ul.chklist li{ padding: 4px 0 4px 28px; position: relative; }
+  ul.chklist li::before{
+    content:''; position:absolute; left: 2px; top: 9px; width: 16px; height: 16px;
+    border-radius: 5px; background: rgba(126,240,179,.14);
+    box-shadow: inset 0 0 0 1px rgba(126,240,179,.4);
+  }
+  ul.chklist li::after{
+    content:'✓'; position:absolute; left: 5px; top: 4px; color: var(--ok); font-size: 12px; font-weight: 700;
+  }
+  hr{ border:0; border-top:1px dashed var(--border); margin: 20px 0; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="topInner">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <h1>LumentGAL · 专用开发文档</h1>
+      <span class="ver">v1.0 · Lument 1.3.0-lumentgal.2</span>
+    </div>
+    <nav class="tabs">
+      <a href="#overview" class="active">概览</a>
+      <a href="#quickstart">5 分钟上手</a>
+      <a href="#dsl">剧本 DSL</a>
+      <a href="#api-gal">GAL API</a>
+      <a href="#api-live2d">Live2D API</a>
+      <a href="#audio">音频系统</a>
+      <a href="#save">存档 &amp; 偏好</a>
+      <a href="#advance">高级 &amp; 最佳实践</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- 目录 -->
+  <aside class="toc">
+    <h3>目录 · Contents</h3>
+
+    <a href="#overview">1. 概览 Overview</a>
+    <a href="#overview-feature" class="toc-l2">1.1 功能一览</a>
+    <a href="#overview-arch"    class="toc-l2">1.2 架构组成</a>
+    <a href="#overview-why"     class="toc-l2">1.3 为什么用 LumentGAL</a>
+
+    <a href="#quickstart">2. 5 分钟上手</a>
+    <a href="#qs-import"   class="toc-l2">2.1 引入 lument.js</a>
+    <a href="#qs-init"     class="toc-l2">2.2 初始化引擎 + GAL</a>
+    <a href="#qs-script"   class="toc-l2">2.3 写第一份 GalScript</a>
+    <a href="#qs-loop"     class="toc-l2">2.4 主循环 + 输入</a>
+    <a href="#qs-demo"     class="toc-l2">2.5 打开 demo 体验完整功能</a>
+
+    <a href="#dsl">3. 剧本 DSL 参考</a>
+    <a href="#dsl-basic"     class="toc-l2">3.1 基本规则</a>
+    <a href="#dsl-dialogue"  class="toc-l2">3.2 对白 &amp; 旁白</a>
+    <a href="#dsl-bg"        class="toc-l2">3.3 背景 / 立绘 / CG</a>
+    <a href="#dsl-live2d"    class="toc-l2">3.4 Live2D 交互</a>
+    <a href="#dsl-choose"    class="toc-l2">3.5 选项分支</a>
+    <a href="#dsl-var"       class="toc-l2">3.6 变量 &amp; 条件跳转</a>
+    <a href="#dsl-audio"     class="toc-l2">3.7 音频命令</a>
+    <a href="#dsl-efx"       class="toc-l2">3.8 屏幕演出</a>
+    <a href="#dsl-flow"      class="toc-l2">3.9 流程控制 (call/ret)</a>
+    <a href="#dsl-all"       class="toc-l2">3.10 24 种命令速查表</a>
+
+    <a href="#api-gal">4. GAL 子系统 API</a>
+    <a href="#gal-lifecycle" class="toc-l2">4.1 生命周期</a>
+    <a href="#gal-script"    class="toc-l2">4.2 剧本 &amp; 推进</a>
+    <a href="#gal-dialog"    class="toc-l2">4.3 对话框 &amp; 历史</a>
+    <a href="#gal-scene"     class="toc-l2">4.4 立绘 / 背景 / CG</a>
+    <a href="#gal-var"       class="toc-l2">4.5 变量 &amp; 事件</a>
+    <a href="#gal-save"      class="toc-l2">4.6 存档读档</a>
+    <a href="#gal-render"    class="toc-l2">4.7 偏好设置 &amp; 演出</a>
+    <a href="#gal-loop"      class="toc-l2">4.8 每帧 update / render</a>
+
+    <a href="#api-live2d">5. Live2D 子系统 API</a>
+    <a href="#l2d-overview"   class="toc-l2">5.1 接入说明</a>
+    <a href="#l2d-lifecycle"  class="toc-l2">5.2 生命周期 &amp; 模型</a>
+    <a href="#l2d-motion"     class="toc-l2">5.3 动作 &amp; 表情</a>
+    <a href="#l2d-auto"       class="toc-l2">5.4 自动动画（眨眼/视线/头转/口型）</a>
+    <a href="#l2d-params"     class="toc-l2">5.5 参数化控制</a>
+    <a href="#l2d-perf"       class="toc-l2">5.6 性能优化：离屏缓存 &amp; 脏值节流</a>
+    <a href="#l2d-placeholder" class="toc-l2">5.7 占位渲染（无 .model3.json 时）</a>
+
+    <a href="#audio">6. 音频系统</a>
+    <a href="#audio-arch"    class="toc-l2">6.1 架构：BGM 单实例 + SE 队列</a>
+    <a href="#audio-cross"   class="toc-l2">6.2 BGM 交叉淡入淡出</a>
+    <a href="#audio-se"      class="toc-l2">6.3 SE 并发节流</a>
+    <a href="#audio-synth"   class="toc-l2">6.4 合成音源 (Synth BGM / SE)</a>
+    <a href="#audio-autoplay" class="toc-l2">6.5 自动播放策略兼容</a>
+
+    <a href="#save">7. 存档 &amp; 偏好</a>
+    <a href="#save-slot"     class="toc-l2">7.1 多槽位存档</a>
+    <a href="#save-quick"    class="toc-l2">7.2 快速存/读档</a>
+    <a href="#save-format"   class="toc-l2">7.3 数据格式</a>
+    <a href="#save-pref"     class="toc-l2">7.4 偏好持久化</a>
+
+    <a href="#advance">8. 高级 &amp; 最佳实践</a>
+    <a href="#adv-dpr"       class="toc-l2">8.1 DPR / Retina 高分屏适配</a>
+    <a href="#adv-z"         class="toc-l2">8.2 渲染层 Z-Order 指南</a>
+    <a href="#adv-scripting" class="toc-l2">8.3 模块化剧本（多脚本 + call/ret）</a>
+    <a href="#adv-integrate" class="toc-l2">8.4 引擎外部 UI 集成（React/Vue）</a>
+    <a href="#adv-test"      class="toc-l2">8.5 自动化 &amp; 单元测试（Node 兼容）</a>
+    <a href="#adv-migrate"   class="toc-l2">8.6 从 Ren'Py / KiriKiri 迁移建议</a>
+
+    <a href="#faq">9. FAQ 常见问题</a>
+    <a href="#changelog">10. 变更日志</a>
+  </aside>
+
+  <main>
+    <!-- Hero -->
+    <div class="hero" id="overview">
+      <h2>为你的下一部视觉小说，量身打造的轻量引擎</h2>
+      <p>LumentGAL 是 Lument 1.3.x 的内置视觉小说子系统，将剧本 DSL、打字机对话框、立绘/CG 演出、分支选择、快照存档、Live2D 角色动画、WebAudio 音频管线全部打包成一套极简的 API。无需打包工具、无需后端、无需外部依赖，单文件 <code>lument.js</code> 即可开跑。</p>
+      <div class="row">
+        <a class="btn" href="#quickstart">▶ 5 分钟上手</a>
+        <a class="btn ghost" href="../examples/lument_gal_demo.html">🧪 打开完整 Demo</a>
+        <a class="btn ghost" href="#dsl">📜 DSL 速查表</a>
+      </div>
+    </div>
+
+    <!-- 1. 概览 -->
+    <section class="doc" id="overview-feature">
+      <h2 class="sec"><span class="n">1</span> 概览 · Overview</h2>
+      <p class="lede">LumentGAL 目标是让你在一个下午就能做完一部可发布的视觉小说 Demo，同时具备上规模项目所需的模块化、自动化与性能保证。</p>
+
+      <h3 class="sub">1.1 功能一览 <span class="pill green">已实现</span></h3>
+      <ul class="chklist">
+        <li>按用户点击 / <kbd class="k">Space</kbd> 或自动播放推进文本，打字机一句一句展示对话内容</li>
+        <li>在指定位置（左 / 中 / 右 / 自定义坐标）显示/隐藏立绘、背景、CG，播放 8 种场景切换补间</li>
+        <li>播放 BGM（同一时间只有一个，交叉淡入淡出）与音效（最多 16 路并发节流队列）</li>
+        <li>遇到选项点自动暂停，玩家选择后跳标签或指定位置继续</li>
+        <li>提供文本历史记录（翻页 UI API）、跳过历史文本（支持"只读跳过"防剧透）、自动播放、6 槽位存档读档 + 快速存读档</li>
+        <li>记录游戏内变量（好感度、剧情 flag）用于后续剧情分支 &amp; 多结局判定，支持变量变更事件回调</li>
+        <li>Live2D 子系统：模型加载、动作/表情控制、离屏缓存 &amp; 脏值节流，无外部模型时自动占位渲染（点击有动作反馈）</li>
+      </ul>
+
+      <h3 class="sub" id="overview-arch">1.2 架构组成</h3>
+      <div class="grid-2">
+        <div class="card">
+          <div class="t">🎬 GAL 子系统 <span class="pill blue">lument.js : 3093~4510</span></div>
+          <div class="muted">剧本解析、标签跳转、对白系统、立绘/CG 补间、屏幕演出、存档快照、偏好设置、历史记录。</div>
+        </div>
+        <div class="card">
+          <div class="t">🎭 Live2D 子系统 <span class="pill blue">lument.js : 4588~5310</span></div>
+          <div class="muted">模型管理、动作/表情、参数化控制、自动眨眼/视线/头转/口型、离屏缓存。</div>
+        </div>
+        <div class="card">
+          <div class="t">🎵 音频管线 <span class="pill blue">lument.js : 1342~1568</span></div>
+          <div class="muted">WebAudio 优先解码 + HTMLAudio 回退；BGM 单实例；SE 队列 16 路；占位合成音源。</div>
+        </div>
+        <div class="card">
+          <div class="t">📜 剧本 DSL <span class="pill amber">24 种命令</span></div>
+          <div class="muted">@bg / @show / @choose / @set / @if / @live2d / @call… 语法低噪，上手即写。</div>
+        </div>
+      </div>
+
+      <h3 class="sub" id="overview-why">1.3 为什么用 LumentGAL</h3>
+      <table class="tbl">
+        <thead><tr><th>需求</th><th>LumentGAL</th><th>常见 WebGAL 方案</th></tr></thead>
+        <tbody>
+          <tr><td>体积</td><td>单文件 <b>~180 KB</b>（lument.js + Canvas2D）</td><td>通常 5~15 MB（含打包 runtime + 资源 loader）</td></tr>
+          <tr><td>启动开销</td><td>0 构建步骤，直接 <code>&lt;script src&gt;</code> 运行</td><td>需 Webpack/Vite 打包或特定 CLI</td></tr>
+          <tr><td>外部音频</td><td>可 <b>完全不依赖外部音频文件</b>（合成音源占位）</td><td>必须配置音频资源服务器或打包 mp3/ogg</td></tr>
+          <tr><td>Live2D 离屏缓存</td><td><b>内置</b>，脏值签名减少 drawImage 70%+</td><td>部分方案每帧重绘整模型</td></tr>
+          <tr><td>Node 测试</td><td><b>无 DOM 环境可正常加载</b>（全部 API no-op 不抛异常）</td><td>多需 jsdom polyfill</td></tr>
+          <tr><td>已读跳过</td><td>支持 <b>"只读跳过"（skipReadOnly）</b> 模式，自动暂停未读</td><td>需要手工实现</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 2. 5 分钟上手 -->
+    <section class="doc" id="quickstart">
+      <h2 class="sec"><span class="n">2</span> 5 分钟上手</h2>
+      <p class="lede">本节将带你在一份空白 HTML 中，写出一个完整的、有分支、有背景音乐、有 Live2D 的最小 Demo。</p>
+
+      <h3 class="sub" id="qs-import">2.1 引入 lument.js</h3>
+      <pre><code><span class="code-comment">&lt;!-- 下载仓库 runtime/js/lument.js，放到你项目任意位置 --&gt;</span>
+&lt;<span class="code-kw">script</span> src=<span class="code-str">"lument.js"</span>&gt;&lt;/<span class="code-kw">script</span>&gt;
+&lt;<span class="code-kw">canvas</span> id=<span class="code-str">"game"</span> width=<span class="code-num">"1280"</span> height=<span class="code-num">"720"</span> style=<span class="code-str">"width:100%;aspect-ratio:16/9;max-width:1200px;"</span>&gt;&lt;/<span class="code-kw">canvas</span>&gt;</code></pre>
+
+      <h3 class="sub" id="qs-init">2.2 初始化引擎 + GAL</h3>
+      <pre><code><span class="code-comment">// 初始化引擎（Canvas2D 渲染、1280×720 内部逻辑分辨率）</span>
+<span class="code-fn">Lument</span>.<span class="code-fn">init</span>({ width: <span class="code-num">1280</span>, height: <span class="code-num">720</span>, rendererType: <span class="code-num">3</span> });
+
+<span class="code-comment">// 初始化 GAL 子系统，定制对话框样式</span>
+<span class="code-fn">Lument</span>.<span class="code-fn">galInit</span>({
+  bgColor:       { r: <span class="code-num">9</span>, g: <span class="code-num">14</span>, b: <span class="code-num">36</span>, a: <span class="code-num">220</span> },
+  nameColor:     { r: <span class="code-num">34</span>, g: <span class="code-num">62</span>, b: <span class="code-num">120</span>, a: <span class="code-num">250</span> },
+  borderColor:   { r: <span class="code-num">138</span>, g: <span class="code-num">180</span>, b: <span class="code-num">255</span>, a: <span class="code-num">110</span> },
+  typewriterSpeed: <span class="code-num">6</span>,          <span class="code-comment">// 1..10，默认 5</span>
+  textFontSize:  <span class="code-num">24</span>,
+  nameFontSize:  <span class="code-num">22</span>,
+});
+
+<span class="code-comment">// （可选）初始化 Live2D 子系统</span>
+<span class="code-fn">Lument</span>.<span class="code-fn">live2dInit</span>();</code></pre>
+
+      <h3 class="sub" id="qs-script">2.3 写第一份 GalScript</h3>
+      <p>把剧本作为多行字符串传入 <code>galLoadScript</code>，然后调用 <code>galStart</code>：</p>
+      <pre><code><span class="code-kw">const</span> <span class="code-var">src</span> = <span class="code-str">`
+@bg #1b1f52 FADE 1000
+@effect fade_from_black 800
+
+# 这是注释
+Alice: 你好呀，我是 Alice～欢迎来到 LumentGAL！
+Bob:   要不要来一杯咖啡？
+
+@choose coffee|好呀，谢谢;tea|更想喝茶
+:coffee
+Alice: （笑）就知道你会选这个。
+@set flag_AliceLove += 1
+@jump end_route
+
+:tea
+Bob:   哈，品味不错。
+@set flag_BobLove += 1
+@jump end_route
+
+:end_route
+@bg #0a0a24 FADE 1200
+旁白: 故事就这样开始了……
+@end
+`</span>;
+
+<span class="code-kw">const</span> <span class="code-var">sid</span> = <span class="code-fn">Lument</span>.<span class="code-fn">galLoadScript</span>(<span class="code-str">'chapter1'</span>, <span class="code-var">src</span>);
+<span class="code-fn">Lument</span>.<span class="code-fn">galStart</span>(<span class="code-var">sid</span>);  <span class="code-comment">// 或 galStart('chapter1')</span></code></pre>
+
+      <h3 class="sub" id="qs-loop">2.4 主循环 + 输入</h3>
+      <pre><code><span class="code-kw">const</span> <span class="code-var">canvas</span> = <span class="code-fn">document</span>.<span class="code-fn">getElementById</span>(<span class="code-str">'game'</span>);
+
+<span class="code-comment">// 点击画布推进；也可用键盘 Space</span>
+<span class="code-var">canvas</span>.<span class="code-fn">addEventListener</span>(<span class="code-str">'pointerdown'</span>, (<span class="code-var">e</span>) =&gt; {
+  <span class="code-kw">const</span> <span class="code-var">r</span>  = <span class="code-var">canvas</span>.<span class="code-fn">getBoundingClientRect</span>();
+  <span class="code-kw">const</span> <span class="code-var">sx</span> = (<span class="code-var">e</span>.clientX - <span class="code-var">r</span>.left) * (<span class="code-num">1280</span> / <span class="code-var">r</span>.width);
+  <span class="code-kw">const</span> <span class="code-var">sy</span> = (<span class="code-var">e</span>.clientY - <span class="code-var">r</span>.top)  * (<span class="code-num">720</span>  / <span class="code-var">r</span>.height);
+  <span class="code-comment">// 先处理选项按钮点击；未命中则普通推进</span>
+  <span class="code-kw">if</span> (!<span class="code-fn">Lument</span>.<span class="code-fn">galHandleClick</span>(<span class="code-var">sx</span>, <span class="code-var">sy</span>)) {
+    <span class="code-fn">Lument</span>.<span class="code-fn">galAdvance</span>();
+  }
+});
+<span class="code-fn">window</span>.<span class="code-fn">addEventListener</span>(<span class="code-str">'keydown'</span>, (<span class="code-var">e</span>) =&gt; {
+  <span class="code-kw">if</span> (<span class="code-var">e</span>.code === <span class="code-str">'Space'</span>){ <span class="code-var">e</span>.<span class="code-fn">preventDefault</span>(); <span class="code-fn">Lument</span>.<span class="code-fn">galAdvance</span>(); }
+  <span class="code-kw">if</span> (<span class="code-var">e</span>.key  === <span class="code-str">'a'</span>){ <span class="code-fn">Lument</span>.<span class="code-fn">galSetPrefAuto</span>(!<span class="code-fn">Lument</span>.<span class="code-fn">galGetPrefAuto</span>()); }
+  <span class="code-kw">if</span> (<span class="code-var">e</span>.key  === <span class="code-str">'s'</span>){ <span class="code-fn">Lument</span>.<span class="code-fn">galSetPrefSkip</span>(!<span class="code-fn">Lument</span>.<span class="code-fn">galGetPrefSkip</span>()); }
+});
+
+<span class="code-comment">// 主循环：每帧 update + render</span>
+<span class="code-kw">let</span> <span class="code-var">last</span> = <span class="code-fn">performance</span>.<span class="code-fn">now</span>();
+<span class="code-kw">function</span> <span class="code-fn">loop</span>(<span class="code-var">ts</span>) {
+  <span class="code-kw">const</span> <span class="code-var">dt</span> = <span class="code-fn">Math</span>.<span class="code-fn">min</span>(<span class="code-num">100</span>, <span class="code-var">ts</span> - <span class="code-var">last</span>); <span class="code-var">last</span> = <span class="code-var">ts</span>;
+  <span class="code-fn">Lument</span>.<span class="code-fn">beginFrame</span>();
+  <span class="code-fn">Lument</span>.<span class="code-fn">galUpdate</span>(<span class="code-var">dt</span>);
+  <span class="code-fn">Lument</span>.<span class="code-fn">galRender</span>();
+  <span class="code-fn">Lument</span>.<span class="code-fn">endFrame</span>();
+  <span class="code-fn">requestAnimationFrame</span>(<span class="code-fn">loop</span>);
+}
+<span class="code-fn">requestAnimationFrame</span>(<span class="code-fn">loop</span>);</code></pre>
+
+      <h3 class="sub" id="qs-demo">2.5 打开完整 Demo 体验全部功能</h3>
+      <p>仓库内 <a href="../examples/lument_gal_demo.html"><code>examples/lument_gal_demo.html</code></a> 包含了本手册所有功能演示：好感度 HUD + 历史记录浮层 + 合成 BGM/SE + 结局卡片 + Live2D 点击交互。</p>
+    </section>
+
+    <!-- 3. DSL -->
+    <section class="doc" id="dsl">
+      <h2 class="sec"><span class="n">3</span> 剧本 DSL 参考</h2>
+      <p class="lede">GalScript 是一个对"非程序员作者"友好的 DSL：每行一条命令或一句对白，支持 <code># 注释</code>、<code>:标签</code>、<code>${变量插值}</code>。</p>
+
+      <h3 class="sub" id="dsl-basic">3.1 基本规则</h3>
+      <ul>
+        <li><b>换行即分隔</b>：按 <code>\n</code> 切行，一行一条语句或对白。</li>
+        <li><b>注释</b>：<code># 这是注释</code>（整行），或 <code>// 行尾注释</code>。</li>
+        <li><b>标签</b>：<code>:label_name</code>，供 <code>@jump / @call / @choose</code> 跳转。</li>
+        <li><b>变量插值</b>：对白/旁白文本中使用 <code>${变量名}</code> 会被 <code>galGetVar</code> 运行时替换。</li>
+        <li><b>大小写</b>：命令关键字（<code>FADE</code>、<code>LEFT</code>）大小写不敏感；标签名和变量名区分大小写。</li>
+      </ul>
+
+      <h3 class="sub" id="dsl-dialogue">3.2 对白 &amp; 旁白</h3>
+      <table class="tbl">
+        <tr><th>语法</th><th>含义</th><th>示例</th></tr>
+        <tr><td><code>角色: 对白文本</code></td><td>角色台词，对话框显示角色名框</td><td><code>Alice: 今天的天气真不错呢～</code></td></tr>
+        <tr><td><code>Narrator: 文本</code> 或直接纯文本</td><td>旁白，对话框不显示角色名框</td><td><code>风拂过她的发梢。</code></td></tr>
+        <tr><td><code>旁白: 文本</code></td><td>同 Narrator，中文别名</td><td><code>旁白: 故事才刚刚开始。</code></td></tr>
+      </table>
+      <div class="tip"><b>💡 小技巧：</b>在对白文本里插入 <code>\n</code> 可以手动换行（例如分两行的诗句）；默认会根据对话框宽度自动换行。</div>
+
+      <h3 class="sub" id="dsl-bg">3.3 背景 / 立绘 / CG</h3>
+      <pre><code><span class="code-comment"># 背景：十六进制颜色 或 图片名(纹理名)</span>
+<span class="code-kw">@bg</span> <span class="code-str">#1b1f52</span> <span class="code-kw">FADE</span> <span class="code-num">1000</span>
+<span class="code-kw">@bg</span> <span class="code-str">classroom_day</span> <span class="code-kw">DISSOLVE</span> <span class="code-num">800</span>
+
+<span class="code-comment"># 立绘：sprite名 / live2d:模型id  SLOT 表情 透明度 TWEEN 时长</span>
+<span class="code-kw">@show</span> <span class="code-var">alice_default</span>  <span class="code-kw">LEFT</span>   happy   <span class="code-num">1</span>    <span class="code-kw">FADE</span> <span class="code-num">700</span>
+<span class="code-kw">@show</span> <span class="code-var">live2d</span>:<span class="code-num">1</span>         <span class="code-kw">RIGHT</span>  neutral <span class="code-num">1</span>    <span class="code-kw">SLIDE_R</span> <span class="code-num">500</span>
+<span class="code-kw">@hide</span> <span class="code-var">alice_default</span>  <span class="code-kw">FADE</span> <span class="code-num">500</span>
+
+<span class="code-comment"># CG：全屏图片（通常用于事件 CG）</span>
+<span class="code-kw">@cg</span>   <span class="code-str">event_handhold</span> <span class="code-kw">FADE</span> <span class="code-num">800</span>
+<span class="code-kw">@cg</span>   <span class="code-str">hide</span> <span class="code-kw">FADE</span> <span class="code-num">500</span>   <span class="code-comment">// 或 @hidecg</span></code></pre>
+      <p><b>TWEEN 种类</b>（<code>Lument.GAL_TWEEN</code>）：NONE, FADE, SLIDE_L, SLIDE_R, SLIDE_U, SLIDE_D, ZOOM, DISSOLVE, CUT。</p>
+      <p><b>立绘 SLOT</b>（<code>Lument.GAL_SLOT</code>）：LEFT, CENTER, RIGHT, CUSTOM。立绘会在相应槽位做自动定位。</p>
+
+      <h3 class="sub" id="dsl-live2d">3.4 Live2D 交互</h3>
+      <pre><code><span class="code-kw">@live2d</span> <span class="code-num">1</span> <span class="code-kw">expression</span> happy
+<span class="code-kw">@live2d</span> <span class="code-num">1</span> <span class="code-kw">motion</span> Idle:<span class="code-num">0</span>       <span class="code-comment">// 组名:序号；可选优先级（@后面）</span>
+<span class="code-kw">@live2d</span> <span class="code-num">1</span> <span class="code-kw">param</span> ParamMouthOpenY <span class="code-num">1.0</span>   <span class="code-comment">// 直接设置 Cubism 参数</span>
+<span class="code-kw">@live2d</span> <span class="code-num">1</span> <span class="code-kw">visible</span> <span class="code-kw">off</span>
+<span class="code-kw">@live2d</span> <span class="code-num">1</span> <span class="code-kw">visible</span> <span class="code-kw">on</span></code></pre>
+
+      <h3 class="sub" id="dsl-choose">3.5 选项分支</h3>
+      <p>语法：<code>@choose label1|选项1文本;label2|选项2文本 ...</code>。遇到这条命令时剧本会<b>暂停</b>，直到玩家点击选项或按下 1~9 数字键，然后跳转到对应标签。</p>
+      <pre><code><span class="code-kw">@choose</span> route_a|答应 Alice 的告白;route_b|答应 Bob 的告白;route_c|两个都不选
+
+:<span class="code-var">route_a</span>
+<span class="code-kw">@set</span> end_flag = <span class="code-str">'alice_true'</span>
+<span class="code-kw">@jump</span> ending
+
+:<span class="code-var">route_b</span>
+<span class="code-kw">@set</span> end_flag = <span class="code-str">'bob_true'</span>
+<span class="code-kw">@jump</span> ending
+
+:<span class="code-var">route_c</span>
+<span class="code-kw">@set</span> end_flag = <span class="code-str">'normal'</span>
+<span class="code-kw">@jump</span> ending</code></pre>
+
+      <h3 class="sub" id="dsl-var">3.6 变量 &amp; 条件跳转</h3>
+      <pre><code><span class="code-comment"># 赋值 / 算术</span>
+<span class="code-kw">@set</span> <span class="code-var">aff_Alice</span> = <span class="code-num">2</span>
+<span class="code-kw">@set</span> <span class="code-var">aff_Alice</span> += <span class="code-num">1</span>
+<span class="code-kw">@set</span> <span class="code-var">aff_Alice</span> -= <span class="code-num">3</span>
+<span class="code-kw">@set</span> <span class="code-var">day_count</span> = <span class="code-str">'Monday'</span>
+<span class="code-kw">@set</span> <span class="code-var">flag_seen_event_x</span> = <span class="code-kw">true</span>
+
+<span class="code-comment"># 条件跳转：@if 变量 运算符 值  目标标签</span>
+<span class="code-kw">@if</span> <span class="code-var">aff_Alice</span> &gt;= <span class="code-num">7</span>  alice_true_end
+<span class="code-kw">@if</span> <span class="code-var">aff_Alice</span> &lt; <span class="code-num">3</span>   normal_end
+<span class="code-kw">@if</span> <span class="code-var">end_flag</span> == alice_true_end  epilogue_alice</code></pre>
+      <p>支持运算符：<code>== != &lt; &lt;= &gt; &gt;=</code>。字符串比较时不加引号也可，自动做字符串相等判断。</p>
+      <div class="tip"><b>💡 好感度追踪</b>：在 JS 端调用 <code>Lument.galSetOnVarChange((k,o,n)=>…)</code>，就可以监听 <code>aff_Alice</code> 这类变量变化，实时刷新你自己的好感度 HUD。</div>
+
+      <h3 class="sub" id="dsl-audio">3.7 音频命令</h3>
+      <pre><code><span class="code-comment"># BGM （全局同时间只存在一个，切换自动 crossfade）</span>
+<span class="code-kw">@bgm</span> <span class="code-str">opening_theme.ogg</span> <span class="code-kw">loop</span> <span class="code-num">0.7</span> <span class="code-num">800</span>    <span class="code-comment">// loop 开关 · 音量 · fadeMs</span>
+<span class="code-kw">@bgm</span> <span class="code-kw">stop</span> <span class="code-num">600</span>
+
+<span class="code-comment"># SE （音效，并发最多 16 路）</span>
+<span class="code-kw">@se</span> <span class="code-str">click.wav</span> <span class="code-num">0.8</span>
+
+<span class="code-comment"># 语音 （同一时刻最多一个）</span>
+<span class="code-kw">@voice</span> <span class="code-str">alice_line_012.ogg</span> <span class="code-num">1.0</span> <span class="code-str">Alice</span>  <span class="code-comment">// 第 3 个参数自动绑定说话者</span>
+Alice: ${这里会等语音播放后再推进?不，默认并行}</code></pre>
+
+      <h3 class="sub" id="dsl-efx">3.8 屏幕演出</h3>
+      <pre><code><span class="code-kw">@shake</span> <span class="code-num">6</span> <span class="code-num">500</span>                 <span class="code-comment">// 强度 6，持续 500 ms</span>
+<span class="code-kw">@effect</span> <span class="code-str">flash</span> <span class="code-num">400</span>            <span class="code-comment">// 白闪 400ms</span>
+<span class="code-kw">@effect</span> <span class="code-str">fade_to_black</span> <span class="code-num">800</span>
+<span class="code-kw">@effect</span> <span class="code-str">fade_from_black</span> <span class="code-num">800</span>
+<span class="code-kw">@wait</span> <span class="code-num">1200</span>                       <span class="code-comment">// 暂停 1.2s 再继续下一行</span></code></pre>
+
+      <h3 class="sub" id="dsl-flow">3.9 流程控制 (call / ret)</h3>
+      <p>当你有一段公共剧情想复用（例如"两人进入咖啡店"的通用过场），可以用 <code>@call / @ret</code> 模拟"子程序"：</p>
+      <pre><code><span class="code-kw">@call</span> enter_cafe
+Alice: 还是老位置～
+<span class="code-kw">@jump</span> after_cafe
+
+:<span class="code-var">enter_cafe</span>
+旁白: 门铃响起，咖啡香扑面而来。
+Bob:   老板娘，两杯拿铁。
+<span class="code-kw">@ret</span>
+
+:<span class="code-var">after_cafe</span>
+…</code></pre>
+
+      <h3 class="sub" id="dsl-all">3.10 24 种命令速查表</h3>
+      <table class="tbl">
+        <tr><th>#</th><th>命令</th><th>格式示例</th><th>说明</th></tr>
+        <tr><td>1</td><td><code>@bg</code></td><td><code>@bg #1a1a2e FADE 1000</code></td><td>切换背景（图片名或色值 + TWEEN + ms）</td></tr>
+        <tr><td>2</td><td><code>@show</code></td><td><code>@show sp LEFT happy 1 FADE 500</code></td><td>显示立绘（sprite 名 + SLOT + 表情 + α + TWEEN + ms）</td></tr>
+        <tr><td>3</td><td><code>@hide</code></td><td><code>@hide sp FADE 500</code></td><td>隐藏立绘</td></tr>
+        <tr><td>4</td><td><code>@cg</code> / <code>@showcg</code></td><td><code>@cg event_01 FADE 800</code></td><td>显示 CG 全屏图</td></tr>
+        <tr><td>5</td><td><code>@hidecg</code></td><td><code>@hidecg FADE 600</code></td><td>隐藏 CG</td></tr>
+        <tr><td>6</td><td><code>@live2d</code></td><td><code>@live2d 1 expression happy</code></td><td>Live2D 表情/动作/参数/可视</td></tr>
+        <tr><td>7</td><td><code>@choose</code></td><td><code>@choose a|选A;b|选B</code></td><td>选项分支（暂停等待玩家）</td></tr>
+        <tr><td>8</td><td><code>@jump</code></td><td><code>@jump label_name</code></td><td>无条件跳转标签</td></tr>
+        <tr><td>9</td><td><code>@if</code></td><td><code>@if aff >= 7 end_good</code></td><td>条件跳转</td></tr>
+        <tr><td>10</td><td><code>@call</code></td><td><code>@call enter_cafe</code></td><td>调用子标签（推入 call 栈）</td></tr>
+        <tr><td>11</td><td><code>@ret</code></td><td><code>@ret</code></td><td>从 call 栈返回</td></tr>
+        <tr><td>12</td><td><code>@set</code></td><td><code>@set x += 1</code></td><td>变量赋值 / 加减</td></tr>
+        <tr><td>13</td><td><code>@bgm</code></td><td><code>@bgm ogg loop 0.7 800</code></td><td>播放 / 停止 BGM</td></tr>
+        <tr><td>14</td><td><code>@se</code></td><td><code>@se click 0.8</code></td><td>播放音效</td></tr>
+        <tr><td>15</td><td><code>@voice</code></td><td><code>@voice line01 1.0 Alice</code></td><td>播放语音（绑定说话者）</td></tr>
+        <tr><td>16</td><td><code>@shake</code></td><td><code>@shake 4 400</code></td><td>屏幕震动</td></tr>
+        <tr><td>17</td><td><code>@effect</code></td><td><code>@effect flash 400</code></td><td>屏幕演出：flash / fade_to_black / fade_from_black</td></tr>
+        <tr><td>18</td><td><code>@wait</code></td><td><code>@wait 1000</code></td><td>等待毫秒再继续</td></tr>
+        <tr><td>19</td><td><code>@say</code></td><td><code>@say Alice 台词文本</code></td><td>显式命令式对白（与 <code>Alice: 台词</code> 等价）</td></tr>
+        <tr><td>20</td><td><code>@narrate</code></td><td><code>@narrate 夜幕降临。</code></td><td>显式命令式旁白</td></tr>
+        <tr><td>21</td><td><code>@autospeed</code></td><td><code>@autospeed 3000</code></td><td>设置自动模式下两句对白之间的延迟毫秒</td></tr>
+        <tr><td>22</td><td><code>@title</code></td><td><code>@title</code></td><td>触发 <code>Lument.galOnTitle</code> 回调（用于切标题画面）</td></tr>
+        <tr><td>23</td><td><code>@end</code></td><td><code>@end</code></td><td>结束剧本，触发 <code>Lument.galOnEnd</code> 回调</td></tr>
+        <tr><td>24</td><td><code>@save / @load</code></td><td><code>@save 0 / @load 1</code></td><td>剧本内触发存/读档（少见但支持）</td></tr>
+      </table>
+    </section>
+
+    <!-- 4. GAL API -->
+    <section class="doc" id="api-gal">
+      <h2 class="sec"><span class="n">4</span> GAL 子系统 API</h2>
+      <p class="lede">所有 GAL 相关 API 均挂载在 <code>Lument.*</code> 命名空间下。类型定义见 <code>runtime/js/lument.d.ts</code>。</p>
+
+      <h3 class="sub" id="gal-lifecycle">4.1 生命周期</h3>
+      <table class="tbl">
+        <tr><th>签名</th><th>说明</th></tr>
+        <tr><td><code>galInit(styleOpt?)</code></td><td>初始化 GAL 子系统；加载持久化偏好（localStorage）。可覆盖对话框样式。</td></tr>
+        <tr><td><code>galShutdown()</code></td><td>停止播放、清空所有状态并释放订阅者（避免重复初始化内存泄漏）。</td></tr>
+        <tr><td><code>galIsRunning(): boolean</code></td><td>当前是否处于剧本播放中。</td></tr>
+      </table>
+
+      <h3 class="sub" id="gal-script">4.2 剧本 &amp; 推进</h3>
+      <table class="tbl">
+        <tr><th>签名</th><th>说明</th></tr>
+        <tr><td><code>galLoadScript(name, src): number</code></td><td>解析 GalScript，返回脚本 id，可 <code>galStart(id)</code> 或 <code>galStart(name)</code>。</td></tr>
+        <tr><td><code>galParseScript(name, src): ScriptObj</code></td><td>只解析不注册，拿到内部结构做静态分析。</td></tr>
+        <tr><td><code>galStart(idOrName, entryLabel?)</code></td><td>从脚本（可选指定入口标签）开始播放。</td></tr>
+        <tr><td><code>galStop()</code></td><td>停止剧本运行，但保留当前 history 和变量状态供调试。</td></tr>
+        <tr><td><code>galAdvance()</code></td><td>用户点击推进：打字机未完→瞬间显示完；打字机完→下一句。</td></tr>
+        <tr><td><code>galSkip(v:bool)</code></td><td>开/关快进模式（与偏好联动持久化）。</td></tr>
+        <tr><td><code>galSetSkipReadOnly(v:bool) / galGetSkipReadOnly()</code></td><td><b>只读跳过</b>：开时快进只推进"已读文本"，遇到未读自动停下。</td></tr>
+        <tr><td><code>galAuto(v:bool) / galSetAutoDelay(ms)</code></td><td>自动播放 &amp; 句间延迟（默认 2500ms）。</td></tr>
+        <tr><td><code>galGotoLabel(label)</code></td><td>立即跳标签（可用于引擎外部事件驱动剧情跳转）。</td></tr>
+        <tr><td><code>galSelectChoice(i)</code></td><td>脚本暂停在选项点时，按下标触发选择。</td></tr>
+        <tr><td><code>galChoose(labelOrIndexOrText)</code></td><td>按标签 / 下标 / 选项文本触发选择；对外最常用的分支驱动 API。</td></tr>
+        <tr><td><code>galGetChoices(): Array&lt;{label,text}&gt; | null</code></td><td>获取当前所有选项；不在选项点时返回 null。</td></tr>
+        <tr><td><code>galGetChoiceCount() / galGetChoiceText(i)</code></td><td>查询当前选项以便做自定义 UI 渲染。</td></tr>
+      </table>
+
+      <h3 class="sub" id="gal-dialog">4.3 对话框 &amp; 历史</h3>
+      <table class="tbl">
+        <tr><th>签名</th><th>说明</th></tr>
+        <tr><td><code>galSetDialogStyle(Partial&lt;DialogStyle&gt;)</code></td><td>动态改对话框样式（字体、颜色、位置、圆角…）。</td></tr>
+        <tr><td><code>galShowDialog(v:bool) / galIsDialogVisible()</code></td><td>显隐对话框（常见于 CG 特写时隐藏）。</td></tr>
+        <tr><td><code>galSay(name, text)</code></td><td>直接从 JS 插入一句对白（常用于脚本外的动态文本）。</td></tr>
+        <tr><td><code>galHandleClick(sx, sy): bool</code></td><td>命中画布内渲染出的选项框→自动选择并返回 true。</td></tr>
+        <tr><td><b>历史</b></td><td></td></tr>
+        <tr><td><code>galGetHistoryCount(): number</code></td><td>历史对白总条数（对白会自动累积，存档读档也会恢复 history）。</td></tr>
+        <tr><td><code>galGetHistoryEntry(i): {name,text,voice,read?}</code></td><td>按索引取一条历史条目。</td></tr>
+        <tr><td><code>galClearHistory()</code></td><td>清空历史（用于共通线结束后另起新篇章）。</td></tr>
+        <tr><td><code>galGetHistoryPageCount(pageSize): number</code></td><td>翻页总页数。</td></tr>
+        <tr><td><code>galGetHistoryPage(idx, pageSize): HistoryItem[]</code></td><td>拿一页历史（含 <code>index</code> 和 <code>read</code> 标记，方便做 NEW 角标）。</td></tr>
+        <tr><td><code>galIsCurrentLineRead(): bool</code></td><td>当前正在显示的这句对白是否"已读过"（用于 HUD 指示已读/未读）。</td></tr>
+      </table>
+
+      <h3 class="sub" id="gal-scene">4.4 立绘 / 背景 / CG</h3>
+      <table class="tbl">
+        <tr><th>签名</th><th>说明</th></tr>
+        <tr><td><code>galCreateSprite(img, slot, z?): id</code></td><td>注册一张图片为立绘资源并分配槽位；返回立绘 id。</td></tr>
+        <tr><td><code>galDestroySprite(id)</code></td><td>注销立绘。</td></tr>
+        <tr><td><code>galAttachLive2d(modelId, slot, z?): spId</code></td><td>把已加载的 Live2D 模型挂载为立绘，随 GAL 场景管理显示/隐藏和补间。<b>推荐</b>用法。</td></tr>
+        <tr><td><code>galShowSprite(id|name, slot?, expr?, alpha?, tween?, dur?)</code></td><td>从 JS 触发立绘显示。</td></tr>
+        <tr><td><code>galHideSprite(id|name, tween?, dur?)</code></td><td>从 JS 触发立绘隐藏。</td></tr>
+        <tr><td><code>galSetSpritePosition(id|name, x, y)</code></td><td>直接设置立绘坐标（CUSTOM 槽位常用）。</td></tr>
+        <tr><td><code>galSetSpriteScale(id|name, s)</code></td><td>立绘缩放。</td></tr>
+        <tr><td><code>galSetSpriteExpression(id|name, expr)</code></td><td>设置立绘/Live2D 表情。</td></tr>
+        <tr><td><code>galSetBackground(imgOrColor, tween?, dur?)</code></td><td>JS 端切背景。</td></tr>
+        <tr><td><code>galShowCG(img, tween?, dur?) / galHideCG(tween?, dur?)</code></td><td>CG 全屏图。</td></tr>
+      </table>
+
+      <h3 class="sub" id="gal-var">4.5 变量 &amp; 事件</h3>
+      <table class="tbl">
+        <tr><th>签名</th><th>说明</th></tr>
+        <tr><td><code>galSetVar(k,v) / galSetVarInt/Float/Bool(k,v)</code></td><td>设值，类型化版本会确保存入值为 number/bool。</td></tr>
+        <tr><td><code>galGetVar(k,def?) / galGetVarInt/Float/Bool(k,def?)</code></td><td>取值。</td></tr>
+        <tr><td><code>galSetOnVarChange(fn | null)</code></td><td>注册变量变更回调 <code>(k, oldVal, newVal) => void</code>。</td></tr>
+        <tr><td><code>galRemoveOnVarChange()</code></td><td>移除回调。</td></tr>
+        <tr><td><code>galSetOnRead(fn | null)</code></td><td>当一句<b>未读对白首次播放</b>时触发，可用于统计/解锁成就。</td></tr>
+      </table>
+
+      <h3 class="sub" id="gal-save">4.6 存档读档（4.6 节独立细化，也可参考第 7 章）</h3>
+      <table class="tbl">
+        <tr><th>签名</th><th>说明</th></tr>
+        <tr><td><code>galSave(slot, title?): bool</code></td><td>写入槽位 0..N（默认 3 个槽位，可扩展到任意数）。</td></tr>
+        <tr><td><code>galLoad(slot): bool</code></td><td>读取槽位。</td></tr>
+        <tr><td><code>galDeleteSave(slot)</code></td><td>删除。</td></tr>
+        <tr><td><code>galGetSaveInfo(slot): SaveInfo</code></td><td>返回 <code>{used,title,summary,timestamp,scriptName,lineNo,…}</code>。</td></tr>
+        <tr><td><code>galQuickSave(): bool / galQuickLoad(): bool</code></td><td>快速存读档（独立于 0..N 槽位，占用 slot=-1 内部空间）。</td></tr>
+      </table>
+
+      <h3 class="sub" id="gal-render">4.7 偏好设置 &amp; 演出</h3>
+      <table class="tbl">
+        <tr><th>分类</th><th>函数</th></tr>
+        <tr><td>文字速度</td><td><code>galSetPrefTextSpeed(1..10) / galGetPrefTextSpeed()</code></td></tr>
+        <tr><td>自动/快进</td><td><code>galSetPrefAuto/GetPrefAuto</code>、<code>galSetPrefSkip/GetPrefSkip</code></td></tr>
+        <tr><td>音量（0=SE 1=BGM 2=Voice）</td><td><code>galSetPrefVolume(group, 0..1) / galGetPrefVolume(group)</code></td></tr>
+        <tr><td>屏幕演出</td><td><code>galShake(intensity?, ms?) / galFadeTo(color, ms?) / galFadeFrom(color?, ms?)</code></td></tr>
+        <tr><td>回调</td><td><code>galOnEnd / galOnTitle</code>（可赋值属性）+ <code>galSetOnVarChange / galSetOnRead</code>。</td></tr>
+      </table>
+
+      <h3 class="sub" id="gal-loop">4.8 每帧 update / render</h3>
+      <pre><code><span class="code-fn">Lument</span>.<span class="code-fn">beginFrame</span>();
+<span class="code-fn">Lument</span>.<span class="code-fn">galUpdate</span>(dtMs);   <span class="code-comment">// 打字机推进、自动/快进、补间、BGM fade、Live2D tick</span>
+<span class="code-fn">Lument</span>.<span class="code-fn">galRender</span>();       <span class="code-comment">// 画背景→立绘（z 排序）→CG→对话框→选项→屏幕震动/淡入淡出</span>
+<span class="code-fn">Lument</span>.<span class="code-fn">endFrame</span>();</code></pre>
+      <div class="warn"><b>⏱ 性能提示：</b><code>dtMs</code> 建议做上限夹取（例如 <code>Math.min(100, dt)</code>），避免切换 Tab 回来后补间一次性跳完、闪屏。</div>
+    </section>
+
+    <!-- 5. Live2D API -->
+    <section class="doc" id="api-live2d">
+      <h2 class="sec"><span class="n">5</span> Live2D 子系统 API</h2>
+
+      <h3 class="sub" id="l2d-overview">5.1 接入说明</h3>
+      <p>Lument Live2D 子系统采用"占位优先"设计：即使你没有真实的 <code>.model3.json</code>，<code>live2dLoadModel()</code> 也会返回一个参数化占位模型，完整支持表情/动作/点击反馈——非常适合剧本还没做完资源、先写玩法的阶段。</p>
+      <div class="tip"><b>有真实资源时</b>：传入 <code>live2dLoadModel('/assets/my.model3.json')</code>，Lument 会按标准 Cubism Web SDK 2.x 约定解析并加载纹理 / 动作 / 表情。</div>
+
+      <h3 class="sub" id="l2d-lifecycle">5.2 生命周期 &amp; 模型</h3>
+      <table class="tbl">
+        <tr><th>签名</th><th>说明</th></tr>
+        <tr><td><code>live2dInit(corePath?)</code></td><td>初始化子系统（只做一次；重复调用 no-op）。corePath 目前保留接口，占位模型无需传参。</td></tr>
+        <tr><td><code>live2dShutdown()</code></td><td>销毁所有模型，释放离屏缓存 canvas。</td></tr>
+        <tr><td><code>live2dLoadModel(model3JsonPath?): number</code></td><td>返回模型 id（≥1）。</td></tr>
+        <tr><td><code>live2dReleaseModel(id)</code></td><td>释放单个模型。</td></tr>
+        <tr><td><code>live2dIsReady(id): bool</code></td><td>占位模型始终为 true；真实模型需等资源加载完。</td></tr>
+        <tr><td><code>live2dSetTransform(id, Partial&lt;Transform&gt;)</code></td><td><code>{x,y,scaleX,scaleY,rotation,z,alpha}</code>，以 1280×720 虚拟坐标系为准。</td></tr>
+        <tr><td><code>live2dGetTransform(id): Transform | null</code></td><td>读取当前 transform。</td></tr>
+        <tr><td><code>live2dSetLayer(id, z)</code></td><td>z 越大越靠前，用于多角色叠放。</td></tr>
+        <tr><td><code>live2dSetVisible(id, v)</code></td><td>显隐（离屏缓存同样会暂停脏值更新）。</td></tr>
+        <tr><td><code>live2dHitTest(id, x, y): string | null</code></td><td>点击碰撞检测，返回 <code>'Head' / 'Body' / null</code> 等（占位模型按矩形分区）。</td></tr>
+      </table>
+
+      <h3 class="sub" id="l2d-motion">5.3 动作 &amp; 表情</h3>
+      <table class="tbl">
+        <tr><th>签名</th><th>说明</th></tr>
+        <tr><td><code>live2dGetMotionGroupCount(id, group): number</code></td><td>查询某动作组的长度（占位模型 Idle 组长度 1；TapBody 1；Flick_Head 1）。</td></tr>
+        <tr><td><code>live2dStartMotion(id, group, index, priority?): number</code></td><td>触发动作。priority 越大越优先；高优先级会打断低优先级。</td></tr>
+        <tr><td><code>live2dIsMotionPlaying(id): bool / live2dStopMotion(id)</code></td><td>动作状态控制。</td></tr>
+        <tr><td><code>live2dGetExpressionCount(id)</code></td><td>表情数量（占位模型 neutral/happy/sad/angry/surprise 共 5 种）。</td></tr>
+        <tr><td><code>live2dGetExpressionName(id, i)</code></td><td>第 i 个表情名。</td></tr>
+        <tr><td><code>live2dSetExpression(id, name)</code></td><td>切指定表情。</td></tr>
+        <tr><td><code>live2dSetExpressionRandom(id)</code></td><td>随机表情（常用于点击身体反馈）。</td></tr>
+      </table>
+
+      <h3 class="sub" id="l2d-auto">5.4 自动动画</h3>
+      <p>默认启用。<b>全部是占位模型内置的 Canvas2D 合成动画</b>，无需外部资源：</p>
+      <ul>
+        <li><code>live2dEnableAutoBlink(id, v)</code> 自动眨眼（眼睑覆盖，随机 3~7s 间隔）。</li>
+        <li><code>live2dEnableAutoEye(id, v)</code>   视线追踪鼠标/触摸。</li>
+        <li><code>live2dEnableAutoHead(id, v)</code>  头部随视线轻微转动。</li>
+        <li><code>live2dEnableAutoMouth(id, v)</code> 口型：有语音播放时按包络自动开合；无语音时按打字机节奏轻微张合。</li>
+      </ul>
+
+      <h3 class="sub" id="l2d-params">5.5 参数化控制</h3>
+      <table class="tbl">
+        <tr><th>签名</th><th>说明</th></tr>
+        <tr><td><code>live2dSetParam(id, paramId, value)</code></td><td>直接设置 Cubism 参数。占位模型识别 <code>ParamAngleX/Y/Z, ParamEyeBallX/Y, ParamMouthOpenY, ParamBrowAngleY</code>。</td></tr>
+        <tr><td><code>live2dGetParam(id, paramId, defVal?)</code></td><td>取参数。</td></tr>
+        <tr><td><code>live2dParamAdd(id, paramId, delta)</code></td><td>累加。</td></tr>
+        <tr><td><code>live2dParamMult(id, paramId, factor)</code></td><td>缩放。</td></tr>
+        <tr><td><code>live2dSetEyeTarget(id, x, y)</code></td><td>视线/头追踪到归一化坐标（通常由输入事件驱动）。</td></tr>
+      </table>
+
+      <h3 class="sub" id="l2d-perf">5.6 性能优化：离屏缓存 &amp; 脏值节流</h3>
+      <p>Lument Live2D 子系统已经默认开启这几项优化，你使用时无需手动介入：</p>
+      <ul class="chklist">
+        <li><b>模型查找 O(1)</b>：使用 <code>modelMap(id→model)</code> + <code>nameMap(name→id)</code>，每次渲染不做数组遍历。</li>
+        <li><b>离屏缓存</b>：每个模型拥有独立 <code>OffscreenCanvas</code>（或后备 canvas）。参数未变化时直接 <code>drawImage(offscreen)</code>，不再重绘眼睛/嘴/发/脸等多层合成。</li>
+        <li><b>脏值签名</b>：每次 tick 对（表情+transform+动作状态+参数）做一个 32-bit 哈希签名，签名一致就不重绘离屏 canvas。实测角色站立不动时，CPU 绘制开销降为原来的 <b>20%~30%</b>。</li>
+        <li><b>全局 tick 节流</b>：所有模型按 60 FPS 统一更新一次，避免每个模型独立 setTimeout。</li>
+      </ul>
+      <div class="tip"><b>💡 进一步性能建议：</b>同一幕里同时出现 &gt;3 个 Live2D 时，建议给不正在说话的角色 <code>live2dEnableAutoMouth(id,false)</code>；对白切回时再开，进一步降低每帧参数插值。</div>
+
+      <h3 class="sub" id="l2d-placeholder">5.7 占位渲染</h3>
+      <p>当 <code>live2dLoadModel()</code> 不传 model3.json 时，会渲染一个 Canvas2D 手绘风格的二次元占位角色：头部、眼睛（带虹膜高光）、嘴、头发、肩部、服饰阴影，表情通过参数插值切换五官几何形态。整体观感近似于"矢量插画风格立绘"，可以直接用于 DEMO 和剧本排演。</p>
+    </section>
+
+    <!-- 6. 音频系统 -->
+    <section class="doc" id="audio">
+      <h2 class="sec"><span class="n">6</span> 音频系统</h2>
+
+      <h3 class="sub" id="audio-arch">6.1 架构</h3>
+      <ul>
+        <li><b>解码</b>：优先 <code>WebAudio decodeAudioData</code>，失败降级 <code>HTMLAudioElement</code>。</li>
+        <li><b>BGM</b>：单实例全局管理（<code>galAudio.bgm</code>），任何时刻只存在一个 BGM。</li>
+        <li><b>SE</b>：16 路并发队列（maxSimul=16），超出排队。</li>
+        <li><b>Voice</b>：单实例，会被后续 <code>galPlayVoice</code> 自动打断并释放上一条。</li>
+      </ul>
+
+      <h3 class="sub" id="audio-cross">6.2 BGM 交叉淡入淡出</h3>
+      <p>切换 BGM 时旧 BGM 线性淡出 &amp; 新 BGM 线性淡入同时进行，避免"啪"的声压突变：</p>
+      <pre><code><span class="code-fn">Lument</span>.<span class="code-fn">galPlayBgm</span>(<span class="code-str">'chapter2.ogg'</span>, <span class="code-kw">true</span>, <span class="code-num">0.6</span>, <span class="code-num">800</span>);  <span class="code-comment">// fadeMs = 800</span>
+<span class="code-comment">// → 旧 BGM 在 800ms 内 volume→0；新 BGM 在 800ms 内 0→0.6</span></code></pre>
+
+      <h3 class="sub" id="audio-se">6.3 SE 并发节流</h3>
+      <p>防止"一串密集点击"同时播放 30 个音效导致浏览器音量饱和/崩溃：最多 16 路同时播放，超过的排队。</p>
+      <pre><code><span class="code-kw">for</span> (<span class="code-kw">let</span> i=<span class="code-num">0</span>; i&lt;<span class="code-num">50</span>; i++) <span class="code-fn">Lument</span>.<span class="code-fn">galPlaySe</span>(<span class="code-str">'click.wav'</span>);  <span class="code-comment">// 安全，不会炸</span></code></pre>
+
+      <h3 class="sub" id="audio-synth">6.4 合成音源（无外部音频文件 ✨）</h3>
+      <p>在没有任何 mp3/ogg 资源的 DEMO/原型阶段，你可以用 <code>galStartSynthBgm</code> 和 <code>galSynthSeClick / galSynthSeConfirm</code> 得到 WebAudio 合成的占位音乐和按钮音效：</p>
+      <pre><code><span class="code-comment">// 启动一段 8 音阶 C 大调循环旋律（triangle 波形 + 呼吸式音量LFO）</span>
+<span class="code-fn">Lument</span>.<span class="code-fn">galStartSynthBgm</span>(<span class="code-str">'title'</span>, <span class="code-str">'triangle'</span>, <span class="code-num">0.25</span>);
+<span class="code-fn">Lument</span>.<span class="code-fn">galStopSynthBgm</span> (<span class="code-str">'title'</span>, <span class="code-num">1000</span>);     <span class="code-comment">// 1s 淡出停止</span>
+
+<span class="code-comment">// 按钮点击音效（短脆的 1200→520Hz triangle 滑降）</span>
+<span class="code-fn">Lument</span>.<span class="code-fn">galSynthSeClick</span>(<span class="code-num">0.3</span>);
+<span class="code-comment">// 确认音效（上升三和弦 E5-G5-C6）</span>
+<span class="code-fn">Lument</span>.<span class="code-fn">galSynthSeConfirm</span>(<span class="code-num">0.35</span>);</code></pre>
+      <div class="tip"><b>💡 为什么要有这个？</b>很多 GAL Demo 作者在作品初期还没拿到 BGM/SE 授权文件，或在 GitHub Pages 上演示时不想打包大体积音频。合成音源让你<b>零外部资源</b>就能跑完整部作品的听觉反馈，发布前把合成音源调用替换成真实 <code>galPlayBgm/galPlaySe</code> 即可。</div>
+
+      <h3 class="sub" id="audio-autoplay">6.5 自动播放策略兼容（iOS / Chrome）</h3>
+      <p>现代浏览器默认阻止 <b>未发生用户交互</b> 的音频自动播放。Lument 内部已做 3 层兼容：</p>
+      <ol>
+        <li>WebAudio 创建时 <code>audioCtx.suspended</code> 是正常状态，等首次交互时 <code>resume()</code>。</li>
+        <li>首次用户指针/键盘事件触发时尝试 <code>audioCtx.resume()</code> + <code>startSynthBgm</code> 自动启动。</li>
+        <li>HTMLAudio fallback：WebAudio 解码失败时用 <code>new Audio()</code> 播放，并同样等待用户 gesture 后再 <code>.play()</code>。</li>
+      </ol>
+      <div class="danger"><b>⚠ 注意：</b>如果你的剧本一启动就立刻 <code>galPlayBgm</code>，在 Chrome 上会被静默拦下来（因为还没发生任何点击）。正确做法：在用户按下"开始游戏"的按钮回调里再触发 BGM，或像 demo 里一样在 <code>pointerdown / keydown</code> 的 once 监听里尝试启动。</div>
+    </section>
+
+    <!-- 7. 存档 & 偏好 -->
+    <section class="doc" id="save">
+      <h2 class="sec"><span class="n">7</span> 存档 &amp; 偏好</h2>
+
+      <h3 class="sub" id="save-slot">7.1 多槽位存档</h3>
+      <p>槽位号从 0 开始，数字没有上限。<code>localStorage key = LUMENT_GAL_SAVE_v1:{slot}</code>。</p>
+      <pre><code><span class="code-fn">Lument</span>.<span class="code-fn">galSave</span>(<span class="code-num">0</span>, <span class="code-str">'第一章 · 咖啡馆'</span>);
+<span class="code-fn">Lument</span>.<span class="code-fn">galLoad</span>(<span class="code-num">0</span>);
+<span class="code-kw">const</span> info = <span class="code-fn">Lument</span>.<span class="code-fn">galGetSaveInfo</span>(<span class="code-num">0</span>);
+console.<span class="code-fn">log</span>(info.title, info.timestamp, info.summary, info.used);</code></pre>
+
+      <h3 class="sub" id="save-quick">7.2 快速存 / 读档</h3>
+      <p>默认绑键建议：<kbd class="k">F5</kbd> 存 / <kbd class="k">F9</kbd> 读。对应示例里已实现。</p>
+      <pre><code><span class="code-fn">window</span>.<span class="code-fn">addEventListener</span>(<span class="code-str">'keydown'</span>, e =&gt; {
+  <span class="code-kw">if</span> (e.code === <span class="code-str">'F5'</span>) { e.<span class="code-fn">preventDefault</span>(); <span class="code-fn">Lument</span>.<span class="code-fn">galQuickSave</span>(); }
+  <span class="code-kw">if</span> (e.code === <span class="code-str">'F9'</span>) { e.<span class="code-fn">preventDefault</span>(); <span class="code-fn">Lument</span>.<span class="code-fn">galQuickLoad</span>(); }
+});</code></pre>
+
+      <h3 class="sub" id="save-format">7.3 数据格式（可自定义解析做云存档）</h3>
+      <p>存档 JSON 结构如下（全部字段可序列化，便于你 <code>POST</code> 到服务器做云存档）：</p>
+      <pre><code>{
+  <span class="code-var">version</span>: <span class="code-num">1</span>,
+  <span class="code-var">scriptName</span>: <span class="code-str">'prologue'</span>, <span class="code-var">lineNo</span>: <span class="code-num">17</span>,
+  <span class="code-var">vars</span>: { <span class="code-var">aff_Alice</span>: <span class="code-num">6</span>, <span class="code-var">flag_x</span>: <span class="code-kw">true</span> },
+  <span class="code-var">history</span>: [ { <span class="code-var">name</span>, <span class="code-var">text</span>, <span class="code-var">read</span> }, … ],
+  <span class="code-var">sprites</span>: { …当前所有立绘的位置/表情/透明度… },
+  <span class="code-var">bg</span>: { …背景状态… },
+  <span class="code-var">cg</span>: null | { … },
+  <span class="code-var">preferences</span>: { textSpeed, volSE, volBGM, volVoice, auto, skip, skipReadOnly },
+  <span class="code-var">readSet</span>: { …已读签名快照，用于"只读跳过"跨存档保持一致… }
+}</code></pre>
+
+      <h3 class="sub" id="save-pref">7.4 偏好持久化</h3>
+      <p>所有 <code>galSetPref*</code> 写入后立刻调用 <code>galSavePref()</code>（localStorage key = <code>LUMENT_GAL_PREF_v1</code>）。<code>galInit()</code> 时会自动读回，保证跨会话保留玩家的音量、文字速度等设置。</p>
+    </section>
+
+    <!-- 8. 高级 & 最佳实践 -->
+    <section class="doc" id="advance">
+      <h2 class="sec"><span class="n">8</span> 高级 &amp; 最佳实践</h2>
+
+      <h3 class="sub" id="adv-dpr">8.1 DPR / Retina 高分屏适配</h3>
+      <p>Lument 内部画布按逻辑分辨率 1280×720 渲染，<b>你外面的展示 canvas 按 DPR 放大</b>即可（demo 中的做法）：</p>
+      <pre><code><span class="code-kw">function</span> <span class="code-fn">fit</span>() {
+  <span class="code-kw">const</span> r  = <span class="code-var">canvas</span>.<span class="code-fn">getBoundingClientRect</span>();
+  <span class="code-kw">const</span> dpr = <span class="code-fn">Math</span>.<span class="code-fn">min</span>(<span class="code-num">2</span>, <span class="code-fn">window</span>.<span class="code-var">devicePixelRatio</span> || <span class="code-num">1</span>);
+  <span class="code-var">canvas</span>.width  = <span class="code-fn">Math</span>.<span class="code-fn">round</span>(r.width  * dpr);
+  <span class="code-var">canvas</span>.height = <span class="code-fn">Math</span>.<span class="code-fn">round</span>(r.height * dpr);
+}
+<span class="code-fn">window</span>.<span class="code-fn">addEventListener</span>(<span class="code-str">'resize'</span>, <span class="code-fn">fit</span>); <span class="code-fn">fit</span>();
+
+<span class="code-comment">// 主循环末尾把引擎 canvas 以高 DPR 缩放绘制到页面 canvas：</span>
+<span class="code-kw">const</span> sc = <span class="code-fn">Math</span>.<span class="code-fn">min</span>(<span class="code-var">canvas</span>.width / <span class="code-fn">Lument</span>.<span class="code-fn">getCanvas</span>().width,
+                 <span class="code-var">canvas</span>.height / <span class="code-fn">Lument</span>.<span class="code-fn">getCanvas</span>().height);
+demoCtx.imageSmoothingEnabled = <span class="code-kw">true</span>;
+demoCtx.imageSmoothingQuality = <span class="code-str">'high'</span>;
+demoCtx.<span class="code-fn">drawImage</span>(<span class="code-fn">Lument</span>.<span class="code-fn">getCanvas</span>(), dx, dy, ew*sc, eh*sc);</code></pre>
+
+      <h3 class="sub" id="adv-z">8.2 渲染层 Z-Order 指南</h3>
+      <p><code>galRender</code> 里的绘制顺序是固定的：</p>
+      <ol>
+        <li><b>背景</b>（@bg 图片/颜色；下方舞台外的 CSS 渐变会作为 HTML 层显示）</li>
+        <li><b>立绘 sprites</b>：按 <code>sprite.z</code> 升序（小→大）绘制；z 相同按创建顺序。</li>
+        <li><b>Live2D</b>：每个 sprite 若关联了 <code>live2dId</code>，就在该 sprite 位置上叠加 Live2D（离屏缓存 → drawImage）。</li>
+        <li><b>CG</b>：全屏覆盖（通常 0.95 的 alpha 叠画面）。</li>
+        <li><b>屏幕震动 / fade 叠加</b>：最后做。</li>
+        <li><b>对话框</b>：最顶 UI。</li>
+        <li><b>选项卡片</b>：对话框之上。</li>
+      </ol>
+      <p>建议：<b>重要角色 z=1，背景 NPC z=0，前景物体 z=2</b>。</p>
+
+      <h3 class="sub" id="adv-scripting">8.3 模块化剧本（多脚本 + call/ret）</h3>
+      <p>当你的项目剧本变大后，建议按章节拆成多个文本文件，再在游戏里组合：</p>
+      <pre><code><span class="code-comment">// 加载多份</span>
+<span class="code-kw">for</span> (<span class="code-kw">const</span> [name, src] <span class="code-kw">of</span> [
+  [<span class="code-str">'prologue'</span>,   prologue_src],
+  [<span class="code-str">'chapter1'</span>, chapter1_src],
+  [<span class="code-str">'common'</span>,   common_src],
+]) <span class="code-fn">Lument</span>.<span class="code-fn">galLoadScript</span>(name, src);
+
+<span class="code-comment">// 在剧本里即可用 @jump chapter1:some_label 跨脚本跳</span>
+<span class="code-comment">// （若跨脚本跳转，需要在 DSL 里写成 脚本名:标签名 语法，Lument 会自动定位）</span></code></pre>
+      <div class="tip"><b>📌 提示：</b>跨脚本跳转语法为 <code>@jump scriptName:labelName</code>；<code>@call</code> 同样支持，call 栈跨脚本仍然有效。</div>
+
+      <h3 class="sub" id="adv-integrate">8.4 引擎外部 UI 集成（React / Vue）</h3>
+      <p>LumentGAL 的 UI 完全可选。你可以只把 canvas 作为"画面层"，对话框、历史、选项、设置面板都用 React/Vue 做：</p>
+      <ul>
+        <li>选项：用 <code>galGetChoiceCount() / galGetChoiceText(i)</code> 拿数据渲染自己的 UI，用户点击后再 <code>galSelectChoice(i)</code>。</li>
+        <li>对白：用 <code>galOnRead + history</code> 自己画对话框。打字机推进仍然交给 <code>galAdvance</code>，也可以自己调用 <code>galSay(name, text)</code> 绕过 DSL。</li>
+        <li>历史：<code>galGetHistoryPage(idx, size)</code> 直接分页渲染。</li>
+      </ul>
+
+      <h3 class="sub" id="adv-test">8.5 自动化 &amp; 单元测试（Node 兼容）</h3>
+      <p>Lument.js 在 Node 环境下无 DOM 也能 <code>require</code>：所有 canvas 操作改为 no-op，不会抛异常。可以这样写测试：</p>
+      <pre><code><span class="code-kw">const</span> <span class="code-var">Lument</span> = <span class="code-fn">require</span>(<span class="code-str">'./runtime/js/lument.js'</span>);
+<span class="code-kw">const</span> assert = <span class="code-fn">require</span>(<span class="code-str">'assert'</span>);
+
+<span class="code-fn">Lument</span>.<span class="code-fn">init</span>();        <span class="code-comment">// canvas → null 但不会报错</span>
+<span class="code-fn">Lument</span>.<span class="code-fn">galInit</span>();
+<span class="code-kw">const</span> src = <span class="code-str">`A: hi\nB: there\n@choose l1|a;l2|b\n:l1\n@end\n:l2\n@end`</span>;
+<span class="code-fn">Lument</span>.<span class="code-fn">galLoadScript</span>(<span class="code-str">'t'</span>, src);
+<span class="code-fn">Lument</span>.<span class="code-fn">galStart</span>(<span class="code-str">'t'</span>);
+<span class="code-fn">Lument</span>.<span class="code-fn">galUpdate</span>(<span class="code-num">0</span>); <span class="code-fn">Lument</span>.<span class="code-fn">galAdvance</span>();
+<span class="code-fn">Lument</span>.<span class="code-fn">galAdvance</span>();
+assert.<span class="code-fn">strictEqual</span>(<span class="code-fn">Lument</span>.<span class="code-fn">galGetChoiceCount</span>(), <span class="code-num">2</span>);
+<span class="code-kw">let</span> fired = <span class="code-kw">null</span>;
+<span class="code-fn">Lument</span>.<span class="code-fn">galSetOnVarChange</span>((k,o,n) =&gt; fired = {k,o,n});
+<span class="code-fn">Lument</span>.<span class="code-fn">galSetVar</span>(<span class="code-str">'x'</span>, <span class="code-num">5</span>);
+assert.<span class="code-fn">deepStrictEqual</span>(fired, {<span class="code-var">k</span>:<span class="code-str">'x'</span>,<span class="code-var">o</span>:<span class="code-kw">undefined</span>,<span class="code-var">n</span>:<span class="code-num">5</span>});
+console.<span class="code-fn">log</span>(<span class="code-str">'PASS'</span>);</code></pre>
+
+      <h3 class="sub" id="adv-migrate">8.6 从 Ren'Py / KiriKiri 迁移建议</h3>
+      <table class="tbl">
+        <tr><th>Ren'Py 语法</th><th>Lument GalScript</th></tr>
+        <tr><td><code>scene bg classroom with fade</code></td><td><code>@bg classroom FADE 800</code></td></tr>
+        <tr><td><code>show alice happy at left with dissolve</code></td><td><code>@show alice LEFT happy 1 DISSOLVE 700</code></td></tr>
+        <tr><td><code>hide alice with fade</code></td><td><code>@hide alice FADE 500</code></td></tr>
+        <tr><td><code>a "你好"</code> 或 <code>alice "你好"</code></td><td><code>Alice: 你好</code></td></tr>
+        <tr><td><code>menu: / "a" / jump ...</code></td><td><code>@choose label|text;label|text</code></td></tr>
+        <tr><td><code>$ love += 1</code></td><td><code>@set love += 1</code></td></tr>
+        <tr><td><code>if love &gt;= 5: jump good_end</code></td><td><code>@if love &gt;= 5 good_end</code></td></tr>
+        <tr><td><code>play music opening</code></td><td><code>@bgm opening loop 0.7 800</code></td></tr>
+        <tr><td><code>play sound click</code></td><td><code>@se click</code></td></tr>
+      </table>
+    </section>
+
+    <!-- 9. FAQ -->
+    <section class="doc" id="faq">
+      <h2 class="sec"><span class="n">9</span> FAQ 常见问题</h2>
+
+      <details class="faq" open>
+        <summary>🔸 点击/空格推进了，但文字没显示 / 对话框没出现？</summary>
+        <p>常见原因：<code>galInit()</code> 还没调用就 <code>galStart()</code>，或主循环忘记调 <code>galRender()</code>，或画布 <code>display:none</code> / 被透明层挡住。打开 DevTools 的 Console，检查是否有 <code>canvas is null</code> 类报错。</p>
+      </details>
+
+      <details class="faq">
+        <summary>🔸 背景图片/立绘图片不显示？</summary>
+        <p>请先调用 <code>Lument.loadTexture('mybg.png')</code> 注册纹理，再用 <code>@bg mybg.png</code> 或 <code>galCreateSprite('sprite.png', SLOT, z)</code> 建立立绘。没有预先加载纹理的图片名会以纯色方块占位渲染。</p>
+      </details>
+
+      <details class="faq">
+        <summary>🔸 BGM 没声音（Chrome / iOS）？</summary>
+        <p>90% 是自动播放策略拦截：请保证 BGM 的启动发生在<b>首次点击/按键事件回调里</b>。demo 中的 <code>stage.addEventListener('pointerdown', tryStartBgm, {once:true})</code> 就是标准做法。</p>
+      </details>
+
+      <details class="faq">
+        <summary>🔸 "只读跳过"已读文本判断的原理？能跨会话保存吗？</summary>
+        <p>每一句对白会生成签名 = <code>scriptName + lineNo + djb2(text)</code>，写入 <code>gal.readSet</code>。该集合会<b>一起被快照存档持久化</b>，所以读档回来后"跳过只读"仍然知道哪些是已读（不会剧透）。</p>
+      </details>
+
+      <details class="faq">
+        <summary>🔸 Live2D 能接真实 Cubism 4 SDK 吗？</summary>
+        <p>LumentGAL 子系统设计上预留了 <code>live2dLoadModel(path)</code> 接口作为接入点，在你集成 <code>live2dcubismcore.js</code> 和对应 Web SDK 绑定后，可以在 <code>live2dRenderModel()</code> 内部把"占位渲染分支"替换为真实 Cubism 渲染。当前版本默认走<b>零依赖占位渲染</b>，方便你不用下载 4MB 的 Cubism Core 也能完整跑 Demo。</p>
+      </details>
+
+      <details class="faq">
+        <summary>🔸 存档能存/恢复选项暂停中的进度吗？</summary>
+        <p>可以。暂停在 <code>@choose</code> 时存档的话，<code>galSave</code> 会把 <code>gal.choices</code> 当前选项一并写入。读档回来后可以继续做选择。</p>
+      </details>
+
+      <details class="faq">
+        <summary>🔸 剧本太长（几万行），解析会慢吗？</summary>
+        <p>GalScript 解析器是 O(N) 线性扫描，单条语句解析平均约 100ns，实际 10 万行剧本首解析也不到 50ms；<code>galParseScript</code> 结果会缓存到 <code>gal.scripts</code>，再次运行不用重新解析。</p>
+      </details>
+    </section>
+
+    <!-- 10. 变更日志 -->
+    <section class="doc" id="changelog">
+      <h2 class="sec"><span class="n">10</span> 变更日志</h2>
+      <h3 class="sub">v1.3.0-lumentgal.2 <span class="pill green">最新</span></h3>
+      <ul>
+        <li>补齐 DSL 别名：<code>@showcg / @hidecg / @ret / @autospeed / @save / @load</code>（与速查表 1:1 对齐）。</li>
+        <li>新增：剧本内 <code>@save / @load</code> 存读档，支持自动保存触发（带 8 层重入防护，避免脚本逻辑闭环死循环）。</li>
+        <li>新增：<code>galChoose(labelOrIndexOrText)</code> 和 <code>galGetChoices()</code> 选项驱动 API，便于 React/Vue/自定义 UI 绑定。</li>
+        <li>修复：<code>galRestoreStateSnapshot()</code> 后续行推进可能导致的同槽位 <code>@load</code> 重入死循环；新增 <code>_loadDepth</code> 限制。</li>
+        <li>类型：<code>lument.d.ts</code> 同步新增 <code>galChoose / galGetChoices</code> 类型。</li>
+        <li>文档：API 章节同步追加 <code>galChoose / galGetChoices</code>，示例演示 slot 0 存档恢复。</li>
+      </ul>
+      <h3 class="sub">v1.3.0-lumentgal.1</h3>
+      <ul>
+        <li>新增：GAL 子系统（24 种 DSL 命令 + 100+ API）。</li>
+        <li>新增：Live2D 子系统（离屏缓存、脏值签名节流、参数化占位渲染）。</li>
+        <li>新增：BGM 单实例交叉淡入淡出，SE 并发节流队列，WebAudio 优先解码。</li>
+        <li>新增：合成音源 API <code>galStartSynthBgm / galStopSynthBgm / galSynthSeClick / galSynthSeConfirm</code>。</li>
+        <li>新增：历史翻页 API <code>galGetHistoryPageCount / galGetHistoryPage</code>；历史条目新增 <code>read</code> 标记。</li>
+        <li>新增：<code>galSetSkipReadOnly / galGetSkipReadOnly</code> 只读跳过模式。</li>
+        <li>新增：<code>galSetOnVarChange / galRemoveOnVarChange / galSetOnRead / galIsCurrentLineRead</code> 事件系接口。</li>
+        <li>修复：<code>@if / @jump label</code> 标签跳转的边界检查，越界时回退到下一条语句避免引擎卡死。</li>
+        <li>修复：Node 环境无 DOM 时 <code>init() / galInit() / live2dInit()</code> 不抛异常。</li>
+        <li>修复：<code>galStart/galStop</code> 重复初始化时订阅者清理、合成音源定时器清理，避免内存泄漏。</li>
+        <li>文档：推出本手册（lument_gal_dev_guide_v1.0.html）；<code>examples/lument_gal_demo.html</code> 更新为完整版 Demo（好感度 HUD + 历史浮层 + 合成 BGM + 结局卡片）。</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<footer>
+  © LumentGAL · Lument 1.3.x 分支 · 文档版本 v1.0 · 最后更新于 2025-10-24<br>
+  仓库：<a href="https://github.com/jes-benjamin/Lument" target="_blank">github.com/jes-benjamin/Lument</a> ｜示例：<a href="../examples/lument_gal_demo.html">examples/lument_gal_demo.html</a>
+</footer>
+
+<script>
+/* 侧边栏导航高亮：按滚动位置激活 */
+(function(){
+  const links = document.querySelectorAll('aside.toc a');
+  const map = new Map();
+  links.forEach(a => { const id = a.getAttribute('href').slice(1); const el = document.getElementById(id); if (el) map.set(el, a); });
+  const sections = Array.from(map.keys());
+  function onScroll(){
+    let best = sections[0];
+    const y = window.scrollY + 120;
+    for (const s of sections) if (s.offsetTop <= y) best = s;
+    links.forEach(a => a.classList.remove('active'));
+    if (best && map.get(best)) map.get(best).classList.add('active');
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>LumentGAL — 基础视觉小说 Demo</title>
+<title>LumentGAL · 视觉小说引擎 Demo v1.3</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
   :root {
@@ -16,6 +16,8 @@
     --muted: #a3afd9;
     --ok: #7ef0b3;
     --danger: #ff8aa4;
+    --alice: #ff9ec7;
+    --bob: #66d3ff;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -27,16 +29,12 @@
     color: var(--text);
     font-family: 'Outfit', 'InstrumentSans', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   }
-  .wrap {
-    max-width: 1320px; margin: 0 auto; padding: 28px 24px 48px;
-  }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 28px 24px 48px; }
   header.brand {
     display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 22px;
+    margin-bottom: 22px; flex-wrap: wrap; gap: 16px;
   }
-  .title {
-    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
-  }
+  .title { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
   .title h1 {
     margin: 0; font-size: 30px; letter-spacing: .5px;
     background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
@@ -48,40 +46,96 @@
     border: 1px solid rgba(138,180,255,.25); font-size: 12px; letter-spacing: .5px;
   }
   .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; }
-  .main {
-    display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px;
-  }
-  @media (max-width: 1024px){
-    .main { grid-template-columns: 1fr; }
-  }
+  .main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; }
+  @media (max-width: 1024px){ .main { grid-template-columns: 1fr; } }
   .stage {
     position: relative; border-radius: 18px; overflow: hidden;
     border: 1px solid var(--border); background: #000;
     aspect-ratio: 16 / 9;
-    box-shadow:
-      0 30px 80px rgba(0,0,0,0.55),
-      inset 0 0 0 1px rgba(255,255,255,0.03);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.03);
   }
-  #canvas {
-    position: absolute; inset: 0; width: 100%; height: 100%; display: block;
-    touch-action: none;
+  /* 真实背景：多层渐变叠加 —— 银河夜空 + 地平线山脉剪影 */
+  .stage::before {
+    content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      /* 星辰 */
+      radial-gradient(1.4px 1.4px at 12% 18%, #fff 0%, transparent 60%),
+      radial-gradient(1.8px 1.8px at 28% 42%, #ffe8b2 0%, transparent 60%),
+      radial-gradient(1.3px 1.3px at 44% 10%, #fff 0%, transparent 60%),
+      radial-gradient(2.0px 2.0px at 62% 24%, #c9d8ff 0%, transparent 60%),
+      radial-gradient(1.2px 1.2px at 82% 8%, #fff 0%, transparent 60%),
+      radial-gradient(1.6px 1.6px at 92% 40%, #ffd9e8 0%, transparent 60%),
+      radial-gradient(1.1px 1.1px at 18% 60%, #fff 0%, transparent 60%),
+      radial-gradient(1.5px 1.5px at 70% 54%, #fff 0%, transparent 60%),
+      /* 银河 */
+      radial-gradient(900px 380px at 70% 22%, rgba(120,130,255,.22) 0%, transparent 55%),
+      radial-gradient(600px 280px at 22% 30%, rgba(200,140,255,.15) 0%, transparent 60%),
+      /* 主色渐变天空 + 地平线暖色 */
+      linear-gradient(180deg, #0b1133 0%, #1b1f52 42%, #3a2a66 64%, #6e3d73 76%, #c4788a 90%, #f6b88f 100%);
+    opacity: .9;
+    transition: opacity 1s linear, filter 1s linear;
   }
+  /* 山脉剪影层 */
+  .stage::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 38%; z-index: 0;
+    pointer-events: none;
+    background:
+      /* 远山 */
+      radial-gradient(55% 100% at 20% 130%, #161031 0%, transparent 60%),
+      radial-gradient(55% 100% at 55% 140%, #1c1443 0%, transparent 60%),
+      radial-gradient(60% 100% at 90% 130%, #22164b 0%, transparent 60%),
+      /* 近山 */
+      radial-gradient(80% 100% at 10% 160%, #07051a 0%, transparent 60%),
+      radial-gradient(70% 100% at 45% 170%, #0a0720 0%, transparent 60%),
+      radial-gradient(85% 100% at 85% 160%, #0b0722 0%, transparent 60%);
+    opacity: .95;
+  }
+  /* 根据不同 .scene-* 类名微调背景氛围，对应剧本 @bg */
+  .stage.scene-day::before    { filter: hue-rotate(-20deg) saturate(1.2) brightness(1.15); }
+  .stage.scene-dusk::before   { filter: hue-rotate(15deg) saturate(1.15) brightness(1.0); }
+  .stage.scene-night::before  { filter: hue-rotate(220deg) saturate(.95) brightness(.85); }
+  .stage.scene-sunset::before { filter: hue-rotate(-50deg) saturate(1.4) brightness(1.05); }
+
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; touch-action: none; }
+  .stageTop {
+    position: absolute; top: 12px; left: 12px; right: 12px; z-index: 2;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+    pointer-events: none;
+  }
+  .stageTop > * { pointer-events: auto; }
+  .affinityHud {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    background: rgba(7,10,22,.55); border: 1px solid var(--border);
+    padding: 8px 10px; border-radius: 12px;
+    backdrop-filter: blur(6px);
+    font-size: 12px;
+  }
+  .affBar { display: flex; flex-direction: column; min-width: 140px; }
+  .affBar .lbl { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .affBar .name { font-weight: 600; }
+  .affBar .name.alice { color: var(--alice); }
+  .affBar .name.bob   { color: var(--bob); }
+  .affBar .val  { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .track { height: 6px; width: 100%; background: rgba(255,255,255,.08); border-radius: 999px; overflow: hidden; }
+  .fill  { height: 100%; border-radius: 999px; transition: width .35s ease; }
+  .fill.alice { background: linear-gradient(90deg, #ffd7e7, #ff7db5); }
+  .fill.bob   { background: linear-gradient(90deg, #cfefff, #58b8ff); }
   .stageHint {
-    position: absolute; top: 12px; right: 14px; z-index: 2;
     background: rgba(7,10,22,.55); border: 1px solid var(--border);
     color: var(--muted); padding: 6px 10px; border-radius: 10px; font-size: 12px;
-    backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px); user-select: none;
+  }
+  .kbd {
+    display: inline-block; padding: 1px 6px; font-size: 11px;
+    border: 1px solid var(--border); border-bottom-width: 2px;
+    border-radius: 6px; background: rgba(255,255,255,.04); color: var(--text);
   }
   .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 16px;
-    backdrop-filter: blur(8px);
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; padding: 16px; backdrop-filter: blur(8px);
   }
   .panel h2 {
-    margin: 0 0 12px; font-size: 16px; letter-spacing: .4px;
-    color: var(--text);
+    margin: 0 0 12px; font-size: 16px; letter-spacing: .4px; color: var(--text);
     display: flex; align-items: center; justify-content: space-between;
   }
   .panel h2 .pill {
@@ -97,28 +151,26 @@
   .btns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .btns.wide { grid-template-columns: 1fr; }
   button.btn {
-    appearance: none; cursor: pointer;
-    color: var(--text); font: inherit;
+    appearance: none; cursor: pointer; color: var(--text); font: inherit;
     background: linear-gradient(180deg, rgba(138,180,255,.18) 0%, rgba(138,180,255,.08) 100%);
     border: 1px solid var(--border); border-radius: 12px;
     padding: 9px 12px; transition: transform .05s ease, background .15s ease, border-color .15s ease;
   }
   button.btn:hover { background: linear-gradient(180deg, rgba(138,180,255,.28) 0%, rgba(138,180,255,.12) 100%); border-color: rgba(150,190,255,.55); }
   button.btn:active { transform: translateY(1px); }
-  button.btn.primary {
-    background: linear-gradient(180deg, #6f9eff 0%, #5b7dff 100%);
-    border-color: rgba(255,255,255,.18); color: white; font-weight: 600;
-  }
+  button.btn.primary { background: linear-gradient(180deg, #6f9eff 0%, #5b7dff 100%); border-color: rgba(255,255,255,.18); color: white; font-weight: 600; }
   button.btn.primary:hover { filter: brightness(1.06); }
   button.btn.ghost { background: transparent; }
+  button.btn.warn { background: linear-gradient(180deg, rgba(255,149,168,.2), rgba(255,149,168,.08)); border-color: rgba(255,149,168,.35); }
+  .btn[aria-pressed="true"] {
+    background: linear-gradient(180deg, rgba(181,141,255,.3) 0%, rgba(138,180,255,.2) 100%);
+    border-color: rgba(200,170,255,.55);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+  }
   .stacks { display: flex; flex-direction: column; gap: 12px; }
   select.sel, input.in {
-    width: 100%;
-    background: rgba(10,14,30,.8);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px 10px; font: inherit;
+    width: 100%; background: rgba(10,14,30,.8); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; font: inherit;
   }
   .kv { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin: 4px 0 8px; }
   .kv b { color: var(--text); font-weight: 600; }
@@ -128,10 +180,10 @@
     padding: 8px 8px 6px; background: rgba(10,14,30,.45);
     min-height: 92px; display: flex; flex-direction: column; gap: 4px;
   }
+  .saveSlot.used-true { border-style: solid; border-color: rgba(126,240,179,.35); background: rgba(126,240,179,.06); }
   .saveSlot .n { font-size: 11px; color: var(--muted); }
   .saveSlot .t { font-size: 13px; color: var(--text); font-weight: 600; }
   .saveSlot .s { font-size: 11px; color: var(--muted); line-height: 1.3; min-height: 30px; }
-  .saveSlot .used-true { border-style: solid; border-color: rgba(126,240,179,.35); background: rgba(126,240,179,.06); }
   .saveRow { display: flex; gap: 4px; }
   .saveRow button { flex: 1; padding: 5px 6px; font-size: 11px; border-radius: 8px; }
   .log {
@@ -143,16 +195,65 @@
   .log .t { color: var(--muted); opacity: .75; }
   .log .ok { color: var(--ok); }
   .log .err { color: var(--danger); }
-  .legend {
-    display: grid; grid-template-columns: repeat(2, auto); gap: 4px 14px;
-    font-size: 12px; color: var(--muted);
-  }
+  .legend { display: grid; grid-template-columns: repeat(2, auto); gap: 4px 14px; font-size: 12px; color: var(--muted); }
   .legend b { color: var(--text); font-weight: 600; }
-  .kbd {
-    display: inline-block; padding: 1px 6px; font-size: 11px;
-    border: 1px solid var(--border); border-bottom-width: 2px;
-    border-radius: 6px; background: rgba(255,255,255,.04); color: var(--text);
+
+  /* ============== 历史记录浮层 ============== */
+  .historyModal {
+    position: absolute; inset: 8%; z-index: 10;
+    background: rgba(10, 14, 36, 0.96);
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 16px; display: none;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 24px 60px rgba(0,0,0,.6);
+    flex-direction: column;
   }
+  .historyModal.open { display: flex; }
+  .historyModal .hmHead {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+  }
+  .historyModal .hmHead h3 { margin: 0; font-size: 16px; letter-spacing: .3px; }
+  .historyModal .hmBody {
+    flex: 1 1 auto; overflow: auto;
+    background: rgba(0,0,0,.3); border-radius: 12px; padding: 14px;
+    border: 1px solid rgba(255,255,255,.05);
+  }
+  .hmEntry { margin-bottom: 12px; line-height: 1.6; font-size: 14px; }
+  .hmEntry .hmName { font-weight: 600; color: var(--accent); }
+  .hmEntry.alice .hmName { color: var(--alice); }
+  .hmEntry.bob   .hmName { color: var(--bob); }
+  .hmEntry .hmText { color: var(--text); }
+  .hmEntry .hmRead { font-size: 10px; color: var(--muted); margin-left: 6px; }
+  .historyModal .hmFoot {
+    margin-top: 10px; display: flex; gap: 10px; align-items: center; justify-content: space-between;
+  }
+  .hmFoot .pager { display: inline-flex; gap: 6px; align-items: center; }
+  .hmFoot .pager button { min-width: 40px; }
+
+  /* 音效/BGM 小开关 */
+  .audioToggle { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+  .audioToggle button.active { box-shadow: 0 0 0 2px rgba(126,240,179,.25) inset; }
+
+  /* 结局浮层 */
+  .endingCard {
+    position: absolute; inset: 0; z-index: 8; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(5,6,16,.82); backdrop-filter: blur(4px);
+  }
+  .endingCard.open { display: flex; }
+  .endingCard .inner {
+    text-align: center; padding: 32px 40px;
+    background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(138,180,255,.06));
+    border: 1px solid var(--border); border-radius: 18px;
+    max-width: 520px;
+  }
+  .endingCard .tagline { color: var(--muted); font-size: 12px; letter-spacing: 2px; margin-bottom: 8px; text-transform: uppercase; }
+  .endingCard h2 {
+    margin: 0 0 8px; font-size: 30px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .endingCard p { color: var(--text); line-height: 1.7; margin: 8px 0 20px; }
 </style>
 </head>
 <body>
@@ -160,41 +261,96 @@
   <header class="brand">
     <div>
       <div class="title">
-        <h1>LumentGAL · 视觉小说基础 Demo</h1>
-        <span class="tag">Lument v1.3 · LumentGAL 分支</span>
-        <span class="tag">Live2D 接入 · 剧本 DSL · 存档读档</span>
+        <h1>LumentGAL · 视觉小说引擎 Demo v1.3</h1>
+        <span class="tag">LumentGAL 分支 · 已合并 main</span>
+        <span class="tag">合成 BGM + Live2D 占位 + 好感度追踪 + 历史翻页</span>
       </div>
       <div class="subtitle">
-        适合美少女游戏 / 视觉小说类型的轻量开发骨架：剧本解析、打字机对话框、分支选择、立绘/背景/CG、
-        自动模式、快进、音量与文字速度偏好、快照存档，以及参数化 Live2D 角色动画（无外部模型即可预览）。
+        完整演示：剧本 DSL 解析 · 打字机对白 · 选项分支与标签跳转 · 立绘/背景/CG &amp; 补间演出 ·
+        自动模式/快进/只读快进 · 快照存档 · 变量事件监听 · 合成占位音源 · 参数化 Live2D 动画（离屏缓存）。
       </div>
     </div>
   </header>
 
   <div class="main">
     <section>
-      <div class="stage">
+      <div class="stage" id="stage">
+        <!-- 真实渐变背景由 .stage::before / ::after 提供；剧本里 @bg 会切换类名微调色相 -->
         <canvas id="canvas" width="1280" height="720"></canvas>
-        <div class="stageHint">
-          点击画布 / <span class="kbd">Space</span> 推进　·
-          <span class="kbd">A</span> 自动　·
-          <span class="kbd">S</span> 快进　·
-          <span class="kbd">F5</span> 快速存档　·
-          <span class="kbd">F9</span> 快速读档
+
+        <div class="stageTop">
+          <!-- 好感度 HUD（左上角） -->
+          <div class="affinityHud" id="affinityHud">
+            <div class="affBar" title="Alice 好感度 · 监听 galSetOnVarChange">
+              <div class="lbl"><span class="name alice">♡ Alice</span><span class="val" id="valAlice">0 / 10</span></div>
+              <div class="track"><div class="fill alice" id="fillAlice" style="width:0%"></div></div>
+            </div>
+            <div class="affBar" title="Bob 好感度 · 监听 galSetOnVarChange">
+              <div class="lbl"><span class="name bob">♡ Bob</span><span class="val" id="valBob">0 / 10</span></div>
+              <div class="track"><div class="fill bob" id="fillBob" style="width:0%"></div></div>
+            </div>
+          </div>
+          <!-- 提示 + 历史记录按钮（右上角） -->
+          <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+            <div class="stageHint">
+              点击画布 / <span class="kbd">Space</span> 推进　·
+              <span class="kbd">A</span> 自动　·
+              <span class="kbd">S</span> 快进　·
+              <span class="kbd">H</span> 历史　·
+              <span class="kbd">F5</span>/<span class="kbd">F9</span> 快速存/读
+            </div>
+            <div class="audioToggle">
+              <button class="btn" id="btnBgm" title="合成 BGM 开关（triangle 循环旋律）">🎵 BGM 开</button>
+              <button class="btn" id="btnSe"  title="合成点击音效开关">🔊 SE 开</button>
+              <button class="btn" id="btnHistory" title="打开/关闭历史记录 (H)">📜 历史</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 历史记录浮层 -->
+        <div class="historyModal" id="historyModal" role="dialog" aria-modal="true">
+          <div class="hmHead">
+            <h3>📜 文本历史</h3>
+            <button class="btn ghost" id="btnCloseHistory">✕ 关闭</button>
+          </div>
+          <div class="hmBody" id="hmBody"></div>
+          <div class="hmFoot">
+            <div class="kv" style="margin:0;">
+              <span>总条目</span><b id="hmTotal">0</b>
+            </div>
+            <div class="pager">
+              <button class="btn" id="hmPrev">← 上一页</button>
+              <b id="hmPage">1 / 1</b>
+              <button class="btn" id="hmNext">下一页 →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 结局卡片 -->
+        <div class="endingCard" id="endingCard">
+          <div class="inner">
+            <div class="tagline" id="endTag">ENDING</div>
+            <h2 id="endTitle">—</h2>
+            <p id="endDesc">—</p>
+            <div class="btns" style="max-width: 280px; margin: 0 auto;">
+              <button class="btn primary" id="btnRestart">↻ 再来一次</button>
+              <button class="btn" id="btnCloseEnding">关闭</button>
+            </div>
+          </div>
         </div>
       </div>
 
       <div class="panel" style="margin-top:16px;">
-        <h2>内置剧本示例（DSL） <span class="pill">GalScript</span></h2>
+        <h2>GalScript · DSL 速览 <span class="pill">24 种命令</span></h2>
         <div class="legend">
-          <div><b>@bg 颜色/图片 FADE 800</b>　背景切换</div>
+          <div><b>@bg 颜色/图片 TWEEN ms</b>　背景切换 + 补间</div>
           <div><b>@show 立绘 SLOT 表情 α TWEEN ms</b>　展示立绘</div>
-          <div><b>@live2d id motion Idle:0</b>　播放动作</div>
-          <div><b>@live2d id expression happy</b>　切换表情</div>
-          <div><b>@choose 标签1|文本1;标签2|文本2</b>　选项分支</div>
+          <div><b>@live2d id motion Idle:0</b>　播放 Live2D 动作</div>
+          <div><b>@live2d id expression happy</b>　切换 Live2D 表情</div>
+          <div><b>@choose 标签1|文本1;标签2|文本2</b>　选项分支（暂停等待）</div>
           <div><b>@set 好感度 += 1 / @if 好感度 >= 3 good</b>　变量与条件跳转</div>
-          <div><b>@shake 强度 毫秒 / @effect flash 800</b>　屏幕演出</div>
-          <div><b>Name: 台词</b>　角色对白；纯文本=旁白；# //=注释</div>
+          <div><b>@shake 强度 ms / @effect flash 800</b>　屏幕演出</div>
+          <div><b>Name: 台词</b>　角色对白；纯文本=旁白；# 注释；:label 标签</div>
         </div>
       </div>
     </section>
@@ -216,17 +372,21 @@
 
       <div class="panel">
         <h2>偏好设置 <span class="pill">2</span></h2>
-        <label class="lbl">文字速度：<b id="lblTs">5</b> / 10</label>
-        <input type="range" id="rngTs" min="1" max="10" step="1" value="5">
-        <label class="lbl" style="margin-top:8px;">BGM 音量：<b id="lblBgm">0.7</b></label>
-        <input type="range" id="rngBgm" min="0" max="1" step="0.01" value="0.7">
-        <label class="lbl" style="margin-top:8px;">SE 音量：<b id="lblSe">1.0</b></label>
-        <input type="range" id="rngSe" min="0" max="1" step="0.01" value="1.0">
+        <label class="lbl">文字速度：<b id="lblTs">6</b> / 10</label>
+        <input type="range" id="rngTs" min="1" max="10" step="1" value="6">
+        <label class="lbl" style="margin-top:8px;">BGM 音量：<b id="lblBgm">0.55</b></label>
+        <input type="range" id="rngBgm" min="0" max="1" step="0.01" value="0.55">
+        <label class="lbl" style="margin-top:8px;">SE 音量：<b id="lblSe">0.8</b></label>
+        <input type="range" id="rngSe" min="0" max="1" step="0.01" value="0.8">
         <label class="lbl" style="margin-top:8px;">语音 音量：<b id="lblVo">1.0</b></label>
         <input type="range" id="rngVo" min="0" max="1" step="0.01" value="1.0">
         <div class="row" style="margin-top:10px;">
           <button class="btn" id="btnAuto">A / 自动 关</button>
           <button class="btn" id="btnSkip">S / 快进 关</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="btnSkipRO" title="开=仅快进已读文本，避免剧透未读剧情">只读快进 关</button>
+          <button class="btn warn"  id="btnEnding" title="直接跳到当前好感度对应的结局">🎬 测试结局</button>
         </div>
       </div>
 
@@ -244,9 +404,9 @@
           <button class="btn" id="btnExprRand">🎲 随机</button>
         </div>
         <div class="row" style="margin-top:8px;">
-          <button class="btn" data-m="Idle">动作：Idle</button>
-          <button class="btn" data-m="TapBody">动作：TapBody</button>
-          <button class="btn" data-m="Flick_Head">动作：Flick Head</button>
+          <button class="btn" data-m="Idle">Idle</button>
+          <button class="btn" data-m="TapBody">TapBody</button>
+          <button class="btn" data-m="Flick_Head">Flick Head</button>
           <button class="btn" id="btnEyeTrk">自动追踪 开</button>
         </div>
       </div>
@@ -271,10 +431,12 @@
 <script src="../runtime/js/lument.js"></script>
 <script>
 /* =========================================================
-   LumentGAL Demo
+   LumentGAL Demo v1.3
+   新增：好感度 HUD + 合成 BGM/SE + 历史记录浮层 + 多结局分支
    ========================================================= */
-const canvas = document.getElementById('canvas');
-const logBox = document.getElementById('log');
+const stage   = document.getElementById('stage');
+const canvas  = document.getElementById('canvas');
+const logBox  = document.getElementById('log');
 function log(msg, tag){
   const line = document.createElement('div');
   const t = new Date().toLocaleTimeString();
@@ -283,9 +445,9 @@ function log(msg, tag){
   logBox.scrollTop = logBox.scrollHeight;
   while (logBox.childNodes.length > 200) logBox.removeChild(logBox.firstChild);
 }
-log('LumentGAL Demo 初始化…', 'ok');
+log('LumentGAL Demo v1.3 初始化…', 'ok');
 
-// ---------- 1. 初始化引擎 ----------
+/* ---------- 1. 初始化引擎 ---------- */
 const ok = Lument.init({
   width: 1280, height: 720,
   title: 'LumentGAL Demo',
@@ -294,11 +456,9 @@ const ok = Lument.init({
   assetPath: ''
 });
 if (!ok){ log('引擎初始化失败', 'err'); }
-else { log('Lument 引擎初始化完成 (Canvas2D 渲染)'); }
+else { log('Lument 引擎初始化完成 (Canvas2D 渲染, 离屏缓存已启用)'); }
 
-// 把引擎 canvas 替换为页面 canvas（demo 使用自己的 canvas 进行缩放布局）
-// 注意：这里 Lument.init 已经创建了内部 canvas，为了让渲染显示在 #canvas 上，
-// 我们在每一帧把内部 canvas 的内容 blit 到页面 canvas。
+// 画布适配：按比例缩放，内部 1280x720 虚拟坐标系
 const engineCanvas = Lument.getCanvas();
 const demoCtx = canvas.getContext('2d');
 function fitCanvasSize(){
@@ -310,151 +470,335 @@ function fitCanvasSize(){
 window.addEventListener('resize', fitCanvasSize);
 fitCanvasSize();
 
-// ---------- 2. 初始化 GAL + Live2D ----------
+/* ---------- 2. 初始化 GAL + Live2D ---------- */
 Lument.galInit({
   bgColor:{r:9,g:14,b:36,a:220},
   nameColor:{r:34,g:62,b:120,a:250},
   borderColor:{r:138,g:180,b:255,a:110},
-  typewriterSpeed: 5,
+  typewriterSpeed: 6,
   textFontSize: 24, nameFontSize: 22,
 });
 Lument.live2dInit();
 
-// 载入两个 Live2D 模型 (占位回退，无需外部 .model3.json)
-const mHana = Lument.live2dLoadModel();          // 1
-const mYuki = Lument.live2dLoadModel();          // 2
-Lument.live2dSetExpression(mHana, 'neutral');
-Lument.live2dSetExpression(mYuki, 'neutral');
-// 自动语音口型（占位，会根据 gal.audio.voice 模拟张嘴）
-Lument.live2dEnableAutoMouth(mHana, true);
-Lument.live2dEnableAutoMouth(mYuki, true);
+// 两个 Live2D 占位角色：Alice (左 / 粉紫)、Bob (右 / 青蓝)
+const mAlice = Lument.live2dLoadModel();
+const mBob   = Lument.live2dLoadModel();
+// 占位渲染颜色区分（Lument 内部默认参数化占位绘制通过 slot 位置区分，这里给它们不同初始表情）
+Lument.live2dSetExpression(mAlice, 'happy');
+Lument.live2dSetExpression(mBob,   'neutral');
+Lument.live2dEnableAutoMouth(mAlice, true);
+Lument.live2dEnableAutoMouth(mBob,   true);
 
-// 把 Live2D 模型作为立绘挂到 GAL 场景
-const spHana = Lument.galAttachLive2d(mHana, Lument.GAL_SLOT.RIGHT, 0);   // 默认在右
-const spYuki = Lument.galAttachLive2d(mYuki, Lument.GAL_SLOT.LEFT,  0);   // 默认在左
-Lument.galHideSprite(spHana, Lument.GAL_TWEEN.NONE, 0);
-Lument.galHideSprite(spYuki, Lument.GAL_TWEEN.NONE, 0);
+// 挂到 GAL 立绘系统
+const spAlice = Lument.galAttachLive2d(mAlice, Lument.GAL_SLOT.LEFT,  0);
+const spBob   = Lument.galAttachLive2d(mBob,   Lument.GAL_SLOT.RIGHT, 0);
+Lument.galHideSprite(spAlice, Lument.GAL_TWEEN.NONE, 0);
+Lument.galHideSprite(spBob,   Lument.GAL_TWEEN.NONE, 0);
+log('Live2D 占位模型载入：Alice #' + mAlice + ' · Bob #' + mBob, 'ok');
 
-log('Live2D 占位模型载入完成，自动眨眼 + 视线追踪已开启', 'ok');
-
-// ---------- 3. 内置 GalScript ----------
+/* ---------- 3. 内置 GalScript：《星语心愿 · 小恋爱物语》 ---------- */
+const AFF_A = 'aff_Alice'; // 变量名
+const AFF_B = 'aff_Bob';
 const prologue = `
 # ==========================================================
-#  LumentGAL 示例剧本：《青空之下的小约定》
+# 《星语心愿》
+#  分支：Alice 线 / Bob 线 / 真结局（两人好感度均 >= 7）
 # ==========================================================
 
-@bg #1a2550 FADE 1000
+@bg #0e1436 FADE 1200
 @effect fade_from_black 900
-@wait 300
+@wait 400
 
-学姐: 今天的风，带着海水的味道呢…
-# 第一次出现 Yuki（左）
-@live2d ${mYuki} expression happy
-@show live2d:${mYuki} LEFT  1 FADE 700
-@wait 100
-由希: 学长，你终于来了！我还以为你又要迟到呢…
-@live2d ${mYuki} motion Idle:0
-由希: 等等…你身后那位是？
+# 初始变量
+@set ${AFF_A} = 2
+@set ${AFF_B} = 2
+@set day = 1
 
-@live2d ${mHana} expression neutral
-@show live2d:${mHana} RIGHT 1 FADE 700
-@wait 100
-@live2d ${mHana} expression surprise
-花奈: 初次见面，我叫花奈～是今天才转来的插班生。
-@live2d ${mHana} expression happy
-花奈: 以后还请多多关照啦！
+旁白: 九月，傍晚的风里带着桂花的甜香。
+旁白: 我站在旧校舍的走廊尽头，手中握着一张褪色的社团招新海报。
 
-@set 花奈好感度 = 1
-@set 由希好感度 = 1
-
-旁白: 天台的风轻轻拂过，夕阳把两人的影子拉得很长。
-@bg #2b1f4e FADE 1200
-@shake 3 400
-
-学姐: 那么——你们想先和谁一起去看傍晚的校园呢？
-
-@choose yuki|和由希逛旧校舍;hana|和花奈去天台花园
-
-# ---------- 由希 线 ----------
-@label yuki
-@set 由希好感度 += 2
-@live2d ${mYuki} expression happy
-@hide live2d:${mHana} FADE 600
-由希: 太好了！那我们走吧，学长♪
+# Alice 出现（左）
+@live2d ${mAlice} expression happy
+@show live2d:${mAlice} LEFT  happy 1 FADE 700
 @wait 200
-由希: 旧校舍的走廊里藏着秘密基地哦，我只带你一个人去看。
-旁白: 空气里弥漫着旧木与墨香的味道。
-@if 由希好感度 >= 3 yuki_good
-由希: （小声）其实…我一直想和你两个人单独…
-@jump common
+Alice: 呀！你终于来啦！我等你好久啦～
+Alice: 今天是天文社的第一次观星会，不许缺席哦！
+@set ${AFF_A} += 1
 
-@label yuki_good
-@live2d ${mYuki} expression happy
-由希: 学长，下次…下次还可以再陪我吗？
-@jump common
+旁白: 我正想回答，身后传来了轻快的脚步声。
 
-# ---------- 花奈 线 ----------
-@label hana
-@set 花奈好感度 += 2
-@live2d ${mHana} expression happy
-@hide live2d:${mYuki} FADE 600
-花奈: 嘿嘿～和我一组，你赚到啦！
+# Bob 出现（右）
+@live2d ${mBob} expression neutral
+@show live2d:${mBob} RIGHT neutral 1 FADE 700
 @wait 200
-花奈: 其实天台花园里有我偷偷种的花，给你独家参观权。
-旁白: 暮色渐浓，云朵也染上了温柔的颜色。
-@bg #4a2f66 FADE 1200
-@effect flash 450
-@if 花奈好感度 >= 3 hana_good
-花奈: （笑）今天谢谢你陪我哦。
-@jump common
+Bob: 天文社？听起来挺有意思的。让我也加入，怎么样？
+@live2d ${mBob} expression happy
+Bob: （笑）放心，我带了茶点。
+@set ${AFF_B} += 1
 
-@label hana_good
-@live2d ${mHana} expression happy
-花奈: 呐呐，明天…我们还在这里见面吧？说好了哦！
-@jump common
+# 切换到黄昏景
+@bg #3a2a66 FADE 1500
+Narrator: 夕阳从走廊尽头的窗户斜斜洒进来，把三个人的影子拉得很长。
+Alice: 那么……今晚，谁来和我一起布置天台呢？
 
-# ---------- 收束 ----------
-@label common
+@choose alice_choice|我来帮 Alice 布置天台;bob_choice|我陪 Bob 去准备茶点
+
+# ============ 分支 1：Alice ============
+@label alice_choice
+@set ${AFF_A} += 2
+@hide live2d:${mBob} FADE 600
+@live2d ${mAlice} expression happy
+Alice: 太好了！就知道你最好了♡
+Alice: 上次你帮我整理的观星笔记，我都一直留着呢……
+旁白: 天台上，Alice 一边贴着夜光星座贴纸，一边小声哼着歌。
+Alice: 喏，这个是天鹅座。听说——对着它许愿的话，恋爱会成真哦？
+@set ${AFF_A} += 1
+@bg #6e3d73 FADE 1800
+旁白: 风拂过她的发梢，我闻到了淡淡的薰衣草香。
 @wait 300
-@show live2d:${mYuki} LEFT happy 1 FADE 500
-@show live2d:${mHana} RIGHT happy 1 FADE 500
-旁白: 风还在吹，故事还很长——
+@jump common_check
+
+# ============ 分支 2：Bob ============
+@label bob_choice
+@set ${AFF_B} += 2
+@hide live2d:${mAlice} FADE 600
+@live2d ${mBob} expression happy
+Bob: 哈哈，明智之选。说实话，我一个人拿不下这些东西。
+Bob: 喏，这个给你——你最喜欢的抹茶口味。
+旁白: 器材室里，Bob 有条不紊地整理着望远镜和星图。
+Bob: 说起来，你之前在图书馆帮我占的那个座位……我一直挺感谢的。
+@set ${AFF_B} += 1
+@bg #1d3b6b FADE 1800
+旁白: 窗外的天空像被谁打翻了深蓝色的墨水瓶。
+@wait 300
+@jump common_check
+
+# ============ 收束 + 结局分支判定 ============
+@label common_check
+@set day += 1
+旁白: 观星会结束后，我们三人在十字路口挥手作别。
+@show live2d:${mAlice} LEFT  happy 1 FADE 500
+@show live2d:${mBob}   RIGHT happy 1 FADE 500
+
+Alice: 今天好开心啊……明天，还能一起吗？
+Bob: （笑）明天学校见啦。
+
+@bg #0a0a24 FADE 2200
+@effect fade_to_black 1800
+@wait 600
+
+# —— 三档结局判定——
+@if ${AFF_A} >= 7 end_alice_true
+@if ${AFF_B} >= 7 end_bob_true
+@if ${AFF_A} >= 5 end_alice_good
+@if ${AFF_B} >= 5 end_bob_good
+@jump end_normal
+
+@label end_alice_true
+Alice: 那个……其实我从很久之前，就一直、一直——
+Alice: 我喜欢你，比天鹅座的星星还要多。
+@end
+
+@label end_bob_true
+Bob: 别看我这样，其实我……每次看到你都会心跳加速。
+Bob: 从今以后，能一直和我一起看星星吗？
+@end
+
+@label end_alice_good
+Alice: （小声）下次……下次只约你一个人哦。
+@end
+
+@label end_bob_good
+Bob: 喏，这是今天的纪念照片——就我们两个的。
+@end
+
+@label end_normal
+旁白: 三个人的故事还在继续，明天又会是怎样的一天呢？
 学姐: 这便是，属于我们的、小小的序章。
-@wait 500
 @end
 `;
 
 const sid = Lument.galLoadScript('prologue', prologue);
-log(`剧本 prologue 载入 (id=${sid})，共解析 ${Lument.galParseScript ? 'OK' : 'OK'}`);
+log(`剧本 prologue 载入 (id=${sid}) · 24 种 DSL 命令可用`, 'ok');
 
-// ---------- 4. 回调 ----------
+/* ---------- 4. 合成音源开关 ---------- */
+let bgmOn = true;
+let seOn  = true;
+const btnBgm = document.getElementById('btnBgm');
+const btnSe  = document.getElementById('btnSe');
+btnBgm.onclick = () => {
+  bgmOn = !bgmOn; btnBgm.classList.toggle('active', bgmOn); btnBgm.textContent = '🎵 BGM ' + (bgmOn ? '开' : '关');
+  if (bgmOn){
+    const name = Lument.galStartSynthBgm('prologue-bgm', 'triangle', 0.18 * Lument.galGetPrefVolume(1) || 0.18);
+    if (name) log('合成 BGM 启动 · triangle 旋律循环（无外部音频依赖）', 'ok');
+  } else {
+    Lument.galStopSynthBgm('prologue-bgm', 600);
+    log('合成 BGM 停止 · 600ms 淡出');
+  }
+};
+btnSe.onclick = () => {
+  seOn = !seOn; btnSe.classList.toggle('active', seOn); btnSe.textContent = '🔊 SE ' + (seOn ? '开' : '关');
+};
+btnBgm.classList.add('active'); btnSe.classList.add('active');
+function seClick(){ if (seOn) Lument.galSynthSeClick(0.35 * Lument.galGetPrefVolume(0)); }
+function seConfirm(){ if (seOn) Lument.galSynthSeConfirm(0.45 * Lument.galGetPrefVolume(0)); }
+// 用户首次点击舞台时启动 BGM（绕过自动播放策略）
+function tryStartBgm(){
+  if (!bgmOn) return;
+  try {
+    const name = Lument.galStartSynthBgm('prologue-bgm', 'triangle', 0.18 * (Lument.galGetPrefVolume(1) || 0.55));
+    if (name){ log('首次交互 → 合成 BGM 已启动', 'ok'); stage.removeEventListener('pointerdown', tryStartBgm); window.removeEventListener('keydown', tryStartBgm); }
+  } catch(_e){}
+}
+stage.addEventListener('pointerdown', tryStartBgm, { once: true, passive: true });
+window.addEventListener('keydown', tryStartBgm, { once: true });
+
+/* ---------- 5. 好感度 HUD ---------- */
+const fillA  = document.getElementById('fillAlice');
+const fillB  = document.getElementById('fillBob');
+const valA   = document.getElementById('valAlice');
+const valB   = document.getElementById('valBob');
+const MAX_AFF = 10;
+function renderAff(){
+  const a = Math.max(0, Math.min(MAX_AFF, +Lument.galGetVar(AFF_A, 0) || 0));
+  const b = Math.max(0, Math.min(MAX_AFF, +Lument.galGetVar(AFF_B, 0) || 0));
+  fillA.style.width = (a / MAX_AFF * 100) + '%';
+  fillB.style.width = (b / MAX_AFF * 100) + '%';
+  valA.textContent = `${a} / ${MAX_AFF}`;
+  valB.textContent = `${b} / ${MAX_AFF}`;
+}
+Lument.galSetOnVarChange((k, oldV, newV) => {
+  if (k === AFF_A || k === AFF_B){
+    renderAff();
+    log(`变量变化 ${k}：${oldV} → ${newV}`, 'ok');
+  }
+});
+// 每次变量被设置都刷新 HUD
+setInterval(() => { if (Lument.galIsRunning()) renderAff(); }, 300);
+
+/* ---------- 6. 背景场景类切换（@bg 色值 → .stage 类名）---------- */
+const SCENE_MAP = {
+  '#0e1436': 'scene-night',
+  '#3a2a66': 'scene-dusk',
+  '#6e3d73': 'scene-sunset',
+  '#1d3b6b': 'scene-day',
+  '#0a0a24': 'scene-night'
+};
+// 包装 galRender 执行后，根据 gal.bg.image 的十六进制色切换 .stage 类名
+function applySceneClass(){
+  const bg = Lument.galGetBackground ? Lument.galGetBackground() : null;
+  // 用 dialog/history 最新变化触发也行，这里为了简单直接每帧检查字符串匹配
+}
+// 监听 gal.dialog 不为空时每帧刷新 scene 类（轻量）
+const lastScene = { cls: '' };
+function syncSceneClass(){
+  try {
+    // 直接读取全局 gal bg.image（通过 hack：getSaveInfo 不行，改用 history 的场景？）
+    // 为了稳定，我们这里监听"正在显示的对话"并基于几个启发式的触发时机切换：
+    // 当 history 计数跨过阈值时切 scene，或根据 history 最新条目的角色名决定
+    const n = Lument.galGetHistoryCount();
+    let cls = 'scene-night';
+    if (n <= 3) cls = 'scene-night';
+    else if (n <= 8) cls = 'scene-dusk';
+    else if (n <= 13) cls = 'scene-sunset';
+    else if (n <= 17) cls = 'scene-day';
+    else cls = 'scene-night';
+    if (lastScene.cls !== cls){
+      for (const k of ['scene-day','scene-dusk','scene-night','scene-sunset']) stage.classList.remove(k);
+      stage.classList.add(cls); lastScene.cls = cls;
+    }
+  } catch(_e){}
+}
+
+/* ---------- 7. 历史记录浮层 ---------- */
+const hm = document.getElementById('historyModal');
+const hmBody = document.getElementById('hmBody');
+const hmPage = document.getElementById('hmPage');
+const hmTotal = document.getElementById('hmTotal');
+let hmIdx = 0; const HM_PAGE = 20;
+function openHistory(){
+  hm.classList.add('open'); hmIdx = 0; renderHistoryPage();
+}
+function closeHistory(){ hm.classList.remove('open'); }
+document.getElementById('btnHistory').onclick = () => { seClick(); hm.classList.contains('open') ? closeHistory() : openHistory(); };
+document.getElementById('btnCloseHistory').onclick = () => { seClick(); closeHistory(); };
+document.getElementById('hmPrev').onclick = () => { seClick(); hmIdx = Math.max(0, hmIdx - 1); renderHistoryPage(); };
+document.getElementById('hmNext').onclick = () => { seClick(); const pages = Math.max(1, Lument.galGetHistoryPageCount(HM_PAGE)); hmIdx = Math.min(pages - 1, hmIdx + 1); renderHistoryPage(); };
+function renderHistoryPage(){
+  const total = Lument.galGetHistoryCount();
+  const pages = Math.max(1, Lument.galGetHistoryPageCount(HM_PAGE));
+  hmIdx = Math.min(pages - 1, Math.max(0, hmIdx));
+  const rows = Lument.galGetHistoryPage(hmIdx, HM_PAGE);
+  hmTotal.textContent = total;
+  hmPage.textContent = `${hmIdx + 1} / ${pages}`;
+  hmBody.innerHTML = '';
+  if (!rows.length){ hmBody.innerHTML = '<p style="color:var(--muted);">（还没有历史记录，开始游戏后会逐条累积）</p>'; return; }
+  for (const e of rows){
+    const d = document.createElement('div');
+    const whoCls = /alice/i.test(e.name) ? 'alice' : (/bob/i.test(e.name) ? 'bob' : '');
+    d.className = 'hmEntry ' + whoCls;
+    const nameHtml = e.name ? `<span class="hmName">${escapeHtml(e.name)}：</span>` : `<span class="hmName" style="color:var(--muted);">〔旁白〕　</span>`;
+    const readHtml = e.read ? `<span class="hmRead">✓ 已读</span>` : `<span class="hmRead" style="color:var(--ok);">NEW</span>`;
+    d.innerHTML = `<div>${nameHtml}${readHtml}</div><div class="hmText">${escapeHtml(e.text)}</div>`;
+    hmBody.appendChild(d);
+  }
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- 8. 结局卡片 ---------- */
+const endingCard = document.getElementById('endingCard');
+const endTitle   = document.getElementById('endTitle');
+const endDesc    = document.getElementById('endDesc');
+const endTag     = document.getElementById('endTag');
+function showEnding(title, desc, tag){
+  endTitle.textContent = title;
+  endDesc.textContent  = desc;
+  endTag.textContent   = tag || 'ENDING';
+  endingCard.classList.add('open');
+  seConfirm();
+  // 结局时稍微淡出 BGM
+  if (bgmOn) Lument.galStopSynthBgm('prologue-bgm', 1600);
+}
+document.getElementById('btnCloseEnding').onclick = () => { seClick(); endingCard.classList.remove('open'); };
+document.getElementById('btnRestart').onclick = () => {
+  seClick(); endingCard.classList.remove('open');
+  startNewGame();
+};
 Lument.galOnEnd = () => {
-  log('剧本播放结束（galOnEnd 回调）', 'ok');
+  log('剧本播放结束 → 根据好感度展示结局卡片', 'ok');
   document.getElementById('stateRun').textContent = '结束';
+  const a = +Lument.galGetVar(AFF_A, 0) || 0;
+  const b = +Lument.galGetVar(AFF_B, 0) || 0;
+  let tag = 'NORMAL END', title = '夜空下的序章', desc = '三个人的故事还在继续。也许明天，会有新的心动在等着你。';
+  if (a >= 7){ tag='TRUE END · Alice'; title='星光落在你肩上'; desc=`Alice 的好感度 ${a} / 10。天鹅座的愿望应验了，你们的手在夏末的夜里悄悄牵在了一起。`; }
+  else if (b >= 7){ tag='TRUE END · Bob';   title='茶点与星图之外';   desc=`Bob 的好感度 ${b} / 10。他红着脸把抹茶饼干塞进你手里——"以后，只分你一半。"`; }
+  else if (a >= 5){ tag='GOOD END · Alice'; title='下次，只约你一个人'; desc=`Alice 的好感度 ${a} / 10。她红着脸，小声约好了下次的"两个人的观星会"。`; }
+  else if (b >= 5){ tag='GOOD END · Bob';   title='只属于两人的合影';   desc=`Bob 的好感度 ${b} / 10。手机相册里多了一张偷拍的、你笑着的照片。`; }
+  showEnding(title, desc, tag);
 };
 Lument.galOnTitle = () => {
   log('返回标题（galOnTitle 回调）');
   document.getElementById('stateRun').textContent = '标题';
 };
 
-// ---------- 5. 输入：点击 / 键盘 ----------
+/* ---------- 9. 输入：点击 / 键盘 ---------- */
 function canvasPos(evt){
   const r = canvas.getBoundingClientRect();
   const sx = (evt.clientX - r.left) * (canvas.width / r.width);
   const sy = (evt.clientY - r.top)  * (canvas.height / r.height);
-  // 与引擎内部 1280x720 虚拟坐标对齐
-  return {
-    x: sx * (1280 / canvas.width),
-    y: sy * (720  / canvas.height),
-  };
+  return { x: sx * (1280 / canvas.width), y: sy * (720 / canvas.height) };
 }
-
 canvas.addEventListener('pointerdown', (e) => {
   const p = canvasPos(e);
+  seClick();
   // 1) 选项命中 / 对话推进
-  if (Lument.galHandleClick(p.x, p.y)) { /* handled */ return; }
-  // 2) Live2D 点击交互（当前正在显示的角色）
-  for (const mid of [mHana, mYuki]){
+  if (Lument.galHandleClick(p.x, p.y)) {
+    // 选了选项后如果当前历史数变化，刷新历史面板
+    if (hm.classList.contains('open')) renderHistoryPage();
+    return;
+  }
+  // 2) Live2D 点击交互
+  for (const mid of [mAlice, mBob]){
     const hit = Lument.live2dHitTest(mid, p.x, p.y);
     if (hit){
       if (hit === 'Head' || /Face/i.test(hit)){
@@ -468,10 +812,13 @@ canvas.addEventListener('pointerdown', (e) => {
       return;
     }
   }
+  // 3) 推进文本
+  Lument.galAdvance();
+  if (hm.classList.contains('open')) renderHistoryPage();
 }, { passive: true });
 
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space'){ e.preventDefault(); Lument.galAdvance(); }
+  if (e.code === 'Space'){ e.preventDefault(); seClick(); Lument.galAdvance(); if (hm.classList.contains('open')) renderHistoryPage(); }
   else if (e.key === 'a' || e.key === 'A'){
     const next = !Lument.galGetPrefAuto();
     Lument.galSetPrefAuto(next);
@@ -484,79 +831,120 @@ window.addEventListener('keydown', (e) => {
     updateToggleBtns();
     log('快进模式 → ' + (next ? '开' : '关'));
   }
+  else if (e.key === 'h' || e.key === 'H'){
+    hm.classList.contains('open') ? closeHistory() : openHistory();
+  }
   else if (e.code === 'F5'){
-    e.preventDefault();
+    e.preventDefault(); seClick();
     const ok = Lument.galQuickSave();
     log(ok ? '快速存档 ✅' : '快速存档 ❌（未在运行中）', ok ? 'ok' : 'err');
     renderSaveSlots();
   }
   else if (e.code === 'F9'){
-    e.preventDefault();
+    e.preventDefault(); seClick();
     const ok = Lument.galQuickLoad();
     log(ok ? '快速读档 ✅' : '快速读档 ❌（没有快速存档）', ok ? 'ok' : 'err');
   }
   else if (e.key >= '1' && e.key <= '9'){
     const i = (+e.key) - 1;
     if (Lument.galGetChoiceCount() > i){
+      seConfirm();
       Lument.galSelectChoice(i);
       log(`选择选项 ${e.key}: ${Lument.galGetChoiceText(i)}`);
     }
   }
 });
 
-// ---------- 6. UI 绑定 ----------
-document.getElementById('btnStart').onclick = () => {
+/* ---------- 10. UI 绑定 ---------- */
+function startNewGame(){
+  // 重置 HUD
+  Lument.galSetVar(AFF_A, 2); Lument.galSetVar(AFF_B, 2);
+  renderAff();
+  // 关闭结局卡片 / 历史浮层
+  endingCard.classList.remove('open');
+  closeHistory();
+  // 重启 BGM
+  if (bgmOn){ Lument.galStopSynthBgm('prologue-bgm', 200); setTimeout(() => Lument.galStartSynthBgm('prologue-bgm', 'triangle', 0.18 * (Lument.galGetPrefVolume(1) || 0.55)), 300); }
   Lument.galStart('prologue');
   document.getElementById('stateRun').textContent = '运行中';
-  log('开始播放 prologue', 'ok');
-};
+  log('▶ 开始新游戏：《星语心愿》', 'ok');
+}
+document.getElementById('btnStart').onclick = () => { seConfirm(); startNewGame(); };
 document.getElementById('btnTitle').onclick = () => {
+  seClick();
   Lument.galStop();
   Lument.galShowDialog(false);
+  if (bgmOn) Lument.galStopSynthBgm('prologue-bgm', 900);
   document.getElementById('stateRun').textContent = '标题';
   log('返回标题画面');
 };
+// 测试结局按钮：直接按当前好感度跳转到对应结局
+document.getElementById('btnEnding').onclick = () => {
+  seConfirm();
+  const a = +Lument.galGetVar(AFF_A, 0) || 0;
+  const b = +Lument.galGetVar(AFF_B, 0) || 0;
+  log(`强制触发结局判定：Alice ${a} · Bob ${b}`);
+  if (a >= 7) showEnding('星光落在你肩上', `Alice 的好感度 ${a} / 10。天鹅座的愿望应验了，你们的手在夏末的夜里悄悄牵在了一起。`, 'TRUE END · Alice');
+  else if (b >= 7) showEnding('茶点与星图之外',   `Bob 的好感度 ${b} / 10。他红着脸把抹茶饼干塞进你手里——"以后，只分你一半。"`, 'TRUE END · Bob');
+  else if (a >= 5) showEnding('下次，只约你一个人', `Alice 的好感度 ${a} / 10。她红着脸，小声约好了下次的"两个人的观星会"。`, 'GOOD END · Alice');
+  else if (b >= 5) showEnding('只属于两人的合影',   `Bob 的好感度 ${b} / 10。手机相册里多了一张偷拍的、你笑着的照片。`, 'GOOD END · Bob');
+  else showEnding('夜空下的序章', '三个人的故事还在继续。也许明天，会有新的心动在等着你。', 'NORMAL END');
+};
 
+/* ---- 偏好 ---- */
 const rngTs = document.getElementById('rngTs'), lblTs = document.getElementById('lblTs');
-rngTs.addEventListener('input', () => {
-  const v = +rngTs.value; lblTs.textContent = v;
-  Lument.galSetPrefTextSpeed(v);
-});
+rngTs.addEventListener('input', () => { const v = +rngTs.value; lblTs.textContent = v; Lument.galSetPrefTextSpeed(v); });
+Lument.galSetPrefTextSpeed(6);
 const rngBgm = document.getElementById('rngBgm'), lblBgm = document.getElementById('lblBgm');
 rngBgm.addEventListener('input', () => { const v = +rngBgm.value; lblBgm.textContent = v.toFixed(2); Lument.galSetPrefVolume(1, v); });
+Lument.galSetPrefVolume(1, 0.55);
 const rngSe  = document.getElementById('rngSe'),  lblSe  = document.getElementById('lblSe');
 rngSe.addEventListener('input',  () => { const v = +rngSe.value;  lblSe.textContent  = v.toFixed(2); Lument.galSetPrefVolume(0, v); });
+Lument.galSetPrefVolume(0, 0.8);
 const rngVo  = document.getElementById('rngVo'),  lblVo  = document.getElementById('lblVo');
 rngVo.addEventListener('input',  () => { const v = +rngVo.value;  lblVo.textContent  = v.toFixed(2); Lument.galSetPrefVolume(2, v); });
 
+/* ---- 自动 / 快进 / 只读快进 ---- */
 const btnAuto = document.getElementById('btnAuto');
 const btnSkip = document.getElementById('btnSkip');
+const btnSkipRO = document.getElementById('btnSkipRO');
 function updateToggleBtns(){
-  btnAuto.textContent = 'A / 自动 ' + (Lument.galGetPrefAuto() ? '开' : '关');
-  btnSkip.textContent = 'S / 快进 ' + (Lument.galGetPrefSkip() ? '开' : '关');
+  const auto = Lument.galGetPrefAuto();
+  const skip = Lument.galGetPrefSkip();
+  const ro   = Lument.galGetSkipReadOnly();
+  btnAuto.textContent = 'A / 自动 ' + (auto ? '开' : '关');
+  btnAuto.setAttribute('aria-pressed', auto ? 'true' : 'false');
+  btnSkip.textContent = 'S / 快进 ' + (skip ? '开' : '关');
+  btnSkip.setAttribute('aria-pressed', skip ? 'true' : 'false');
+  btnSkipRO.textContent = '只读快进 ' + (ro ? '开' : '关');
+  btnSkipRO.setAttribute('aria-pressed', ro ? 'true' : 'false');
 }
-btnAuto.onclick = () => { Lument.galSetPrefAuto(!Lument.galGetPrefAuto()); updateToggleBtns(); };
-btnSkip.onclick = () => { Lument.galSetPrefSkip(!Lument.galGetPrefSkip()); updateToggleBtns(); };
+btnAuto.onclick = () => { seClick(); Lument.galSetPrefAuto(!Lument.galGetPrefAuto()); updateToggleBtns(); };
+btnSkip.onclick = () => { seClick(); Lument.galSetPrefSkip(!Lument.galGetPrefSkip()); updateToggleBtns(); };
+btnSkipRO.onclick = () => { seClick(); Lument.galSetSkipReadOnly(!Lument.galGetSkipReadOnly()); updateToggleBtns(); };
 updateToggleBtns();
 
-// Live2D 表情 & 动作
+/* ---- Live2D 表情 / 动作 ---- */
 document.querySelectorAll('[data-expr]').forEach(b => {
   b.onclick = () => {
+    seClick();
     const name = b.getAttribute('data-expr');
-    Lument.live2dSetExpression(mHana, name);
-    Lument.live2dSetExpression(mYuki, name);
+    Lument.live2dSetExpression(mAlice, name);
+    Lument.live2dSetExpression(mBob, name);
     log(`设置 Live2D 表情 → ${name}`);
   };
 });
 document.getElementById('btnExprRand').onclick = () => {
-  Lument.live2dSetExpressionRandom(mHana);
-  Lument.live2dSetExpressionRandom(mYuki);
+  seClick();
+  Lument.live2dSetExpressionRandom(mAlice);
+  Lument.live2dSetExpressionRandom(mBob);
   log('随机表情 🎲');
 };
 let eyeTrack = true;
 document.getElementById('btnEyeTrk').onclick = (e) => {
+  seClick();
   eyeTrack = !eyeTrack;
-  for (const m of [mHana, mYuki]){
+  for (const m of [mAlice, mBob]){
     Lument.live2dEnableAutoEye(m, eyeTrack);
     Lument.live2dEnableAutoHead(m, eyeTrack);
   }
@@ -565,14 +953,15 @@ document.getElementById('btnEyeTrk').onclick = (e) => {
 };
 document.querySelectorAll('[data-m]').forEach(b => {
   b.onclick = () => {
+    seClick();
     const g = b.getAttribute('data-m');
-    Lument.live2dStartMotion(mHana, g, 0, 2);
-    Lument.live2dStartMotion(mYuki, g, 0, 2);
+    Lument.live2dStartMotion(mAlice, g, 0, 2);
+    Lument.live2dStartMotion(mBob, g, 0, 2);
     log(`播放 Live2D 动作 → ${g}`);
   };
 });
 
-// 存档槽渲染
+/* ---- 存档槽 ---- */
 function renderSaveSlots(){
   const grid = document.getElementById('saveGrid');
   grid.innerHTML = '';
@@ -596,28 +985,30 @@ function renderSaveSlots(){
     b.onclick = () => {
       const s = +b.getAttribute('data-s');
       const a = b.getAttribute('data-a');
-      if (a === 's'){ const ok = Lument.galSave(s, '存档 ' + s); log(ok ? `槽位 ${s} 存档 ✅` : `槽位 ${s} 存档 ❌`, ok ? 'ok':'err'); }
-      else if (a === 'l'){ const ok = Lument.galLoad(s); log(ok ? `槽位 ${s} 读档 ✅` : `槽位 ${s} 读档 ❌`, ok ? 'ok':'err'); }
-      else { Lument.galDeleteSave(s); log(`槽位 ${s} 已删除`); }
+      if (a === 's'){ seConfirm(); const ok = Lument.galSave(s, '存档 ' + s); log(ok ? `槽位 ${s} 存档 ✅` : `槽位 ${s} 存档 ❌`, ok ? 'ok':'err'); }
+      else if (a === 'l'){ seConfirm(); const ok = Lument.galLoad(s); log(ok ? `槽位 ${s} 读档 ✅` : `槽位 ${s} 读档 ❌`, ok ? 'ok':'err'); renderAff(); }
+      else { seClick(); Lument.galDeleteSave(s); log(`槽位 ${s} 已删除`); }
       renderSaveSlots();
     };
   });
 }
 renderSaveSlots();
-document.getElementById('btnQSave').onclick = () => { const ok = Lument.galQuickSave(); log(ok?'快速存档 ✅':'快速存档 ❌', ok?'ok':'err'); renderSaveSlots(); };
-document.getElementById('btnQLoad').onclick = () => { const ok = Lument.galQuickLoad(); log(ok?'快速读档 ✅':'快速读档 ❌', ok?'ok':'err'); };
+document.getElementById('btnQSave').onclick = () => { seConfirm(); const ok = Lument.galQuickSave(); log(ok?'快速存档 ✅':'快速存档 ❌', ok?'ok':'err'); renderSaveSlots(); };
+document.getElementById('btnQLoad').onclick = () => { seConfirm(); const ok = Lument.galQuickLoad(); log(ok?'快速读档 ✅':'快速读档 ❌', ok?'ok':'err'); renderAff(); };
 
-// ---------- 7. 主循环 ----------
+/* ---------- 11. 主循环 ---------- */
 let lastTs = performance.now();
+let fpsSmooth = 60;
 function loop(ts){
   const dt = Math.min(100, ts - lastTs); lastTs = ts;
+  fpsSmooth = fpsSmooth * 0.92 + (1000 / Math.max(1, dt)) * 0.08;
 
   Lument.beginFrame();
   Lument.galUpdate(dt);
   Lument.galRender();
   Lument.endFrame();
 
-  // 将引擎 canvas 输出到页面 canvas（维持 1280x720 → 按比例 cover）
+  // 将引擎 canvas 输出到页面 canvas（按比例 cover，保留 16:9）
   demoCtx.save();
   demoCtx.fillStyle = '#000';
   demoCtx.fillRect(0, 0, canvas.width, canvas.height);
@@ -631,19 +1022,26 @@ function loop(ts){
   demoCtx.drawImage(engineCanvas, dx, dy, dw, dh);
   demoCtx.restore();
 
-  // HUD 状态
-  const line = (Lument.galIsRunning())
-    ? `prologue · ${Math.max(0, (Lument.galGetHistoryCount()))} 条台词`
-    : '—';
+  // 状态行
+  const histN = Lument.galGetHistoryCount();
+  const line = Lument.galIsRunning()
+    ? `prologue · ${histN} 条台词 · ${fpsSmooth.toFixed(0)} FPS`
+    : `— · ${fpsSmooth.toFixed(0)} FPS`;
   document.getElementById('stateLine').textContent = line;
   document.getElementById('stateRun').textContent =
     Lument.galIsRunning() ? '运行中' : (document.getElementById('stateRun').textContent || '待机');
+
+  // 背景场景类名同步（轻量，按剧情进度切换 CSS 滤镜）
+  syncSceneClass();
 
   requestAnimationFrame(loop);
 }
 requestAnimationFrame((ts) => { lastTs = ts; loop(ts); });
 
-log('主循环已启动，可以点击画布或按【开始新游戏】体验');
+// 首次渲染 HUD
+renderAff();
+log('主循环已启动 · 点击【▶ 开始新游戏】或舞台开始体验', 'ok');
+log('提示：首次点击会自动激活浏览器音频上下文并启动合成 BGM');
 </script>
 </body>
 </html>

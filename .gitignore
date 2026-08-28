@@ -46,3 +46,8 @@ pip-wheel-metadata/
 # Node (if any)
 node_modules/
 npm-debug.log*
+
+# TRAE 分享用打包产物（随会话生成，不入库）
+.trae-html-share-packages/
+/tmp/
+

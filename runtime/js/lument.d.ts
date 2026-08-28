@@ -500,12 +500,17 @@ export interface LumentEngine {
   galStop(): void;
   galAdvance(): void;
   galSkip(enable: boolean): void;
+  galSetSkipReadOnly(enable: boolean): void;
+  galGetSkipReadOnly(): boolean;
   galAuto(enable: boolean): void;
   galSetAutoDelay(ms: number): void;
   galGotoLabel(label: string): void;
   galSelectChoice(index: number): void;
+  /** 按标签 / 下标 / 选项文本触发选择（对外最常用） */
+  galChoose(labelOrIndexOrText: string | number): void;
   galGetChoiceCount(): number;
   galGetChoiceText(i: number): string;
+  galGetChoices(): Array<{ label: string; text: string }> | null;
 
   // 对话框
   galSetDialogStyle(style: Partial<LumentGalDialogStyle>): void;
@@ -515,6 +520,8 @@ export interface LumentEngine {
   galGetHistoryCount(): number;
   galGetHistoryEntry(idx: number): LumentGalHistoryEntry | null;
   galClearHistory(): void;
+  galGetHistoryPageCount(pageSize?: number): number;
+  galGetHistoryPage(pageIndex: number, pageSize?: number): LumentGalHistoryPageItem[];
   galHandleClick(sx: number, sy: number): boolean;
 
   // 立绘 / 背景 / CG
@@ -543,6 +550,11 @@ export interface LumentEngine {
   galPlaySe(audio: string, volume?: number): void;
   galPlayVoice(audio: string, volume?: number, speaker?: string): void;
   galStopVoice(): void;
+  // 合成音源（无需外部音频文件，WebAudio 合成占位 BGM / SE）
+  galStartSynthBgm(name: string, type?: 'sine'|'triangle'|'square'|'sawtooth', volume?: number): string | null;
+  galStopSynthBgm(name: string, fadeMs?: number): void;
+  galSynthSeClick(volume?: number): boolean | null;
+  galSynthSeConfirm(volume?: number): boolean | null;
 
   // 偏好设置
   galSetPrefTextSpeed(v: number): void;
@@ -572,6 +584,10 @@ export interface LumentEngine {
   // 回调
   galOnEnd: (() => void) | null;
   galOnTitle: (() => void) | null;
+  galSetOnVarChange(fn: ((key: string, oldValue: any, newValue: any) => void) | null): void;
+  galRemoveOnVarChange(): void;
+  galSetOnRead(fn: ((name: string, text: string) => void) | null): void;
+  galIsCurrentLineRead(): boolean;
 
   // 每帧
   galUpdate(dtMs: number): void;
@@ -627,6 +643,11 @@ export interface LumentGalHistoryEntry {
   name: string;
   text: string;
   voice: string;
+  read?: boolean;
+}
+
+export interface LumentGalHistoryPageItem extends LumentGalHistoryEntry {
+  index: number;
 }
 
 export interface LumentGalSaveInfo {
