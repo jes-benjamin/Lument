@@ -472,4 +472,205 @@ export interface LumentEngine {
   uiBuildFromJson(json: string): number;
   uiDumpTree(root: number): string;
   uiFindById(name: string): number;
+
+  // ============================================================
+  // LumentGAL: 视觉小说 / GAL 子系统 (LumentGAL 分支)
+  // ============================================================
+  GAL_CMD: Readonly<{
+    SAY: 1; NARRATE: 2; SHOW: 3; HIDE: 4; BG: 5; CG: 6; CG_CLEAR: 7;
+    BGM: 8; BGM_STOP: 9; SE: 10; VOICE: 11; CHOOSE: 12; LABEL: 13; JUMP: 14;
+    IF: 15; SET: 16; WAIT: 17; SHAKE: 18; EFFECT: 19; CALL: 20; RETURN: 21;
+    LIVE2D: 22; END: 23; TITLE: 24;
+  }>;
+  GAL_SLOT: Readonly<{ LEFT: 0; CENTER: 1; RIGHT: 2; CUSTOM: 3; }>;
+  GAL_TWEEN: Readonly<{
+    NONE: 0; FADE: 1; SLIDE_L: 2; SLIDE_R: 3; SLIDE_U: 4; SLIDE_D: 5;
+    ZOOM: 6; DISSOLVE: 7; CUT: 8;
+  }>;
+
+  // 生命周期
+  galInit(styleOpt?: Partial<LumentGalDialogStyle>): void;
+  galShutdown(): void;
+  galIsRunning(): boolean;
+
+  // 剧本
+  galParseScript(name: string, src: string): LumentGalScript;
+  galLoadScript(name: string, source?: string): number;
+  galStart(scriptId: number | string, entryLabel?: string): void;
+  galStop(): void;
+  galAdvance(): void;
+  galSkip(enable: boolean): void;
+  galAuto(enable: boolean): void;
+  galSetAutoDelay(ms: number): void;
+  galGotoLabel(label: string): void;
+  galSelectChoice(index: number): void;
+  galGetChoiceCount(): number;
+  galGetChoiceText(i: number): string;
+
+  // 对话框
+  galSetDialogStyle(style: Partial<LumentGalDialogStyle>): void;
+  galShowDialog(v: boolean): void;
+  galIsDialogVisible(): boolean;
+  galSay(name: string, text: string): void;
+  galGetHistoryCount(): number;
+  galGetHistoryEntry(idx: number): LumentGalHistoryEntry | null;
+  galClearHistory(): void;
+  galHandleClick(sx: number, sy: number): boolean;
+
+  // 立绘 / 背景 / CG
+  galCreateSprite(image: string, slot: number, zOrder?: number): number;
+  galDestroySprite(id: number): void;
+  galShowSprite(id: number | string, slot?: number, expr?: string, alpha?: number, tween?: number, duration?: number): void;
+  galHideSprite(id: number | string, tween?: number, duration?: number): void;
+  galSetSpritePosition(id: number | string, x: number, y: number): void;
+  galSetSpriteScale(id: number | string, s: number): void;
+  galSetSpriteExpression(id: number | string, e: string): void;
+  galSetBackground(imageOrColor: string, tween?: number, duration?: number): void;
+  galShowCG(image: string, tween?: number, duration?: number): void;
+  galHideCG(tween?: number, duration?: number): void;
+
+  // 存档 / 读档
+  galSave(slot: number, title?: string): boolean;
+  galLoad(slot: number): boolean;
+  galDeleteSave(slot: number): boolean;
+  galGetSaveInfo(slot: number): LumentGalSaveInfo;
+  galQuickSave(): boolean;
+  galQuickLoad(): boolean;
+
+  // 音频
+  galPlayBgm(audio: string, loop?: boolean, volume?: number, fadeMs?: number): void;
+  galStopBgm(fadeMs?: number): void;
+  galPlaySe(audio: string, volume?: number): void;
+  galPlayVoice(audio: string, volume?: number, speaker?: string): void;
+  galStopVoice(): void;
+
+  // 偏好设置
+  galSetPrefTextSpeed(v: number): void;
+  galGetPrefTextSpeed(): number;
+  galSetPrefAuto(v: boolean): void;
+  galGetPrefAuto(): boolean;
+  galSetPrefSkip(v: boolean): void;
+  galGetPrefSkip(): boolean;
+  galSetPrefVolume(group: number, value: number): void;
+  galGetPrefVolume(group: number): number;
+
+  // 演出
+  galShake(intensity?: number, ms?: number): void;
+  galFadeTo(color: LumentColor, ms?: number): void;
+  galFadeFrom(color?: LumentColor, ms?: number): void;
+
+  // 变量
+  galSetVar(k: string, v: any): void;
+  galSetVarInt(k: string, v: number): void;
+  galSetVarFloat(k: string, v: number): void;
+  galSetVarBool(k: string, v: boolean): void;
+  galGetVar(k: string, def?: any): any;
+  galGetVarInt(k: string, def?: number): number;
+  galGetVarFloat(k: string, def?: number): number;
+  galGetVarBool(k: string, def?: boolean): boolean;
+
+  // 回调
+  galOnEnd: (() => void) | null;
+  galOnTitle: (() => void) | null;
+
+  // 每帧
+  galUpdate(dtMs: number): void;
+  galRender(): void;
+
+  // ============================================================
+  // LumentGAL: Live2D 子系统 (LumentGAL 分支)
+  // ============================================================
+  live2dInit(corePath?: string): void;
+  live2dShutdown(): void;
+  live2dLoadModel(model3JsonPath?: string): number;
+  live2dReleaseModel(id: number): void;
+  live2dIsReady(id: number): boolean;
+  live2dSetTransform(id: number, tf: Partial<LumentLive2DTransform>): void;
+  live2dGetTransform(id: number): LumentLive2DTransform | null;
+  live2dSetLayer(id: number, z: number): void;
+  live2dSetVisible(id: number, v: boolean): void;
+  live2dGetMotionGroupCount(id: number, group: string): number;
+  live2dStartMotion(id: number, group: string, index: number, priority?: number): number;
+  live2dIsMotionPlaying(id: number): boolean;
+  live2dStopMotion(id: number): void;
+  live2dGetExpressionCount(id: number): number;
+  live2dGetExpressionName(id: number, i: number): string | null;
+  live2dSetExpression(id: number, name: string): void;
+  live2dSetExpressionRandom(id: number): void;
+  live2dSetParam(id: number, paramId: string, value: number): void;
+  live2dGetParam(id: number, paramId: string, defVal?: number): number;
+  live2dParamAdd(id: number, paramId: string, delta: number): void;
+  live2dParamMult(id: number, paramId: string, factor: number): void;
+  live2dSetEyeTarget(id: number, x: number, y: number): void;
+  live2dSetHeadTarget(id: number, x: number, y: number): void;
+  live2dEnableAutoEye(id: number, v: boolean): void;
+  live2dEnableAutoHead(id: number, v: boolean): void;
+  live2dEnableAutoBlink(id: number, v: boolean): void;
+  live2dEnableAutoMouth(id: number, v: boolean): void;
+  live2dHitTest(id: number, sx: number, sy: number): string | null;
+  galAttachLive2d(modelId: number, slot: number, zOrder?: number): number;
+  live2dUpdate(dtMs: number): void;
+  live2dRender(): void;
+}
+
+// ============================================================
+// LumentGAL / Live2D 数据结构
+// ============================================================
+export interface LumentGalScript {
+  id: number;
+  name: string;
+  lines: any[];
+  labels: Record<string, number>;
+}
+
+export interface LumentGalHistoryEntry {
+  name: string;
+  text: string;
+  voice: string;
+}
+
+export interface LumentGalSaveInfo {
+  slot: number;
+  used: boolean;
+  title?: string;
+  summary?: string;
+  timestamp?: string;
+  lineNo?: number;
+  scriptName?: string;
+  bgmVolume?: number;
+  seVolume?: number;
+  voiceVolume?: number;
+  textSpeed?: number;
+  autoMode?: boolean;
+}
+
+export interface LumentGalDialogStyle {
+  x: number; y: number; w: number; h: number;
+  bgColor: LumentColor;
+  borderColor: LumentColor;
+  borderWidth: number;
+  radius: number;
+  padding: number;
+  nameColor: LumentColor;
+  nameTextColor: LumentColor;
+  textColor: LumentColor;
+  nameFontSize: number;
+  textFontSize: number;
+  lineHeight: number;
+  fontFace: string;
+  showNameBox: boolean;
+  showAdvanceHint: boolean;
+  typewriterSpeed: number;
+  autoWrap: boolean;
+  maxLines: number;
+}
+
+export interface LumentLive2DTransform {
+  x: number; y: number;
+  scale: number;
+  rotation: number;
+  opacity: number;
+  width: number;
+  height: number;
+  flipX: boolean;
 }

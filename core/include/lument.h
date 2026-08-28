@@ -875,6 +875,269 @@ LUMENT_API LumentEntity lument_ai_agent_get_target(int agentId);
 LUMENT_API void lument_ai_agent_tick(int agentId, float dt);
 LUMENT_API const char* lument_ai_agent_query(const char* query);  // AI查询引擎状态
 
+// ============================================================
+// 视觉小说 (GAL) 引擎 API   —  LumentGAL 分支新增
+// 剧本 DSL、对话框、打字机、历史回看、选择分支、背景/立绘、
+// 存档槽位、BGM/语音、Live2D 模型驱动。
+// C 端为统一抽象桩；Web/JS Runtime 提供完整实现。
+// ============================================================
+
+// --- Opaque handle 类型 ---
+typedef int LumentGalScript;   // 剧本句柄
+typedef int LumentGalSprite;   // 角色立绘 / Live2D 句柄
+typedef int LumentGalLayer;    // 图层句柄（背景/前景/CG/对话框覆层）
+#define LUMENT_GAL_INVALID (-1)
+
+// --- 剧本 DSL 常量 ---
+typedef enum {
+    LUMENT_GAL_CMD_SAY       = 1,   // 角色说话：say <name> <text>
+    LUMENT_GAL_CMD_NARRATE   = 2,   // 旁白： narrate <text>
+    LUMENT_GAL_CMD_SHOW      = 3,   // 显示立绘：show <sprite> [slot] [expression] [alpha] [tween]
+    LUMENT_GAL_CMD_HIDE      = 4,   // 隐藏立绘：hide <sprite> [tween]
+    LUMENT_GAL_CMD_BG        = 5,   // 换背景：bg <image> [tween] [color]
+    LUMENT_GAL_CMD_CG        = 6,   // 显示 CG：cg <image> [tween]
+    LUMENT_GAL_CMD_CG_CLEAR  = 7,   // 关闭 CG：cg_clear [tween]
+    LUMENT_GAL_CMD_BGM       = 8,   // 播放 BGM：bgm <audio> [loop] [volume] [fade]
+    LUMENT_GAL_CMD_BGM_STOP  = 9,   // 停止 BGM：bgm_stop [fade]
+    LUMENT_GAL_CMD_SE        = 10,  // 音效：se <audio> [volume]
+    LUMENT_GAL_CMD_VOICE     = 11,  // 语音：voice <audio> [volume] [speaker]
+    LUMENT_GAL_CMD_CHOOSE    = 12,  // 选择分支：choose <label1|text1;label2|text2:...>
+    LUMENT_GAL_CMD_LABEL     = 13,  // 标签：label <name>
+    LUMENT_GAL_CMD_JUMP      = 14,  // 跳转：jump <label>
+    LUMENT_GAL_CMD_IF        = 15,  // 条件：if <var><op><value> <label>  (op: ==/!=/>/</>=/<=)
+    LUMENT_GAL_CMD_SET       = 16,  // 变量赋值：set <var> <value>  或 set <var> <op> <value>
+    LUMENT_GAL_CMD_WAIT      = 17,  // 等时/等事件：wait <ms> 或 wait click
+    LUMENT_GAL_CMD_SHAKE     = 18,  // 屏幕震动：shake <intensity> <ms>
+    LUMENT_GAL_CMD_EFFECT    = 19,  // 画面效果：effect <name> [duration] [args]
+    LUMENT_GAL_CMD_CALL      = 20,  // 子脚本调用：call <script> [entryLabel]
+    LUMENT_GAL_CMD_RETURN    = 21,  // 从 call 返回：return
+    LUMENT_GAL_CMD_LIVE2D    = 22,  // Live2D 操作：live2d <id> <motion|expression|param> <arg>
+    LUMENT_GAL_CMD_END       = 23,  // 剧本到达结束
+    LUMENT_GAL_CMD_TITLE     = 24   // 回到标题画面：title
+} LumentGalCommand;
+
+// --- 槽位（角色在屏幕上的站位） ---
+typedef enum {
+    LUMENT_GAL_SLOT_LEFT    = 0,
+    LUMENT_GAL_SLOT_CENTER  = 1,
+    LUMENT_GAL_SLOT_RIGHT   = 2,
+    LUMENT_GAL_SLOT_CUSTOM  = 3   // 使用坐标
+} LumentGalSlot;
+
+// --- 画面过渡类型 ---
+typedef enum {
+    LUMENT_GAL_TWEEN_NONE      = 0,
+    LUMENT_GAL_TWEEN_FADE      = 1,   // 淡入淡出（默认）
+    LUMENT_GAL_TWEEN_SLIDE_L   = 2,   // 从左滑入
+    LUMENT_GAL_TWEEN_SLIDE_R   = 3,   // 从右滑入
+    LUMENT_GAL_TWEEN_SLIDE_U   = 4,   // 从上滑入
+    LUMENT_GAL_TWEEN_SLIDE_D   = 5,   // 从下滑入
+    LUMENT_GAL_TWEEN_ZOOM      = 6,   // 缩放出现
+    LUMENT_GAL_TWEEN_DISSOLVE  = 7,   // 溶解（噪声遮罩）
+    LUMENT_GAL_TWEEN_CUT       = 8    // 直接切换（0 ms）
+} LumentGalTween;
+
+// --- 存档槽位信息 ---
+typedef struct LumentGalSaveInfo {
+    int   slot;
+    bool  used;
+    char  title[128];          // 章节/场景标题
+    char  summary[256];        // 当前对话文本摘要
+    char  timestamp[32];       // ISO 字符串
+    int   lineNo;              // 剧本行号
+    char  scriptName[64];      // 当前剧本名
+    float bgmVolume;
+    float seVolume;
+    float voiceVolume;
+    int   textSpeed;           // 打字机速度 1-10
+    bool  autoMode;
+} LumentGalSaveInfo;
+
+// --- 对话框样式 ---
+typedef struct LumentGalDialogStyle {
+    float x, y, w, h;
+    LumentColor bgColor;       // 对话框底色（含 alpha）
+    LumentColor borderColor;
+    float     borderWidth;
+    float     radius;
+    float     padding;
+    LumentColor nameColor;     // 名字框颜色（含 alpha）
+    LumentColor nameTextColor;
+    LumentColor textColor;
+    float     nameFontSize;
+    float     textFontSize;
+    float     lineHeight;
+    char      fontFace[128];   // 可选自定义字体家族
+    bool      showNameBox;
+    bool      showAdvanceHint; // 显示 ▼ 点击提示
+    int       typewriterSpeed; // 1 最快 10 最慢 (ms / char)
+    bool      autoWrap;        // 文本自动换行
+    int       maxLines;        // 对话框最大行数（超出行自动滚）
+} LumentGalDialogStyle;
+
+// --- 视觉小说引擎生命周期 & 剧本 ---
+LUMENT_API void  lument_gal_init(const LumentGalDialogStyle* defaultStyle);
+LUMENT_API void  lument_gal_shutdown(void);
+LUMENT_API void  lument_gal_update(float dt);
+LUMENT_API void  lument_gal_render(void);
+LUMENT_API LumentGalScript lument_gal_load_script(const char* name, const char* scriptSource);
+LUMENT_API LumentGalScript lument_gal_load_script_from_file(const char* path);
+LUMENT_API void  lument_gal_start(LumentGalScript script, const char* entryLabel);
+LUMENT_API void  lument_gal_stop(void);
+LUMENT_API bool  lument_gal_is_running(void);
+LUMENT_API void  lument_gal_advance(void);        // 玩家点击推进下一句 / 跳过打字机
+LUMENT_API void  lument_gal_skip(bool enable);    // 跳过模式：所有台词瞬间显示
+LUMENT_API void  lument_gal_auto(bool enable);    // 自动模式：延迟后自动前进
+LUMENT_API void  lument_gal_set_auto_delay_ms(int ms);
+LUMENT_API bool  lument_gal_is_waiting_click(void);
+LUMENT_API void  lument_gal_goto_label(const char* label);
+LUMENT_API void  lument_gal_select_choice(int index);  // 选择分支（index 从 0 开始）
+LUMENT_API int   lument_gal_get_choice_count(void);
+LUMENT_API const char* lument_gal_get_choice_text(int index);
+
+// --- 变量系统 ---
+LUMENT_API void  lument_gal_set_var(const char* key, const char* value);
+LUMENT_API void  lument_gal_set_var_int(const char* key, int value);
+LUMENT_API void  lument_gal_set_var_float(const char* key, float value);
+LUMENT_API void  lument_gal_set_var_bool(const char* key, bool value);
+LUMENT_API const char* lument_gal_get_var(const char* key, const char* defVal);
+LUMENT_API int   lument_gal_get_var_int(const char* key, int defVal);
+LUMENT_API float lument_gal_get_var_float(const char* key, float defVal);
+LUMENT_API bool  lument_gal_get_var_bool(const char* key, bool defVal);
+
+// --- 对话框 & 历史 ---
+LUMENT_API void  lument_gal_set_dialog_style(const LumentGalDialogStyle* style);
+LUMENT_API void  lument_gal_show_dialog(bool show);
+LUMENT_API bool  lument_gal_is_dialog_visible(void);
+LUMENT_API void  lument_gal_say(const char* name, const char* text);  // 直接调用（不走剧本）
+LUMENT_API int   lument_gal_get_history_count(void);
+LUMENT_API void  lument_gal_get_history_entry(int idx,
+                                              char* outName, int nameBufSize,
+                                              char* outText, int textBufSize,
+                                              char* outVoice, int voiceBufSize);
+LUMENT_API void  lument_gal_clear_history(void);
+
+// --- 背景 / 立绘 / CG / 图层 ---
+LUMENT_API void      lument_gal_set_background(const char* imageOrColor,
+                                                LumentGalTween tween, int durationMs);
+LUMENT_API LumentGalSprite lument_gal_create_sprite(const char* image,
+                                                    LumentGalSlot slot, int zOrder);
+LUMENT_API void      lument_gal_destroy_sprite(LumentGalSprite id);
+LUMENT_API void      lument_gal_show_sprite(LumentGalSprite id, LumentGalSlot slot,
+                                            const char* expression, float alpha,
+                                            LumentGalTween tween, int durationMs);
+LUMENT_API void      lument_gal_hide_sprite(LumentGalSprite id,
+                                            LumentGalTween tween, int durationMs);
+LUMENT_API void      lument_gal_set_sprite_position(LumentGalSprite id, float x, float y);
+LUMENT_API void      lument_gal_set_sprite_scale(LumentGalSprite id, float scale);
+LUMENT_API void      lument_gal_set_sprite_expression(LumentGalSprite id, const char* expression);
+LUMENT_API void      lument_gal_show_cg(const char* image, LumentGalTween tween, int durationMs);
+LUMENT_API void      lument_gal_hide_cg(LumentGalTween tween, int durationMs);
+
+// --- 音频（分组：0=SFX 1=BGM 2=Voice） ---
+LUMENT_API void  lument_gal_play_bgm(const char* audio, bool loop, float volume, int fadeMs);
+LUMENT_API void  lument_gal_stop_bgm(int fadeMs);
+LUMENT_API void  lument_gal_play_se(const char* audio, float volume);
+LUMENT_API void  lument_gal_play_voice(const char* audio, float volume, const char* speaker);
+LUMENT_API void  lument_gal_stop_voice(void);
+
+// --- 存档 / 读档（共 100 个槽位 0..99） ---
+#define LUMENT_GAL_MAX_SLOTS 100
+LUMENT_API bool  lument_gal_save(int slot, const char* title);
+LUMENT_API bool  lument_gal_load(int slot);
+LUMENT_API bool  lument_gal_delete_save(int slot);
+LUMENT_API bool  lument_gal_get_save_info(int slot, LumentGalSaveInfo* outInfo);
+LUMENT_API void  lument_gal_quick_save(void);   // slot 99
+LUMENT_API bool  lument_gal_quick_load(void);   // slot 99
+
+// --- 屏幕特效 ---
+LUMENT_API void  lument_gal_shake(float intensity, int durationMs);
+LUMENT_API void  lument_gal_fade_to(LumentColor color, int durationMs);
+LUMENT_API void  lument_gal_fade_from(LumentColor color, int durationMs);
+
+// --- 设置 / 偏好（localStorage / 本地存储） ---
+LUMENT_API void  lument_gal_set_pref_text_speed(int value);   // 1-10
+LUMENT_API int   lument_gal_get_pref_text_speed(void);
+LUMENT_API void  lument_gal_set_pref_auto(bool enable);
+LUMENT_API bool  lument_gal_get_pref_auto(void);
+LUMENT_API void  lument_gal_set_pref_skip(bool enable);
+LUMENT_API bool  lument_gal_get_pref_skip(void);
+LUMENT_API void  lument_gal_set_pref_volume(int group, float value);  // group 0 SE, 1 BGM, 2 Voice
+LUMENT_API float lument_gal_get_pref_volume(int group);
+
+// ============================================================
+// Live2D API   —  LumentGAL 分支新增
+// 基于 Cubism 4.x Web SDK / Canvas2D & WebGL 渲染。
+// Web Runtime 自带完整加载与驱动；C 端为抽象桩。
+// ============================================================
+
+typedef int LumentLive2DModel;  // 模型句柄
+#define LUMENT_LIVE2D_INVALID (-1)
+
+typedef struct LumentLive2DTransform {
+    float x;         // 屏幕坐标（世界或 UI 坐标，按坐标系选择）
+    float y;
+    float scale;     // 等比缩放（默认 1.0）
+    float rotation;  // 角度（度，默认 0）
+    float opacity;   // 0~1
+    int   width;     // 目标显示宽（0 = 使用模型原始宽）
+    int   height;    // 目标显示高（0 = 使用模型原始高）
+    bool  flipX;     // 水平镜像
+} LumentLive2DTransform;
+
+// --- 初始化 & 销毁 Live2D 子系统 ---
+LUMENT_API void  lument_live2d_init(const char* cubismCorePath); // core.wasm / cubism2 core.js
+LUMENT_API void  lument_live2d_shutdown(void);
+LUMENT_API void  lument_live2d_update(float dt);
+LUMENT_API void  lument_live2d_render(void);
+
+// --- 模型加载 & 释放 ---
+LUMENT_API LumentLive2DModel lument_live2d_load_model(const char* model3JsonPath);
+LUMENT_API void  lument_live2d_release_model(LumentLive2DModel id);
+LUMENT_API bool  lument_live2d_is_ready(LumentLive2DModel id);
+
+// --- 模型位置/变换 ---
+LUMENT_API void  lument_live2d_set_transform(LumentLive2DModel id,
+                                             const LumentLive2DTransform* tf);
+LUMENT_API void  lument_live2d_get_transform(LumentLive2DModel id,
+                                             LumentLive2DTransform* outTf);
+LUMENT_API void  lument_live2d_set_layer(LumentLive2DModel id, int zLayer);  // 与 GAL 立绘统一排序
+LUMENT_API void  lument_live2d_set_visible(LumentLive2DModel id, bool visible);
+
+// --- 动作 Motion（由 model3.json / motion 分组触发） ---
+LUMENT_API int   lument_live2d_get_motion_group_count(LumentLive2DModel id, const char* group);
+LUMENT_API int   lument_live2d_start_motion(LumentLive2DModel id, const char* group,
+                                            int index, int priority); // priority 0=低 1=中 2=强 3=强制
+LUMENT_API bool  lument_live2d_is_motion_playing(LumentLive2DModel id);
+LUMENT_API void  lument_live2d_stop_motion(LumentLive2DModel id);
+
+// --- 表情 Expression ---
+LUMENT_API int   lument_live2d_get_expression_count(LumentLive2DModel id);
+LUMENT_API const char* lument_live2d_get_expression_name(LumentLive2DModel id, int index);
+LUMENT_API void  lument_live2d_set_expression(LumentLive2DModel id, const char* name);
+LUMENT_API void  lument_live2d_set_expression_random(LumentLive2DModel id);
+
+// --- 参数控制（手动操作如眼睛/嘴巴/角度）---
+LUMENT_API void  lument_live2d_set_param(LumentLive2DModel id, const char* paramId, float value);
+LUMENT_API float lument_live2d_get_param(LumentLive2DModel id, const char* paramId, float defVal);
+LUMENT_API void  lument_live2d_param_add(LumentLive2DModel id, const char* paramId, float delta);
+LUMENT_API void  lument_live2d_param_mult(LumentLive2DModel id, const char* paramId, float factor);
+
+// --- 眼睛跟踪 / 头跟踪（看向屏幕坐标，默认自动） ---
+LUMENT_API void  lument_live2d_set_eye_target(LumentLive2DModel id, float x, float y);
+LUMENT_API void  lument_live2d_set_head_target(LumentLive2DModel id, float x, float y);
+LUMENT_API void  lument_live2d_enable_auto_eye(LumentLive2DModel id, bool enable);
+LUMENT_API void  lument_live2d_enable_auto_head(LumentLive2DModel id, bool enable);
+LUMENT_API void  lument_live2d_enable_auto_blink(LumentLive2DModel id, bool enable);
+LUMENT_API void  lument_live2d_enable_auto_mouth(LumentLive2DModel id, bool enable);  // 配合语音音量驱动
+
+// --- 手动 Hit 测试 / 点击触发（用于互动 Live2D） ---
+LUMENT_API const char* lument_live2d_hit_test(LumentLive2DModel id, float screenX, float screenY);
+
+// --- 与 GAL 引擎集成：注册为立绘（共享槽位 / 渲染顺序） ---
+LUMENT_API LumentGalSprite lument_gal_attach_live2d(LumentLive2DModel model,
+                                                    LumentGalSlot slot, int zOrder);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,7 +1,7 @@
 {
   "name": "lument-engine",
-  "version": "1.3.0",
-  "description": "轻量级跨平台 2D 游戏引擎 - UI自动化/渲染图元/物理空间分区/工程化",
+  "version": "1.3.0-lumentgal.1",
+  "description": "轻量级跨平台 2D 游戏引擎（LumentGAL 分支：视觉小说/GAL 子系统 + Live2D 接入，含剧本 DSL、对话框、分支选择、存档读档、Live2D 动作/表情/参数控制与占位渲染）",
   "main": "runtime/js/lument.js",
   "types": "runtime/js/lument.d.ts",
   "files": [
@@ -17,13 +17,21 @@
     "test": "node tests/run_tests.js",
     "build": "bash build.sh cpp",
     "build:web": "bash build.sh web",
-    "example": "node -e \"console.log('打开 examples/v1.3_demo.html 查看示例')\"",
+    "example": "node -e \"console.log('打开 examples/v1.3_demo.html 查看通用示例，examples/lument_gal_demo.html 查看视觉小说示例')\"",
+    "example:gal": "node -e \"console.log('在浏览器中打开 examples/lument_gal_demo.html 体验 LumentGAL Demo')\"",
     "typecheck": "tsc --noEmit --strict runtime/js/lument.d.ts"
   },
   "keywords": [
     "game-engine",
     "2d",
     "cross-platform",
+    "visual-novel",
+    "galgame",
+    "live2d",
+    "cubism",
+    "dialogue-system",
+    "script-dsl",
+    "save-system",
     "physics",
     "rendering",
     "ui",
@@ -37,7 +45,8 @@
   "homepage": "https://lument.uzens.cc.cd/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lument/lument.git"
+    "url": "git+https://github.com/jes-benjamin/Lument.git",
+    "branch": "LumentGAL"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

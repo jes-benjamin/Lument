@@ -3091,6 +3091,1640 @@ const Lument = (function() {
     }
 
     // ============================================================
+    // 视觉小说 / GAL 引擎 (LumentGAL 分支)
+    // ============================================================
+    const GAL_CMD = {
+        SAY:1, NARRATE:2, SHOW:3, HIDE:4, BG:5, CG:6, CG_CLEAR:7,
+        BGM:8, BGM_STOP:9, SE:10, VOICE:11, CHOOSE:12, LABEL:13, JUMP:14,
+        IF:15, SET:16, WAIT:17, SHAKE:18, EFFECT:19, CALL:20, RETURN:21,
+        LIVE2D:22, END:23, TITLE:24
+    };
+    const GAL_SLOT = { LEFT:0, CENTER:1, RIGHT:2, CUSTOM:3 };
+    const GAL_TWEEN = { NONE:0, FADE:1, SLIDE_L:2, SLIDE_R:3, SLIDE_U:4, SLIDE_D:5, ZOOM:6, DISSOLVE:7, CUT:8 };
+
+    const gal = {
+        inited: false,
+        running: false,
+        scripts: Object.create(null), // name -> {lines:[], labels:{}}
+        scriptIdSeq: 1,
+        curScript: null,
+        curLine: 0,
+        stack: [],              // call 栈
+        vars: Object.create(null),
+        skip: false,
+        auto: false,
+        autoDelayMs: 2500,
+        waitingClick: false,
+        waitingTimerMs: 0,
+        waitingTimerElapsed: 0,
+        choices: null,          // [{label,text}] or null
+        history: [],            // [{name,text,voice}]
+        dialogVisible: true,
+        dialog: null,           // {name, text, shownChars, timer, speed}
+        bg: { image:null, color:{r:30,g:30,b:40,a:255}, tween: GAL_TWEEN.FADE, tweenT:1, tweenDur:500, from:null, to:null },
+        cg: null,               // {image, tween, tweenT, tweenDur, fromAlpha, toAlpha}
+        sprites: new Map(),     // id -> {id, image, expr, slot,x,y,scale,alpha,z,destAlpha,tween,tweenT,tweenDur,fromX,fromY,fromAlpha,toX,toY,toAlpha,live2dId}
+        spriteIdSeq: 1,
+        audio: { bgm:null, bgmFadeT:0, bgmFadeDur:500, bgmFromVol:0, bgmToVol:0, bgmTargetStop:false, voice:null, se:[] },
+        saveSlotKey: 'LUMENT_GAL_SAVE_v1',
+        prefKey: 'LUMENT_GAL_PREF_v1',
+        pref: {
+            textSpeed: 5,   // 1..10 -> ms = 110 - speed*10
+            auto: false,
+            skip: false,
+            volSE: 1.0, volBGM: 1.0, volVoice: 1.0
+        },
+        style: null,
+        onEnd: null,
+        onTitle: null,
+        shake: { intensity:0, t:0, dur:500, ox:0, oy:0 },
+        fade: { r:0,g:0,b:0,a:0, t:0, dur:500, fromA:0, toA:0 }
+    };
+
+    function galDefaultStyle(){
+        const w = (canvas && canvas.width) || 1280;
+        const h = (canvas && canvas.height) || 720;
+        return {
+            x: 40, y: h - 250, w: w - 80, h: 210,
+            bgColor:{r:10,g:14,b:30,a:215},
+            borderColor:{r:120,g:160,b:255,a:90},
+            borderWidth: 1.5, radius: 16, padding: 22,
+            nameColor:{r:20,g:40,b:80,a:240},
+            nameTextColor:{r:235,g:240,b:255,a:255},
+            textColor:{r:230,g:232,b:250,a:255},
+            nameFontSize: 20, textFontSize: 22, lineHeight: 1.7,
+            fontFace: '', showNameBox: true, showAdvanceHint: true,
+            typewriterSpeed: 5, autoWrap: true, maxLines: 4
+        };
+    }
+
+    function galSavePref(){
+        try { localStorage.setItem(gal.prefKey, JSON.stringify(gal.pref)); } catch(e){}
+    }
+    function galLoadPref(){
+        try {
+            const s = localStorage.getItem(gal.prefKey);
+            if (s) Object.assign(gal.pref, JSON.parse(s));
+        } catch(e){}
+    }
+
+    function galParseScript(name, src){
+        const lines = src.split(/\r?\n/);
+        const script = { id: gal.scriptIdSeq++, name, lines: [], labels: Object.create(null) };
+        for (let i = 0; i < lines.length; i++){
+            let line = lines[i];
+            // 去掉注释 # 或 //
+            const cm = line.match(/^\s*(#|\/\/)/);
+            if (cm) continue;
+            line = line.replace(/\t/g, ' ').trim();
+            if (!line) continue;
+            // 命令以 @ 开头，否则作为说话/旁白行（冒号前为名字）
+            let cmd = null;
+            if (line.startsWith('@')){
+                const rest = line.slice(1).trim();
+                const parts = tokenizeLine(rest);
+                const kw = parts[0];
+                switch(kw){
+                    case 'say': {
+                        const nm = parts[1] || '';
+                        const tx = parts.slice(2).join(' ');
+                        cmd = { type: GAL_CMD.SAY, name: nm, text: tx };
+                        break;
+                    }
+                    case 'narrate': cmd = { type: GAL_CMD.NARRATE, text: parts.slice(1).join(' ') }; break;
+                    case 'show': {
+                        const sprite = parts[1] || '';
+                        const slotStr = parts[2] || 'CENTER';
+                        const expr = parts[3] || '';
+                        const alpha = parts[4] ? parseFloat(parts[4]) : 1;
+                        const twStr = parts[5] || 'FADE';
+                        const dur = parts[6] ? parseInt(parts[6]) : 500;
+                        cmd = { type: GAL_CMD.SHOW, sprite, slot: slotByName(slotStr), expression:expr, alpha, tween: tweenByName(twStr), duration: dur };
+                        break;
+                    }
+                    case 'hide': {
+                        const sprite = parts[1] || '';
+                        const twStr = parts[2] || 'FADE';
+                        const dur = parts[3] ? parseInt(parts[3]) : 500;
+                        cmd = { type: GAL_CMD.HIDE, sprite, tween: tweenByName(twStr), duration: dur };
+                        break;
+                    }
+                    case 'bg': {
+                        const img = parts[1] || '';
+                        const twStr = parts[2] || 'FADE';
+                        const dur = parts[3] ? parseInt(parts[3]) : 800;
+                        cmd = { type: GAL_CMD.BG, image: img, tween: tweenByName(twStr), duration: dur };
+                        break;
+                    }
+                    case 'cg': {
+                        const img = parts[1] || '';
+                        const twStr = parts[2] || 'FADE';
+                        const dur = parts[3] ? parseInt(parts[3]) : 800;
+                        cmd = { type: GAL_CMD.CG, image: img, tween: tweenByName(twStr), duration: dur };
+                        break;
+                    }
+                    case 'cg_clear': {
+                        const twStr = parts[1] || 'FADE';
+                        const dur = parts[2] ? parseInt(parts[2]) : 500;
+                        cmd = { type: GAL_CMD.CG_CLEAR, tween: tweenByName(twStr), duration: dur };
+                        break;
+                    }
+                    case 'bgm': {
+                        const audio = parts[1] || '';
+                        const loop = parts[2] ? parts[2] === 'true' : true;
+                        const vol = parts[3] ? parseFloat(parts[3]) : 0.7;
+                        const fade = parts[4] ? parseInt(parts[4]) : 800;
+                        cmd = { type: GAL_CMD.BGM, audio, loop, volume: vol, fadeMs: fade };
+                        break;
+                    }
+                    case 'bgm_stop': {
+                        const fade = parts[1] ? parseInt(parts[1]) : 800;
+                        cmd = { type: GAL_CMD.BGM_STOP, fadeMs: fade };
+                        break;
+                    }
+                    case 'se': {
+                        const audio = parts[1] || '';
+                        const vol = parts[2] ? parseFloat(parts[2]) : 1.0;
+                        cmd = { type: GAL_CMD.SE, audio, volume: vol };
+                        break;
+                    }
+                    case 'voice': {
+                        const audio = parts[1] || '';
+                        const vol = parts[2] ? parseFloat(parts[2]) : 1.0;
+                        const sp = parts[3] || '';
+                        cmd = { type: GAL_CMD.VOICE, audio, volume: vol, speaker: sp };
+                        break;
+                    }
+                    case 'choose': {
+                        const pairs = (parts[1] || '').split(';');
+                        const opts = [];
+                        for (const p of pairs){
+                            const [label, text] = p.split('|');
+                            if (label && text) opts.push({ label, text });
+                        }
+                        cmd = { type: GAL_CMD.CHOOSE, options: opts };
+                        break;
+                    }
+                    case 'label': {
+                        const lb = parts[1] || '';
+                        script.labels[lb] = script.lines.length;
+                        cmd = { type: GAL_CMD.LABEL, label: lb };
+                        break;
+                    }
+                    case 'jump': cmd = { type: GAL_CMD.JUMP, label: parts[1] || '' }; break;
+                    case 'if': {
+                        const cond = parts[1] || '';
+                        const m = cond.match(/^([^=<>!]+)(==|!=|>=|<=|>|<)(.+)$/);
+                        const label = parts[2] || '';
+                        cmd = { type: GAL_CMD.IF, variable: m?m[1]:cond, op: m?m[2]:'==', value: m?m[3]:'true', label };
+                        break;
+                    }
+                    case 'set': {
+                        const v = parts[1] || '';
+                        const op = ['+=','-=','*=','/=','%=','=','+=','-='].indexOf(parts[2]) >= 0 ? parts[2] : '=';
+                        const val = parts[3] !== undefined ? parts.slice(3).join(' ') : parts[2];
+                        cmd = { type: GAL_CMD.SET, variable: v, op, value: val };
+                        break;
+                    }
+                    case 'wait': {
+                        const arg = (parts[1] || 'click').toLowerCase();
+                        if (arg === 'click' || arg === 'tap') cmd = { type: GAL_CMD.WAIT, click: true };
+                        else cmd = { type: GAL_CMD.WAIT, ms: parseInt(arg) || 0 };
+                        break;
+                    }
+                    case 'shake': cmd = { type: GAL_CMD.SHAKE, intensity: parseFloat(parts[1])||6, ms: parseInt(parts[2])||400 }; break;
+                    case 'effect': {
+                        cmd = { type: GAL_CMD.EFFECT, name: parts[1]||'', duration: parseInt(parts[2])||1000, args: parts.slice(3) };
+                        break;
+                    }
+                    case 'call': cmd = { type: GAL_CMD.CALL, script: parts[1]||'', entry: parts[2]||null }; break;
+                    case 'return': cmd = { type: GAL_CMD.RETURN }; break;
+                    case 'live2d': {
+                        const id = parts[1]||'';
+                        const op = parts[2]||'';
+                        const arg = parts[3]||'';
+                        cmd = { type: GAL_CMD.LIVE2D, id, op, arg };
+                        break;
+                    }
+                    case 'end': cmd = { type: GAL_CMD.END }; break;
+                    case 'title': cmd = { type: GAL_CMD.TITLE }; break;
+                    default: break;
+                }
+            } else {
+                // 台词行:  "Name: Text"  或 "Text"（旁白）
+                const col = line.indexOf(':');
+                if (col > 0){
+                    const nm = line.slice(0, col).trim();
+                    const tx = line.slice(col + 1).trim();
+                    cmd = { type: GAL_CMD.SAY, name: nm, text: tx };
+                } else {
+                    cmd = { type: GAL_CMD.NARRATE, text: line };
+                }
+            }
+            if (cmd) script.lines.push(cmd);
+        }
+        return script;
+    }
+
+    function tokenizeLine(s){
+        // 按空格拆分，但保留引号整体
+        const out = [];
+        let i = 0, cur = '', quote = null;
+        while (i < s.length){
+            const c = s[i];
+            if (quote){
+                if (c === quote){ quote = null; i++; continue; }
+                cur += c; i++; continue;
+            }
+            if (c === '"' || c === "'"){ quote = c; i++; continue; }
+            if (c === ' ' || c === '\t'){
+                if (cur) { out.push(cur); cur = ''; }
+                while (i < s.length && (s[i] === ' ' || s[i] === '\t')) i++;
+                continue;
+            }
+            cur += c; i++;
+        }
+        if (cur) out.push(cur);
+        return out;
+    }
+    function slotByName(s){
+        switch ((s||'').toUpperCase()){
+            case 'LEFT': case 'L': return GAL_SLOT.LEFT;
+            case 'CENTER': case 'C': case 'CENTRE': return GAL_SLOT.CENTER;
+            case 'RIGHT': case 'R': return GAL_SLOT.RIGHT;
+            case 'CUSTOM': case 'X': default: return GAL_SLOT.CUSTOM;
+        }
+    }
+    function tweenByName(s){
+        switch ((s||'').toUpperCase()){
+            case 'NONE': case '0': return GAL_TWEEN.NONE;
+            case 'FADE': default: return GAL_TWEEN.FADE;
+            case 'SLIDE_L': case 'SLIDE_LEFT': return GAL_TWEEN.SLIDE_L;
+            case 'SLIDE_R': case 'SLIDE_RIGHT': return GAL_TWEEN.SLIDE_R;
+            case 'SLIDE_U': case 'SLIDE_UP': return GAL_TWEEN.SLIDE_U;
+            case 'SLIDE_D': case 'SLIDE_DOWN': return GAL_TWEEN.SLIDE_D;
+            case 'ZOOM': return GAL_TWEEN.ZOOM;
+            case 'DISSOLVE': return GAL_TWEEN.DISSOLVE;
+            case 'CUT': case 'INSTANT': return GAL_TWEEN.CUT;
+        }
+    }
+
+    function galEvalVariable(v, fallback){
+        if (v === undefined || v === null) return fallback;
+        if (v in gal.vars) return gal.vars[v];
+        // 字面量支持
+        if (v === 'true') return true;
+        if (v === 'false') return false;
+        if (v === 'null') return null;
+        if (/^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+        const s = String(v);
+        if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) return s.slice(1, -1);
+        return fallback === undefined ? v : fallback;
+    }
+    function galCompare(a, op, b){
+        switch(op){
+            case '==': return a == b;
+            case '!=': return a != b;
+            case '>':  return a >  b;
+            case '<':  return a <  b;
+            case '>=': return a >= b;
+            case '<=': return a <= b;
+        }
+        return false;
+    }
+
+    function galSetVar(k, v){ gal.vars[k] = v; }
+    function galSetVarInt(k, v){ gal.vars[k] = Number(v)|0; }
+    function galSetVarFloat(k, v){ gal.vars[k] = Number(v); }
+    function galSetVarBool(k, v){ gal.vars[k] = !!v; }
+    function galGetVar(k, def){ return (k in gal.vars) ? gal.vars[k] : def; }
+    function galGetVarInt(k, def){ const v = galGetVar(k, def); return v === undefined ? def : Number(v)|0; }
+    function galGetVarFloat(k, def){ const v = galGetVar(k, def); return v === undefined ? def : Number(v); }
+    function galGetVarBool(k, def){ const v = galGetVar(k, null); return v === null ? !!def : !!v; }
+
+    function galInit(styleOpt){
+        if (gal.inited) return;
+        gal.inited = true;
+        gal.style = Object.assign(galDefaultStyle(), styleOpt || {});
+        galLoadPref();
+        if (gal.pref.textSpeed) gal.style.typewriterSpeed = gal.pref.textSpeed;
+        if (gal.pref.auto) gal.auto = true;
+        if (gal.pref.skip) gal.skip = true;
+    }
+    function galShutdown(){
+        gal.inited = false; gal.running = false;
+        gal.scripts = Object.create(null); gal.curScript = null;
+        gal.sprites.clear();
+        gal.history.length = 0;
+        gal.cg = null;
+        if (gal.audio.bgm){ try { stopAudio(gal.audio.bgm); } catch(e){} gal.audio.bgm = null; }
+        if (gal.audio.voice){ try { stopAudio(gal.audio.voice); } catch(e){} gal.audio.voice = null; }
+    }
+    function galLoadScript(name, source){
+        const s = galParseScript(name, source || '');
+        gal.scripts[name] = s;
+        gal.scripts[s.id] = s;
+        return s.id;
+    }
+    function galStart(scriptId, entryLabel){
+        const sc = typeof scriptId === 'number'
+            ? (gal.scripts[scriptId] || null)
+            : (gal.scripts[scriptId] || null);
+        if (!sc) return;
+        if (!gal.inited) galInit();
+        gal.curScript = sc;
+        if (entryLabel && entryLabel in sc.labels){
+            gal.curLine = sc.labels[entryLabel];
+        } else {
+            gal.curLine = 0;
+        }
+        gal.stack = [];
+        gal.vars = Object.create(null);
+        gal.history.length = 0;
+        gal.running = true;
+        gal.waitingClick = false;
+        gal.waitingTimerMs = 0;
+        gal.choices = null;
+        galAdvanceNextLine();
+    }
+    function galStop(){ gal.running = false; }
+    function galIsRunning(){ return gal.running; }
+
+    function galAdvance(){
+        if (!gal.running) return;
+        // 打字机进行中 -> 瞬间显示
+        if (gal.dialog && gal.dialog.shownChars < (gal.dialog.text || '').length){
+            gal.dialog.shownChars = (gal.dialog.text || '').length;
+            gal.dialog.timer = 0;
+            return;
+        }
+        if (gal.waitingClick){
+            gal.waitingClick = false;
+            galAdvanceNextLine();
+        }
+    }
+    function galSkip(enable){ gal.skip = !!enable; gal.pref.skip = !!enable; galSavePref(); }
+    function galAuto(enable){ gal.auto = !!enable; gal.pref.auto = !!enable; galSavePref(); }
+    function galSetAutoDelay(ms){ gal.autoDelayMs = ms; }
+
+    function galStartLine(cmd){
+        switch (cmd.type){
+            case GAL_CMD.SAY:
+            case GAL_CMD.NARRATE: {
+                const name = cmd.type === GAL_CMD.NARRATE ? '' : (cmd.name || '');
+                const text = interpolateVars(cmd.text || '');
+                if (name) gal.history.push({ name, text, voice: (gal._lastVoice||null) });
+                else gal.history.push({ name: '', text, voice: (gal._lastVoice||null) });
+                gal._lastVoice = null;
+                const speedMs = Math.max(2, 110 - gal.style.typewriterSpeed*10);
+                gal.dialog = { name, text, shownChars: 0, timer: 0, speedMs };
+                gal.waitingClick = true;
+                return true; // yield
+            }
+            case GAL_CMD.SHOW: {
+                const sp = findSpriteByName(cmd.sprite);
+                if (sp){
+                    applySpriteShow(sp, cmd.slot, cmd.expression, cmd.alpha, cmd.tween, cmd.duration);
+                }
+                return false;
+            }
+            case GAL_CMD.HIDE: {
+                const sp = findSpriteByName(cmd.sprite);
+                if (sp) applySpriteHide(sp, cmd.tween, cmd.duration);
+                return false;
+            }
+            case GAL_CMD.BG: {
+                const dur = cmd.duration || 500;
+                gal.bg.tween = cmd.tween; gal.bg.tweenDur = dur; gal.bg.tweenT = 0;
+                gal.bg.from = gal.bg.image || ('#' + rgbHex(gal.bg.color));
+                gal.bg.to = cmd.image;
+                if (cmd.image && cmd.image.startsWith('#')){
+                    const c = parseColor(cmd.image); gal.bg.color = c;
+                }
+                gal.bg.image = cmd.image;
+                return false;
+            }
+            case GAL_CMD.CG: {
+                if (!gal.cg) gal.cg = { image:null, alpha:0, destAlpha:1, tween: cmd.tween, tweenT:0, tweenDur: cmd.duration||500, fromA:0, toA:1 };
+                gal.cg.image = cmd.image; gal.cg.fromA = 0; gal.cg.toA = 1; gal.cg.tweenT = 0; gal.cg.tweenDur = cmd.duration||500;
+                return false;
+            }
+            case GAL_CMD.CG_CLEAR: {
+                if (gal.cg){ gal.cg.fromA = 1; gal.cg.toA = 0; gal.cg.tweenT = 0; gal.cg.tweenDur = cmd.duration||500; gal.cg.tween = cmd.tween; }
+                return false;
+            }
+            case GAL_CMD.BGM: {
+                try {
+                    const vol = (cmd.volume ?? 0.7) * gal.pref.volBGM;
+                    if (gal.audio.bgm){ stopAudio(gal.audio.bgm); gal.audio.bgm = null; }
+                    const id = loadSound(cmd.audio) || 0;
+                    gal.audio.bgm = playSound(id, vol, !!cmd.loop) || null;
+                    // fade support: if playing, ramp up from 0
+                    if (id > 0 && gal.audio.bgm){
+                        // simple approach: set volume, trust platform
+                    }
+                } catch(e){}
+                return false;
+            }
+            case GAL_CMD.BGM_STOP: {
+                if (gal.audio.bgm){ try { fadeOut(gal.audio.bgm, (cmd.fadeMs||500)/1000); } catch(e){} setTimeout(()=>{ try { stopAudio(gal.audio.bgm); gal.audio.bgm=null; } catch(e){} }, cmd.fadeMs||500); }
+                return false;
+            }
+            case GAL_CMD.SE: {
+                try {
+                    const id = loadSound(cmd.audio)||0;
+                    if (id) playSound(id, (cmd.volume??1)*gal.pref.volSE, false);
+                } catch(e){}
+                return false;
+            }
+            case GAL_CMD.VOICE: {
+                try {
+                    if (gal.audio.voice){ stopAudio(gal.audio.voice); gal.audio.voice = null; }
+                    const id = loadSound(cmd.audio)||0;
+                    if (id) gal.audio.voice = playSound(id, (cmd.volume??1)*gal.pref.volVoice, false) || null;
+                    gal._lastVoice = cmd.audio;
+                } catch(e){ gal._lastVoice = cmd.audio; }
+                return false;
+            }
+            case GAL_CMD.CHOOSE: {
+                gal.choices = cmd.options ? cmd.options.slice() : [];
+                gal.waitingClick = true;
+                return true;
+            }
+            case GAL_CMD.LABEL: return false;
+            case GAL_CMD.JUMP: {
+                const idx = gal.curScript.labels[cmd.label];
+                if (idx != null) gal.curLine = idx;
+                return false;
+            }
+            case GAL_CMD.IF: {
+                const a = galEvalVariable(cmd.variable);
+                let b = cmd.value;
+                if (b && (b in gal.vars)) b = gal.vars[b];
+                else b = galEvalVariable(b, b);
+                if (galCompare(a, cmd.op, b)){
+                    const idx = gal.curScript.labels[cmd.label];
+                    if (idx != null) gal.curLine = idx;
+                }
+                return false;
+            }
+            case GAL_CMD.SET: {
+                const prev = gal.vars[cmd.variable];
+                let val = cmd.value;
+                if (val in gal.vars) val = gal.vars[val];
+                else val = galEvalVariable(val, val);
+                if (cmd.op === '=' || !cmd.op){
+                    gal.vars[cmd.variable] = val;
+                } else if (cmd.op === '+='){ gal.vars[cmd.variable] = (+prev||0) + (+val||0); }
+                else if (cmd.op === '-='){ gal.vars[cmd.variable] = (+prev||0) - (+val||0); }
+                else if (cmd.op === '*='){ gal.vars[cmd.variable] = (+prev||0) * (+val||0); }
+                else if (cmd.op === '/='){ gal.vars[cmd.variable] = (+prev||0) / (+val||1); }
+                else if (cmd.op === '%='){ gal.vars[cmd.variable] = (+prev||0) % (+val||1); }
+                return false;
+            }
+            case GAL_CMD.WAIT: {
+                if (cmd.click) { gal.waitingClick = true; return true; }
+                gal.waitingTimerMs = cmd.ms || 0; gal.waitingTimerElapsed = 0;
+                return gal.waitingTimerMs > 0 ? true : false;
+            }
+            case GAL_CMD.SHAKE: {
+                gal.shake.intensity = cmd.intensity;
+                gal.shake.dur = cmd.ms; gal.shake.t = 0;
+                return false;
+            }
+            case GAL_CMD.EFFECT: {
+                if (cmd.name === 'fade_to_black') { gal.fade = { r:0,g:0,b:0,a:1, fromA:0, toA:1, t:0, dur:cmd.duration }; }
+                else if (cmd.name === 'fade_from_black') { gal.fade = { r:0,g:0,b:0,a:1, fromA:1, toA:0, t:0, dur:cmd.duration }; }
+                else if (cmd.name === 'flash'){ gal.fade = { r:255,g:255,b:255,a:1, fromA:0.9, toA:0, t:0, dur:cmd.duration }; }
+                return false;
+            }
+            case GAL_CMD.CALL: {
+                const target = gal.scripts[cmd.script];
+                if (target){
+                    gal.stack.push({ script: gal.curScript, line: gal.curLine + 1 });
+                    gal.curScript = target;
+                    gal.curLine = (cmd.entry && target.labels[cmd.entry] != null) ? target.labels[cmd.entry] : 0;
+                    return false;
+                }
+                return false;
+            }
+            case GAL_CMD.RETURN: {
+                if (gal.stack.length){
+                    const f = gal.stack.pop();
+                    gal.curScript = f.script; gal.curLine = f.line;
+                    return false;
+                }
+                gal.running = false; if (gal.onEnd) gal.onEnd();
+                return true;
+            }
+            case GAL_CMD.LIVE2D: {
+                const mId = live2dByNameOrId(cmd.id);
+                if (mId == null) return false;
+                if (cmd.op === 'motion' || cmd.op === 'm'){
+                    const args = (cmd.arg || 'Idle:0').split(':');
+                    live2dStartMotion(mId, args[0] || 'Idle', parseInt(args[1]||'0')|0, 2);
+                } else if (cmd.op === 'expression' || cmd.op === 'expr'){
+                    live2dSetExpression(mId, cmd.arg);
+                } else if (cmd.op === 'param'){
+                    const parts = (cmd.arg || '').split(':');
+                    live2dSetParam(mId, parts[0]||'', parseFloat(parts[1]||'0'));
+                } else if (cmd.op === 'show'){
+                    live2dSetVisible(mId, true);
+                } else if (cmd.op === 'hide'){
+                    live2dSetVisible(mId, false);
+                }
+                return false;
+            }
+            case GAL_CMD.TITLE: {
+                gal.running = false;
+                if (gal.onTitle) gal.onTitle();
+                return true;
+            }
+            case GAL_CMD.END:
+            default:
+                gal.running = false;
+                if (gal.onEnd) gal.onEnd();
+                return true;
+        }
+    }
+
+    function galAdvanceNextLine(){
+        if (!gal.running || !gal.curScript) return;
+        while (gal.curLine < gal.curScript.lines.length){
+            const cmd = gal.curScript.lines[gal.curLine++];
+            const yieldControl = galStartLine(cmd);
+            if (yieldControl) return;
+            // skip auto runs next without waiting (non-blocked lines)
+        }
+        gal.running = false;
+        if (gal.onEnd) gal.onEnd();
+    }
+
+    function interpolateVars(txt){
+        return String(txt).replace(/\{([^{}]+)\}/g, (_, k) => {
+            if (k in gal.vars) return String(gal.vars[k]);
+            if (k === 'DATE') return new Date().toISOString().slice(0,10);
+            if (k === 'TIME') return new Date().toTimeString().slice(0,8);
+            return _;
+        });
+    }
+
+    // ---- 立绘 ----
+    function findSpriteByName(nameOrId){
+        if (typeof nameOrId === 'number' || /^\d+$/.test(nameOrId)){
+            return gal.sprites.get(+nameOrId) || null;
+        }
+        for (const [,sp] of gal.sprites){ if (sp.name === nameOrId) return sp; }
+        return null;
+    }
+    function galCreateSprite(image, slot, zOrder){
+        const id = gal.spriteIdSeq++;
+        const canvasW = (canvas && canvas.width) || 1280;
+        const canvasH = (canvas && canvas.height) || 720;
+        const pos = slotXY(slot, canvasW, canvasH);
+        const sp = {
+            id, name: image && typeof image === 'string' ? image : ('s'+id),
+            image: image && typeof image === 'string' ? image : null,
+            expression: '', slot,
+            x: pos.x, y: pos.y, scale: 1, alpha: 0,
+            z: zOrder || 0,
+            destAlpha: 0,
+            tween: GAL_TWEEN.NONE, tweenT: 1, tweenDur: 0,
+            fromX: 0, fromY: 0, fromAlpha: 0,
+            toX: 0, toY: 0, toAlpha: 0,
+            exprMap: {},
+            live2dId: null
+        };
+        gal.sprites.set(id, sp);
+        return id;
+    }
+    function galDestroySprite(id){ gal.sprites.delete(id); }
+    function slotXY(slot, w, h){
+        switch (slot){
+            case GAL_SLOT.LEFT:   return { x: w*0.25, y: h*0.58 };
+            case GAL_SLOT.RIGHT:  return { x: w*0.75, y: h*0.58 };
+            case GAL_SLOT.CENTER:
+            default:              return { x: w*0.50, y: h*0.58 };
+        }
+    }
+    function applySpriteShow(sp, slot, expression, alpha, tween, duration){
+        if (expression != null) sp.expression = expression;
+        if (slot != null && slot !== GAL_SLOT.CUSTOM) sp.slot = slot;
+        const canvasW = (canvas && canvas.width) || 1280;
+        const canvasH = (canvas && canvas.height) || 720;
+        const pos = (slot === GAL_SLOT.CUSTOM || sp.slot === GAL_SLOT.CUSTOM) ? {x:sp.x, y:sp.y} : slotXY(sp.slot, canvasW, canvasH);
+        sp.fromX = sp.x; sp.fromY = sp.y; sp.fromAlpha = sp.alpha;
+        sp.toX = pos.x; sp.toY = pos.y; sp.toAlpha = (alpha != null) ? alpha : 1;
+        sp.tween = tween || GAL_TWEEN.FADE;
+        sp.tweenDur = duration || 500;
+        sp.tweenT = 0;
+    }
+    function applySpriteHide(sp, tween, duration){
+        sp.fromX = sp.x; sp.fromY = sp.y; sp.fromAlpha = sp.alpha;
+        sp.toX = sp.x; sp.toY = sp.y; sp.toAlpha = 0;
+        sp.tween = tween || GAL_TWEEN.FADE;
+        sp.tweenDur = duration || 500;
+        sp.tweenT = 0;
+    }
+    function galShowSprite(id, slot, expr, alpha, tween, duration){
+        const sp = findSpriteByName(id);
+        if (!sp) return;
+        applySpriteShow(sp, slot, expr, alpha, tween, duration);
+    }
+    function galHideSprite(id, tween, duration){
+        const sp = findSpriteByName(id);
+        if (!sp) return;
+        applySpriteHide(sp, tween, duration);
+    }
+    function galSetSpritePosition(id, x, y){ const sp = findSpriteByName(id); if (sp){ sp.x = x; sp.y = y; sp.slot = GAL_SLOT.CUSTOM; } }
+    function galSetSpriteScale(id, s){ const sp = findSpriteByName(id); if (sp) sp.scale = s; }
+    function galSetSpriteExpression(id, e){ const sp = findSpriteByName(id); if (sp) sp.expression = e; }
+
+    function galSetBackground(imageOrColor, tween, duration){
+        const dur = duration || 500;
+        gal.bg.tween = tween || GAL_TWEEN.FADE; gal.bg.tweenDur = dur; gal.bg.tweenT = 0;
+        gal.bg.from = gal.bg.image || ('#' + rgbHex(gal.bg.color));
+        gal.bg.to = imageOrColor;
+        if (imageOrColor && imageOrColor.startsWith('#')) gal.bg.color = parseColor(imageOrColor);
+        gal.bg.image = imageOrColor;
+    }
+    function galShowCG(image, tween, duration){
+        if (!gal.cg) gal.cg = { image:null, alpha:0, fromA:0, toA:1, tween: tween, tweenT:0, tweenDur: duration||500 };
+        gal.cg.image = image; gal.cg.fromA = 0; gal.cg.toA = 1; gal.cg.tweenT = 0; gal.cg.tweenDur = duration||500;
+    }
+    function galHideCG(tween, duration){
+        if (!gal.cg) return;
+        gal.cg.fromA = gal.cg.alpha; gal.cg.toA = 0; gal.cg.tweenT = 0; gal.cg.tweenDur = duration||500;
+    }
+
+    function galSetDialogStyle(style){ Object.assign(gal.style, style||{}); }
+    function galShowDialog(v){ gal.dialogVisible = !!v; }
+    function galIsDialogVisible(){ return gal.dialogVisible; }
+    function galSay(name, text){
+        if (!gal.inited) galInit();
+        const speedMs = Math.max(2, 110 - gal.style.typewriterSpeed*10);
+        gal.dialog = { name: name||'', text: text||'', shownChars: 0, timer: 0, speedMs };
+        gal.history.push({ name: name||'', text: text||'', voice: null });
+        gal.waitingClick = true;
+    }
+    function galGetHistoryCount(){ return gal.history.length; }
+    function galGetHistoryEntry(idx){
+        const e = gal.history[idx]; if (!e) return null;
+        return { name: e.name||'', text: e.text||'', voice: e.voice||'' };
+    }
+    function galClearHistory(){ gal.history.length = 0; }
+
+    function galSelectChoice(index){
+        if (!gal.choices || !gal.choices[index]) return;
+        const c = gal.choices[index];
+        gal.choices = null;
+        gal.waitingClick = false;
+        if (c.label && gal.curScript){
+            const idx = gal.curScript.labels[c.label];
+            if (idx != null) gal.curLine = idx;
+        }
+        galAdvanceNextLine();
+    }
+    function galGetChoiceCount(){ return gal.choices ? gal.choices.length : 0; }
+    function galGetChoiceText(i){ return gal.choices && gal.choices[i] ? gal.choices[i].text : ''; }
+    function galGotoLabel(label){
+        if (!gal.curScript) return;
+        const idx = gal.curScript.labels[label];
+        if (idx != null) gal.curLine = idx;
+    }
+
+    function galSaveStateSnapshot(){
+        return {
+            scriptName: gal.curScript ? gal.curScript.name : null,
+            line: gal.curLine,
+            vars: JSON.parse(JSON.stringify(gal.vars)),
+            history: gal.history.slice(),
+            bg: JSON.parse(JSON.stringify(gal.bg)),
+            sprites: Array.from(gal.sprites.values()).map(s => ({
+                id:s.id, name:s.name, image:s.image, expression:s.expression,
+                slot:s.slot, x:s.x, y:s.y, scale:s.scale, alpha:s.alpha, z:s.z,
+                live2dId: s.live2dId
+            })),
+            cg: gal.cg ? JSON.parse(JSON.stringify(gal.cg)) : null,
+            prefs: JSON.parse(JSON.stringify(gal.pref))
+        };
+    }
+    function galRestoreStateSnapshot(ss){
+        if (!ss) return false;
+        if (ss.scriptName && gal.scripts[ss.scriptName]){
+            gal.curScript = gal.scripts[ss.scriptName];
+        }
+        gal.curLine = ss.line || 0;
+        gal.vars = ss.vars || {};
+        gal.history = ss.history || [];
+        Object.assign(gal.bg, ss.bg || {});
+        gal.sprites.clear();
+        (ss.sprites||[]).forEach(s => gal.sprites.set(s.id, s));
+        gal.cg = ss.cg || null;
+        Object.assign(gal.pref, ss.prefs || {});
+        gal.style.typewriterSpeed = gal.pref.textSpeed || 5;
+        gal.auto = !!gal.pref.auto;
+        gal.skip = !!gal.pref.skip;
+        gal.choices = null;
+        gal.waitingClick = false;
+        gal.dialog = null;
+        gal.running = true;
+        galAdvanceNextLine();
+        return true;
+    }
+    function galSave(slot, title){
+        try {
+            const ss = galSaveStateSnapshot();
+            const info = {
+                slot, used: true,
+                title: title || (gal.curScript ? gal.curScript.name : ''),
+                summary: gal.history.length ? gal.history[gal.history.length-1].text.slice(0, 80) : '',
+                timestamp: new Date().toISOString(),
+                lineNo: gal.curLine || 0,
+                scriptName: gal.curScript ? gal.curScript.name : '',
+                bgmVolume: gal.pref.volBGM, seVolume: gal.pref.volSE, voiceVolume: gal.pref.volVoice,
+                textSpeed: gal.pref.textSpeed, autoMode: !!gal.pref.auto,
+                snapshot: ss
+            };
+            const key = gal.saveSlotKey + '_' + slot;
+            localStorage.setItem(key, JSON.stringify(info));
+            return true;
+        } catch(e){ return false; }
+    }
+    function galLoad(slot){
+        try {
+            const key = gal.saveSlotKey + '_' + slot;
+            const raw = localStorage.getItem(key);
+            if (!raw) return false;
+            const info = JSON.parse(raw);
+            if (!info.snapshot) return false;
+            if (!gal.inited) galInit();
+            return galRestoreStateSnapshot(info.snapshot);
+        } catch(e){ return false; }
+    }
+    function galDeleteSave(slot){ try { localStorage.removeItem(gal.saveSlotKey + '_' + slot); return true; } catch(e){ return false; } }
+    function galGetSaveInfo(slot){
+        try {
+            const key = gal.saveSlotKey + '_' + slot;
+            const raw = localStorage.getItem(key);
+            if (!raw) return { slot, used:false };
+            const i = JSON.parse(raw);
+            return {
+                slot, used: !!i.used,
+                title: i.title || '', summary: i.summary || '',
+                timestamp: i.timestamp || '',
+                lineNo: i.lineNo||0, scriptName: i.scriptName||'',
+                bgmVolume: i.bgmVolume, seVolume: i.seVolume, voiceVolume: i.voiceVolume,
+                textSpeed: i.textSpeed, autoMode: !!i.autoMode
+            };
+        } catch(e){ return { slot, used:false }; }
+    }
+    function galQuickSave(){ return galSave(99, 'Quick Save'); }
+    function galQuickLoad(){ return galLoad(99); }
+
+    function galShake(intensity, ms){ gal.shake.intensity = intensity||6; gal.shake.dur = ms||400; gal.shake.t = 0; }
+    function galFadeTo(color, ms){ gal.fade = { r:color.r,g:color.g,b:color.b,a:1, fromA:0, toA:1, t:0, dur:ms||500 }; }
+    function galFadeFrom(color, ms){ gal.fade = { r:color.r||0, g:color.g||0, b:color.b||0, a:1, fromA:1, toA:0, t:0, dur:ms||500 }; }
+
+    function galPlayBgm(audio, loop, volume, fadeMs){
+        try {
+            if (gal.audio.bgm){ stopAudio(gal.audio.bgm); gal.audio.bgm = null; }
+            const id = loadSound(audio)||0;
+            if (id) gal.audio.bgm = playSound(id, (volume??0.7) * gal.pref.volBGM, !!loop) || null;
+        } catch(e){}
+    }
+    function galStopBgm(fadeMs){
+        if (!gal.audio.bgm) return;
+        try { fadeOut(gal.audio.bgm, (fadeMs||500)/1000); } catch(e){}
+        setTimeout(()=>{ try { stopAudio(gal.audio.bgm); gal.audio.bgm = null; } catch(e){} }, fadeMs||500);
+    }
+    function galPlaySe(audio, volume){ try { const id = loadSound(audio)||0; if (id) playSound(id, (volume??1)*gal.pref.volSE, false); } catch(e){} }
+    function galPlayVoice(audio, volume, speaker){
+        try {
+            if (gal.audio.voice){ stopAudio(gal.audio.voice); gal.audio.voice = null; }
+            const id = loadSound(audio)||0;
+            if (id) gal.audio.voice = playSound(id, (volume??1)*gal.pref.volVoice, false) || null;
+            gal._lastVoice = audio;
+        } catch(e){ gal._lastVoice = audio; }
+    }
+    function galStopVoice(){ if (gal.audio.voice){ try { stopAudio(gal.audio.voice); } catch(e){} gal.audio.voice = null; } }
+
+    function galSetPrefTextSpeed(v){
+        const n = Math.max(1, Math.min(10, v|0));
+        gal.pref.textSpeed = n; gal.style.typewriterSpeed = n; galSavePref();
+    }
+    function galGetPrefTextSpeed(){ return gal.pref.textSpeed; }
+    function galSetPrefAuto(v){ gal.auto = !!v; gal.pref.auto = !!v; galSavePref(); }
+    function galGetPrefAuto(){ return !!gal.pref.auto; }
+    function galSetPrefSkip(v){ gal.skip = !!v; gal.pref.skip = !!v; galSavePref(); }
+    function galGetPrefSkip(){ return !!gal.pref.skip; }
+    function galSetPrefVolume(group, value){
+        const g = group|0; const v = Math.max(0, Math.min(1, +value));
+        if (g === 0) gal.pref.volSE = v;
+        else if (g === 1) gal.pref.volBGM = v;
+        else if (g === 2) gal.pref.volVoice = v;
+        galSavePref();
+    }
+    function galGetPrefVolume(group){
+        if (group === 0) return gal.pref.volSE;
+        if (group === 1) return gal.pref.volBGM;
+        if (group === 2) return gal.pref.volVoice;
+        return 1;
+    }
+
+    // 辅助：颜色工具
+    function parseColor(s){
+        if (typeof s !== 'string') return {r:0,g:0,b:0,a:255};
+        if (s.startsWith('#')){
+            let hex = s.slice(1);
+            if (hex.length === 3) hex = hex.split('').map(c => c+c).join('');
+            if (hex.length === 6) return { r: parseInt(hex.slice(0,2),16), g: parseInt(hex.slice(2,4),16), b: parseInt(hex.slice(4,6),16), a: 255 };
+            if (hex.length === 8) return { r: parseInt(hex.slice(0,2),16), g: parseInt(hex.slice(2,4),16), b: parseInt(hex.slice(4,6),16), a: parseInt(hex.slice(6,8),16) };
+        }
+        return {r:0,g:0,b:0,a:255};
+    }
+    function rgbHex(c){
+        const r = (c.r).toString(16).padStart(2,'0');
+        const g = (c.g).toString(16).padStart(2,'0');
+        const b = (c.b).toString(16).padStart(2,'0');
+        return r+g+b;
+    }
+
+    // GAL Update & Render
+    function galUpdate(dtMs){
+        if (!gal.inited) return;
+        const dt = +dtMs || 16;
+        // 打字机推进
+        if (gal.dialog){
+            const sp = gal.skip ? 0 : gal.dialog.speedMs;
+            if (sp <= 0 || !gal.waitingClick){
+                gal.dialog.shownChars = (gal.dialog.text||'').length;
+            } else {
+                gal.dialog.timer += dt;
+                while (gal.dialog.timer >= sp && gal.dialog.shownChars < (gal.dialog.text||'').length){
+                    gal.dialog.shownChars++;
+                    gal.dialog.timer -= sp;
+                }
+            }
+            if (gal.auto && !gal.skip && gal.waitingClick && gal.dialog.shownChars >= (gal.dialog.text||'').length){
+                if (!gal._autoTimer) gal._autoTimer = 0;
+                gal._autoTimer += dt;
+                if (gal._autoTimer >= gal.autoDelayMs){
+                    gal._autoTimer = 0;
+                    galAdvance();
+                }
+            } else if (gal.skip && gal.waitingClick && gal.dialog.shownChars >= (gal.dialog.text||'').length){
+                galAdvance();
+            }
+        } else {
+            gal._autoTimer = 0;
+        }
+        // Wait timer
+        if (gal.waitingTimerMs > 0){
+            gal.waitingTimerElapsed += dt;
+            if (gal.waitingTimerElapsed >= gal.waitingTimerMs){
+                gal.waitingTimerMs = 0; gal.waitingTimerElapsed = 0;
+                galAdvanceNextLine();
+            }
+        }
+        // 立绘过渡
+        for (const [,sp] of gal.sprites){
+            if (sp.tweenT < 1){
+                sp.tweenT = Math.min(1, sp.tweenT + dt/Math.max(1, sp.tweenDur));
+                const e = easeOutCubic(sp.tweenT);
+                sp.x = sp.fromX + (sp.toX - sp.fromX) * e;
+                sp.y = sp.fromY + (sp.toY - sp.fromY) * e;
+                sp.alpha = sp.fromAlpha + (sp.toAlpha - sp.fromAlpha) * e;
+            }
+        }
+        // CG
+        if (gal.cg && gal.cg.tweenT < 1){
+            gal.cg.tweenT = Math.min(1, gal.cg.tweenT + dt/Math.max(1, gal.cg.tweenDur));
+            const e = easeOutCubic(gal.cg.tweenT);
+            gal.cg.alpha = gal.cg.fromA + (gal.cg.toA - gal.cg.fromA) * e;
+            if (gal.cg.tweenT >= 1 && gal.cg.toA === 0) gal.cg = null;
+        }
+        // Shake
+        if (gal.shake.dur > 0 && gal.shake.t < gal.shake.dur){
+            gal.shake.t += dt;
+            const p = 1 - Math.min(1, gal.shake.t / gal.shake.dur);
+            gal.shake.ox = (Math.random()*2-1) * gal.shake.intensity * p;
+            gal.shake.oy = (Math.random()*2-1) * gal.shake.intensity * p;
+        } else { gal.shake.ox = 0; gal.shake.oy = 0; }
+        // Fade
+        if (gal.fade.dur > 0 && gal.fade.t < gal.fade.dur){
+            gal.fade.t += dt;
+            const p = Math.min(1, gal.fade.t / gal.fade.dur);
+            gal.fade.a = gal.fade.fromA + (gal.fade.toA - gal.fade.fromA) * easeOutCubic(p);
+        }
+        // Live2D
+        if (live2d.inited) live2dUpdate(dt);
+    }
+    function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
+    function galRender(){
+        if (!gal.inited) return;
+        const ox = gal.shake.ox || 0, oy = gal.shake.oy || 0;
+        ctx.save();
+        ctx.translate(ox, oy);
+        // 背景
+        if (gal.bg.image){
+            if (gal.bg.image.startsWith('#')){
+                const c = parseColor(gal.bg.image);
+                ctx.fillStyle = `rgba(${c.r},${c.g},${c.b},${(c.a||255)/255})`;
+                ctx.fillRect(-ox, -oy, canvas.width, canvas.height);
+            } else {
+                const tex = textures.get(findTextureIdByName(gal.bg.image));
+                if (tex){
+                    ctx.drawImage(tex, 0, 0, canvas.width, canvas.height);
+                } else {
+                    ctx.fillStyle = '#101428'; ctx.fillRect(0,0,canvas.width, canvas.height);
+                }
+            }
+        } else {
+            const c = gal.bg.color || {r:30,g:30,b:40,a:255};
+            ctx.fillStyle = `rgba(${c.r},${c.g},${c.b},${(c.a||255)/255})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        // 立绘按 z 排序 + live2d 叠加
+        const list = [];
+        for (const [,sp] of gal.sprites) list.push(sp);
+        list.sort((a,b) => (a.z|0) - (b.z|0));
+        for (const sp of list){
+            if (sp.alpha <= 0.001) continue;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, Math.min(1, sp.alpha));
+            if (sp.live2dId != null){
+                // 委托给 Live2D 渲染该具体模型
+                live2dRenderModel(sp.live2dId, sp.x, sp.y, sp.scale);
+            } else if (sp.image){
+                const tex = textures.get(findTextureIdByName(sp.image));
+                if (tex){
+                    const iw = tex.naturalWidth || tex.width || 256;
+                    const ih = tex.naturalHeight || tex.height || 256;
+                    const sc = sp.scale || 1;
+                    const dw = iw * sc, dh = ih * sc;
+                    ctx.drawImage(tex, sp.x - dw/2, sp.y - dh, dw, dh);
+                } else {
+                    ctx.fillStyle = '#444';
+                    ctx.fillRect(sp.x - 80, sp.y - 200, 160, 200);
+                    ctx.fillStyle = '#eee'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+                    ctx.fillText('Sprite: ' + sp.name, sp.x, sp.y - 100);
+                }
+            }
+            ctx.restore();
+        }
+        // CG
+        if (gal.cg && gal.cg.alpha > 0.001){
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, Math.min(1, gal.cg.alpha));
+            if (gal.cg.image){
+                const tex = textures.get(findTextureIdByName(gal.cg.image));
+                if (tex) ctx.drawImage(tex, 0, 0, canvas.width, canvas.height);
+                else { ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width, canvas.height); }
+            }
+            ctx.restore();
+        }
+        ctx.restore();
+
+        // Live2D 全局兜底渲染（非挂载到 sprite 的独立模型）
+        if (live2d.inited) live2dRender();
+
+        // 对话框
+        if (gal.dialogVisible){
+            drawGalDialog();
+        }
+        // 选项 UI
+        if (gal.choices && gal.choices.length){
+            drawGalChoices();
+        }
+        // 全局 fade
+        if (gal.fade && gal.fade.a > 0.001){
+            ctx.fillStyle = `rgba(${gal.fade.r|0},${gal.fade.g|0},${gal.fade.b|0},${Math.max(0,Math.min(1, gal.fade.a))})`;
+            ctx.fillRect(0,0,canvas.width, canvas.height);
+        }
+    }
+
+    function drawGalDialog(){
+        const s = gal.style; if (!s) return;
+        const x = s.x, y = s.y, w = s.w, h = s.h;
+        // 对话框背景
+        roundRect(x, y, w, h, s.radius);
+        ctx.fillStyle = `rgba(${s.bgColor.r},${s.bgColor.g},${s.bgColor.b},${(s.bgColor.a||255)/255})`;
+        ctx.fill();
+        if (s.borderWidth > 0){
+            ctx.lineWidth = s.borderWidth;
+            ctx.strokeStyle = `rgba(${s.borderColor.r},${s.borderColor.g},${s.borderColor.b},${(s.borderColor.a||255)/255})`;
+            ctx.stroke();
+        }
+        // 名字框
+        if (s.showNameBox && gal.dialog && gal.dialog.name){
+            const name = gal.dialog.name;
+            const fontStr = `${s.nameFontSize}px ${s.fontFace || "'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif"}`;
+            ctx.font = fontStr;
+            const nameW = Math.ceil(ctx.measureText(name).width) + 28;
+            const nameH = s.nameFontSize + 14;
+            const nx = x + 14, ny = y - nameH + 6;
+            roundRect(nx, ny, nameW, nameH, s.radius * 0.6);
+            ctx.fillStyle = `rgba(${s.nameColor.r},${s.nameColor.g},${s.nameColor.b},${(s.nameColor.a||255)/255})`;
+            ctx.fill();
+            if (s.borderWidth > 0){
+                ctx.lineWidth = s.borderWidth;
+                ctx.strokeStyle = `rgba(${s.borderColor.r},${s.borderColor.g},${s.borderColor.b},${(s.borderColor.a||255)/255})`;
+                ctx.stroke();
+            }
+            ctx.fillStyle = `rgba(${s.nameTextColor.r},${s.nameTextColor.g},${s.nameTextColor.b},${(s.nameTextColor.a||255)/255})`;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'left';
+            ctx.fillText(name, nx + 14, ny + nameH/2 + 1);
+        }
+        // 文本内容
+        if (gal.dialog){
+            const pad = s.padding;
+            const tx = x + pad, ty = y + pad + (s.showNameBox && gal.dialog.name ? 8 : 0);
+            const tw = w - pad*2;
+            const th = h - pad*2;
+            const shown = (gal.dialog.text || '').slice(0, gal.dialog.shownChars);
+            const fontStr = `${s.textFontSize}px ${s.fontFace || "'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif"}`;
+            ctx.font = fontStr;
+            ctx.fillStyle = `rgba(${s.textColor.r},${s.textColor.g},${s.textColor.b},${(s.textColor.a||255)/255})`;
+            ctx.textBaseline = 'top';
+            ctx.textAlign = 'left';
+            const lh = Math.max(1.2, s.lineHeight) * s.textFontSize;
+            const lines = wrapLines(shown, tw, fontStr);
+            for (let i = 0; i < lines.length; i++){
+                ctx.fillText(lines[i], tx, ty + i*lh);
+            }
+            // 点击提示 ▼
+            if (s.showAdvanceHint && gal.waitingClick && gal.dialog.shownChars >= (gal.dialog.text||'').length){
+                if (!gal._hintT) gal._hintT = 0;
+                gal._hintT += 16;
+                const phase = (Math.sin(gal._hintT/250) + 1) / 2;
+                ctx.globalAlpha = 0.4 + 0.6*phase;
+                ctx.fillStyle = `rgba(${s.textColor.r},${s.textColor.g},${s.textColor.b},${(s.textColor.a||255)/255})`;
+                ctx.font = `${s.textFontSize}px sans-serif`;
+                ctx.textBaseline = 'alphabetic';
+                ctx.fillText('▼', x + w - 32, y + h - 18 + (1-phase)*4);
+                ctx.globalAlpha = 1;
+                ctx.textBaseline = 'top';
+            }
+        }
+    }
+    function drawGalChoices(){
+        const opts = gal.choices || [];
+        if (!opts.length) return;
+        const W = Math.min(720, canvas.width - 80);
+        const btnH = 54;
+        const gap = 14;
+        const totalH = btnH * opts.length + gap * (opts.length - 1);
+        let y = canvas.height/2 - totalH/2 - 80;
+        const x = canvas.width/2 - W/2;
+        for (let i = 0; i < opts.length; i++){
+            roundRect(x, y, W, btnH, 14);
+            ctx.fillStyle = 'rgba(12,18,40,0.92)'; ctx.fill();
+            ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(120,160,255,0.45)'; ctx.stroke();
+            ctx.fillStyle = '#eaf0ff';
+            ctx.font = 'bold 20px "Outfit","InstrumentSans","PingFang SC",sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(`${i+1}. ${opts[i].text}`, canvas.width/2, y + btnH/2);
+            // 绘制热区索引：给 galHandleClick 判断用（渲染时存在临时数据）
+            opts[i]._rect = { x, y, w: W, h: btnH };
+            y += btnH + gap;
+        }
+    }
+    function roundRect(x,y,w,h,r){
+        const rr = Math.min(r, w/2, h/2);
+        ctx.beginPath();
+        ctx.moveTo(x+rr, y);
+        ctx.lineTo(x+w-rr, y);
+        ctx.quadraticCurveTo(x+w, y, x+w, y+rr);
+        ctx.lineTo(x+w, y+h-rr);
+        ctx.quadraticCurveTo(x+w, y+h, x+w-rr, y+h);
+        ctx.lineTo(x+rr, y+h);
+        ctx.quadraticCurveTo(x, y+h, x, y+h-rr);
+        ctx.lineTo(x, y+rr);
+        ctx.quadraticCurveTo(x, y, x+rr, y);
+        ctx.closePath();
+    }
+    function wrapLines(text, maxW, font){
+        ctx.font = font;
+        // 按字符逐个拆（中文逐个，英文按词）
+        const out = [];
+        let cur = '';
+        const chars = Array.from(text || '');
+        let i = 0;
+        while (i < chars.length){
+            const ch = chars[i++];
+            if (ch === '\n'){ out.push(cur); cur = ''; continue; }
+            const test = cur + ch;
+            if (ctx.measureText(test).width > maxW){
+                if (!cur){ out.push(ch); continue; }
+                out.push(cur); cur = ch;
+            } else cur = test;
+        }
+        if (cur) out.push(cur);
+        return out;
+    }
+    // 外部点击/触摸转发到选项/对话框推进
+    function galHandleClick(sx, sy){
+        // 选项命中
+        if (gal.choices && gal.choices.length){
+            for (let i = 0; i < gal.choices.length; i++){
+                const r = gal.choices[i]._rect;
+                if (r && sx >= r.x && sx <= r.x+r.w && sy >= r.y && sy <= r.y+r.h){
+                    galSelectChoice(i); return true;
+                }
+            }
+            return false;
+        }
+        galAdvance(); return true;
+    }
+    function findTextureIdByName(name){
+        if (!name) return 0;
+        if (/^\d+$/.test(name)) return +name;
+        // 遍历 textures reverse
+        let found = 0;
+        for (const [id, t] of textures.entries()){
+            if (t && (t.name === name || (t.src && t.src === name))) found = id;
+        }
+        if (!found){
+            // lazy load
+            try {
+                const id = loadTexture(name);
+                if (id) return id;
+            } catch(e){}
+        }
+        return found || 0;
+    }
+
+    // ============================================================
+    // Live2D 集成  (LumentGAL 分支)
+    // 使用简易 Canvas2D 回退（若无 Cubism SDK）并在检测到 Cubism Core / pixi-live2d 时启用。
+    // 为保持开箱即用，模型若未配置 SDK 时会自动回退到精灵占位渲染 +
+    // 有限的参数/动作/表情模拟（参数化绘制）。
+    // ============================================================
+    const live2d = {
+        inited: false,
+        corePath: null,
+        models: [],        // id -> model state
+        idSeq: 1,
+        mouse: { x:-9999, y:-9999 },
+        tick: 0,
+    };
+
+    function live2dInit(corePath){
+        if (live2d.inited) return;
+        live2d.inited = true;
+        live2d.corePath = corePath || null;
+        // 监听全局鼠标（为自动 eye/head 跟踪）
+        try {
+            if (canvas){
+                canvas.addEventListener('mousemove', (e) => {
+                    const r = canvas.getBoundingClientRect();
+                    live2d.mouse.x = (e.clientX - r.left) * (canvas.width / r.width);
+                    live2d.mouse.y = (e.clientY - r.top)  * (canvas.height / r.height);
+                }, { passive:true });
+                canvas.addEventListener('mouseleave', ()=>{ live2d.mouse.x = -9999; live2d.mouse.y = -9999; });
+            }
+        } catch(e){}
+    }
+    function live2dShutdown(){
+        for (const m of live2d.models){
+            live2dDispose(m);
+        }
+        live2d.models.length = 0;
+        live2d.inited = false;
+    }
+    function live2dByNameOrId(x){
+        if (x == null) return null;
+        if (typeof x === 'number' || /^\d+$/.test(x)){
+            const id = +x;
+            const m = live2d.models.find(mm => mm.id === id);
+            return m ? m.id : null;
+        }
+        // 按名字查找
+        const m = live2d.models.find(mm => mm.name === x);
+        return m ? m.id : null;
+    }
+
+    function live2dLoadModel(model3JsonPath){
+        const id = live2d.idSeq++;
+        const m = {
+            id, name: model3JsonPath,
+            path: model3JsonPath,
+            tf: { x: canvas.width*0.5, y: canvas.height*0.7, scale: 1, rotation: 0, opacity: 1, width: 0, height: 0, flipX: false },
+            zLayer: 0,
+            visible: true,
+            ready: false,
+            motions: Object.create(null),   // group -> [motionDef]
+            expressions: [],               // [{name}]
+            currentMotion: null,
+            motionPriority: 0,
+            motionQueue: [],
+            currentExpression: null,
+            expressionName: '',
+            params: Object.create(null),   // ParamAngleX/Y, EyeOpen, MouthOpen, ...
+            auto: { eye: true, head: true, blink: true, mouth: false },
+            blinkTimer: 0, blinkState: 0, blinkVal: 1,
+            hitAreas: [],
+            data: null,
+            // 模拟动画
+            anim: { breath: 0, tiltX: 0, tiltY: 0, eyeX: 0, eyeY: 0, mouth: 0 }
+        };
+        // 默认参数
+        m.params['ParamAngleX'] = 0;
+        m.params['ParamAngleY'] = 0;
+        m.params['ParamBodyAngleX'] = 0;
+        m.params['ParamEyeLOpen'] = 1;
+        m.params['ParamEyeROpen'] = 1;
+        m.params['ParamMouthOpenY'] = 0;
+        m.params['ParamMouthForm']  = 0;
+        m.params['ParamBreath'] = 0;
+        live2d.models.push(m);
+        // 尝试异步加载 JSON（若网络可用，失败则保留占位回退渲染）
+        if (typeof fetch !== 'undefined' && model3JsonPath){
+            const base = model3JsonPath.slice(0, model3JsonPath.lastIndexOf('/') + 1);
+            fetch(model3JsonPath).then(r => r.ok ? r.json() : null).then(data => {
+                if (!data) return;
+                m.data = data;
+                if (data.FileReferences){
+                    const fr = data.FileReferences;
+                    if (fr.Motions){
+                        for (const k of Object.keys(fr.Motions)){
+                            m.motions[k] = (fr.Motions[k]||[]).map((x,i)=>({name:`${k}_${i}`, file: base + (x.File||''), duration: 1500 + Math.random()*1000|0}));
+                        }
+                    }
+                    if (Array.isArray(fr.Expressions)){
+                        m.expressions = fr.Expressions.map((e,i)=>({
+                            name: e.Name || ('expr_'+i),
+                            file: base + (e.File || '')
+                        }));
+                    }
+                    if (Array.isArray(fr.HitAreas)){
+                        m.hitAreas = fr.HitAreas.map(h => ({ id: h.Id, name: h.Name }));
+                    }
+                }
+                m.ready = true;
+            }).catch(()=>{});
+        } else {
+            // 无网络：填充占位动作与表情
+            m.motions['Idle'] = [{name:'Idle_0', duration:2000}];
+            m.motions['TapBody'] = [{name:'TapBody_0', duration:900}];
+            m.motions['Flick_Head'] = [{name:'Flick_Head_0', duration:700}];
+            m.expressions = [{name:'neutral'},{name:'happy'},{name:'sad'},{name:'angry'},{name:'surprise'}];
+            m.ready = true;
+        }
+        return id;
+    }
+    function live2dReleaseModel(id){
+        const idx = live2d.models.findIndex(m => m.id === id);
+        if (idx >= 0){ live2dDispose(live2d.models[idx]); live2d.models.splice(idx, 1); }
+    }
+    function live2dDispose(m){
+        // 目前无 WebGL 纹理占用，占位即可
+    }
+    function live2dIsReady(id){
+        const m = live2d.models.find(x => x.id === id);
+        return !!(m && m.ready);
+    }
+
+    function live2dSetTransform(id, tf){
+        const m = live2d.models.find(x => x.id === id);
+        if (!m || !tf) return;
+        for (const k of ['x','y','scale','rotation','opacity','width','height','flipX']){
+            if (tf[k] != null) m.tf[k] = tf[k];
+        }
+    }
+    function live2dGetTransform(id){
+        const m = live2d.models.find(x => x.id === id);
+        if (!m) return null;
+        return Object.assign({}, m.tf);
+    }
+    function live2dSetLayer(id, z){ const m = live2d.models.find(x => x.id === id); if (m) m.zLayer = z|0; }
+    function live2dSetVisible(id, v){ const m = live2d.models.find(x => x.id === id); if (m) m.visible = !!v; }
+
+    function live2dGetMotionGroupCount(id, group){
+        const m = live2d.models.find(x => x.id === id);
+        if (!m || !m.motions[group]) return 0;
+        return m.motions[group].length;
+    }
+    function live2dStartMotion(id, group, index, priority){
+        const m = live2d.models.find(x => x.id === id);
+        if (!m) return -1;
+        if (priority != null && priority < (m.motionPriority||0)) return -1;
+        const list = m.motions[group] || [];
+        if (!list.length) return -1;
+        const i = Math.min(list.length-1, Math.max(0, (index|0) % list.length));
+        const motion = list[i];
+        m.currentMotion = { ...motion, elapsed: 0, group };
+        m.motionPriority = priority || 1;
+        return i;
+    }
+    function live2dIsMotionPlaying(id){
+        const m = live2d.models.find(x => x.id === id);
+        return !!(m && m.currentMotion && m.currentMotion.elapsed < m.currentMotion.duration);
+    }
+    function live2dStopMotion(id){ const m = live2d.models.find(x => x.id === id); if (m){ m.currentMotion = null; m.motionPriority = 0; } }
+
+    function live2dGetExpressionCount(id){
+        const m = live2d.models.find(x => x.id === id);
+        return m ? m.expressions.length : 0;
+    }
+    function live2dGetExpressionName(id, i){
+        const m = live2d.models.find(x => x.id === id);
+        return (m && m.expressions[i]) ? m.expressions[i].name : null;
+    }
+    function live2dSetExpression(id, name){
+        const m = live2d.models.find(x => x.id === id);
+        if (!m) return;
+        const e = m.expressions.find(x => x.name === name);
+        if (!e) return;
+        m.expressionName = name;
+        // 参数化应用
+        m.params['ParamMouthForm'] = {
+            neutral:0, happy:0.4, sad:-0.3, angry:-0.5, surprise:0.1
+        }[name] || 0;
+        m.params['ParamEyeLOpen'] = {
+            neutral:1, happy:0.95, sad:0.6, angry:0.4, surprise:1.1
+        }[name] || 1;
+        m.params['ParamEyeROpen'] = m.params['ParamEyeLOpen'];
+        m._expressionOverride = true;
+    }
+    function live2dSetExpressionRandom(id){
+        const m = live2d.models.find(x => x.id === id);
+        if (!m || !m.expressions.length) return;
+        const e = m.expressions[(Math.random()*m.expressions.length)|0].name;
+        live2dSetExpression(id, e);
+    }
+    function live2dSetParam(id, paramId, value){
+        const m = live2d.models.find(x => x.id === id);
+        if (m) m.params[paramId] = value;
+    }
+    function live2dGetParam(id, paramId, defVal){
+        const m = live2d.models.find(x => x.id === id);
+        if (!m) return defVal;
+        return (paramId in m.params) ? m.params[paramId] : defVal;
+    }
+    function live2dParamAdd(id, paramId, delta){
+        const m = live2d.models.find(x => x.id === id);
+        if (m) m.params[paramId] = (m.params[paramId]||0) + (+delta||0);
+    }
+    function live2dParamMult(id, paramId, factor){
+        const m = live2d.models.find(x => x.id === id);
+        if (m) m.params[paramId] = (m.params[paramId]||0) * (+factor||1);
+    }
+
+    function live2dSetEyeTarget(id, x, y){ const m = live2d.models.find(x => x.id === id); if (m){ m._eyeTx = x; m._eyeTy = y; m.auto.eye = false; } }
+    function live2dSetHeadTarget(id, x, y){ const m = live2d.models.find(x => x.id === id); if (m){ m._headTx = x; m._headTy = y; m.auto.head = false; } }
+    function live2dEnableAutoEye(id, v){ const m = live2d.models.find(x => x.id === id); if (m){ m.auto.eye = !!v; if (v){ delete m._eyeTx; delete m._eyeTy; } } }
+    function live2dEnableAutoHead(id, v){ const m = live2d.models.find(x => x.id === id); if (m){ m.auto.head = !!v; if (v){ delete m._headTx; delete m._headTy; } } }
+    function live2dEnableAutoBlink(id, v){ const m = live2d.models.find(x => x.id === id); if (m) m.auto.blink = !!v; }
+    function live2dEnableAutoMouth(id, v){ const m = live2d.models.find(x => x.id === id); if (m) m.auto.mouth = !!v; }
+
+    function live2dHitTest(id, sx, sy){
+        const m = live2d.models.find(x => x.id === id);
+        if (!m || !m.tf) return null;
+        const dx = sx - m.tf.x, dy = sy - (m.tf.y - (m.tf.height || 400) * 0.5 * (m.tf.scale||1));
+        const scale = (m.tf.scale || 1) * 250;
+        if (Math.abs(dx) < scale*0.5 && Math.abs(dy) < (m.tf.height||400)*(m.tf.scale||1)*0.5){
+            if (m.hitAreas && m.hitAreas.length){
+                // 简化返回第一个命中
+                const hit = m.hitAreas.find(a => /Head|Face/i.test(a.name || a.id));
+                if (hit) return hit.name || hit.id;
+                const h2 = m.hitAreas.find(a => /Body/i.test(a.name || a.id));
+                if (h2) return h2.name || h2.id;
+                return m.hitAreas[0].name || m.hitAreas[0].id || 'Body';
+            }
+            // 近似分区（无 HitAreas）
+            if (Math.abs(dy) < scale*0.7 && Math.abs(dx) < scale*0.35) return 'Head';
+            return 'Body';
+        }
+        return null;
+    }
+
+    function galAttachLive2d(modelId, slot, zOrder){
+        const m = live2d.models.find(x => x.id === modelId);
+        if (!m) return -1;
+        const id = galCreateSprite(`live2d:${modelId}`, slot, zOrder || 0);
+        const sp = gal.sprites.get(id);
+        if (sp){
+            sp.live2dId = modelId;
+            sp.alpha = 0; sp.destAlpha = 1;
+            sp.toAlpha = 1; sp.fromAlpha = 0;
+            sp.tween = GAL_TWEEN.FADE; sp.tweenDur = 500; sp.tweenT = 0;
+        }
+        return id;
+    }
+
+    function live2dUpdate(dtMs){
+        const dt = (+dtMs||16) / 1000;
+        live2d.tick += dt;
+        for (const m of live2d.models){
+            // Motion 计时
+            if (m.currentMotion){
+                m.currentMotion.elapsed += (+dtMs||16);
+                if (m.currentMotion.elapsed >= m.currentMotion.duration){
+                    m.currentMotion = null;
+                    m.motionPriority = 0;
+                } else {
+                    // 简单 motion: 动作期间摇头
+                    const e = m.currentMotion.elapsed / m.currentMotion.duration;
+                    if (m.currentMotion.group === 'TapBody' || /Tap|Flick|Shake/.test(m.currentMotion.group||'')){
+                        m.params['ParamAngleX'] = Math.sin(e * Math.PI * 2) * 20;
+                    } else {
+                        m.params['ParamBodyAngleX'] = Math.sin(e * Math.PI) * 3;
+                    }
+                }
+            }
+            // 呼吸
+            m.anim.breath += dt;
+            m.params['ParamBreath'] = (Math.sin(m.anim.breath*1.8) + 1) * 0.5;
+            // 自动 eye track
+            if (m.auto.eye){
+                const dx = (live2d.mouse.x >= -1000) ? (live2d.mouse.x - m.tf.x) : 0;
+                const dy = (live2d.mouse.y >= -1000) ? (live2d.mouse.y - (m.tf.y - 150*(m.tf.scale||1))) : 0;
+                const maxD = 300;
+                m.params['ParamAngleX'] = (m.currentMotion && (m.currentMotion.group === 'TapBody' || /Flick|Shake/.test(m.currentMotion.group||'')))
+                    ? m.params['ParamAngleX'] : Math.max(-30, Math.min(30, (dx/maxD)*30));
+                m.params['ParamAngleY'] = Math.max(-15, Math.min(15, (dy/maxD)*15));
+            }
+            // 自动眨眼
+            if (m.auto.blink){
+                m.blinkTimer -= dtMs;
+                if (m.blinkTimer <= 0){
+                    if (m.blinkState === 0){ m.blinkState = 1; m.blinkTimer = 120; } // close
+                    else if (m.blinkState === 1){ m.blinkState = 2; m.blinkTimer = 80; } // fully closed
+                    else { m.blinkState = 0; m.blinkTimer = 2000 + Math.random()*3000; } // open & idle
+                }
+                const e = (m.blinkState === 0) ? 1 : (m.blinkState === 1 ? (1 - (m.blinkTimer/120)) : (m.blinkTimer/80));
+                if (!m._expressionOverride){
+                    m.params['ParamEyeLOpen'] = e;
+                    m.params['ParamEyeROpen'] = e;
+                }
+            }
+            // 自动 mouth (根据语音音量占位)
+            if (m.auto.mouth){
+                if (gal.audio && gal.audio.voice){
+                    m.params['ParamMouthOpenY'] = 0.3 + 0.3*(Math.random());
+                } else {
+                    m.params['ParamMouthOpenY'] *= 0.9;
+                }
+            }
+        }
+    }
+
+    function live2dRender(){
+        const list = live2d.models.filter(m => m.visible && !isAttached(m));
+        list.sort((a,b) => (a.zLayer|0) - (b.zLayer|0));
+        for (const m of list){
+            live2dRenderModel(m.id, m.tf.x, m.tf.y, m.tf.scale || 1);
+        }
+    }
+    function isAttached(m){
+        for (const [,sp] of gal.sprites){ if (sp.live2dId === m.id) return true; }
+        return false;
+    }
+    function live2dRenderModel(id, cx, cy, scale){
+        const m = live2d.models.find(x => x.id === id);
+        if (!m || !m.tf || (m.tf.opacity != null && m.tf.opacity <= 0.001)) return;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, m.tf.opacity ?? 1));
+        ctx.translate(cx, cy);
+        ctx.rotate((m.tf.rotation || 0) * Math.PI / 180);
+        const s = (scale || 1) * (m.tf.scale || 1);
+        if (m.tf.flipX) ctx.scale(-s, s); else ctx.scale(s, s);
+        const ax = m.params['ParamAngleX'] || 0;
+        const ay = m.params['ParamAngleY'] || 0;
+        const bx = m.params['ParamBodyAngleX'] || 0;
+        ctx.translate((ax + bx*0.5) * 0.7, ay * 0.3);
+        drawLive2DPlaceholder(m);
+        ctx.restore();
+    }
+    // 占位绘制：参数化可爱角色轮廓（无需外部模型文件也能可视化 Live2D API 效果）
+    // 当模型 JSON 未加载或失败时始终可用。
+    function drawLive2DPlaceholder(m){
+        // 身体 & 头（参数响应）
+        const breath = m.params['ParamBreath'] || 0;
+        const eyeL = Math.max(0, Math.min(1.1, m.params['ParamEyeLOpen'] ?? 1));
+        const eyeR = Math.max(0, Math.min(1.1, m.params['ParamEyeROpen'] ?? 1));
+        const mouth = Math.max(0, Math.min(1, m.params['ParamMouthOpenY'] ?? 0));
+        const mouthForm = m.params['ParamMouthForm'] || 0;
+        // 身体
+        ctx.fillStyle = '#f6d3c6';
+        ctx.beginPath();
+        ctx.moveTo(-110, 260);
+        ctx.quadraticCurveTo(-120, 150 + breath*3, -80, 110 + breath*3);
+        ctx.lineTo(80, 110 + breath*3);
+        ctx.quadraticCurveTo(120, 150 + breath*3, 110, 260);
+        ctx.closePath(); ctx.fill();
+        // 衣服
+        const grad = ctx.createLinearGradient(0, 100, 0, 260);
+        grad.addColorStop(0, '#a6c8ff'); grad.addColorStop(1, '#4a64b0');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(-82, 120 + breath*2);
+        ctx.lineTo(82, 120 + breath*2);
+        ctx.quadraticCurveTo(105, 170, 95, 260);
+        ctx.lineTo(-95, 260);
+        ctx.quadraticCurveTo(-105, 170, -82, 120 + breath*2);
+        ctx.closePath(); ctx.fill();
+        // 头
+        ctx.fillStyle = '#f8e0d0';
+        ctx.beginPath();
+        ctx.ellipse(0, -10, 95, 110 + breath*1.5, 0, 0, Math.PI*2);
+        ctx.fill();
+        // 头发 (后)
+        ctx.fillStyle = '#3d2a1a';
+        ctx.beginPath();
+        ctx.moveTo(-95, -20);
+        ctx.quadraticCurveTo(-120, -80, -70, -110);
+        ctx.quadraticCurveTo(0, -135, 70, -110);
+        ctx.quadraticCurveTo(120, -80, 95, -20);
+        ctx.quadraticCurveTo(110, 40, 95, 90);
+        ctx.quadraticCurveTo(0, 60, -95, 90);
+        ctx.quadraticCurveTo(-110, 40, -95, -20);
+        ctx.closePath(); ctx.fill();
+        // 刘海
+        ctx.fillStyle = '#4c3420';
+        ctx.beginPath();
+        ctx.moveTo(-90, -30);
+        ctx.quadraticCurveTo(-80, -110, 0, -100);
+        ctx.quadraticCurveTo(80, -110, 90, -30);
+        ctx.quadraticCurveTo(60, -60, 0, -70);
+        ctx.quadraticCurveTo(-60, -60, -90, -30);
+        ctx.closePath(); ctx.fill();
+        // 腮红
+        ctx.fillStyle = 'rgba(240,150,170,0.55)';
+        ctx.beginPath(); ctx.ellipse(-48, 24, 16, 8, 0, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse( 48, 24, 16, 8, 0, 0, Math.PI*2); ctx.fill();
+        // 眼睛
+        const eyeY = -4;
+        drawEye(-36, eyeY, 26, 38, eyeL, '#2a4a7a');
+        drawEye( 36, eyeY, 26, 38, eyeR, '#2a4a7a');
+        // 眉毛
+        ctx.strokeStyle = '#3d2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        const brow = (m.expressionName === 'angry') ? -6 : (m.expressionName === 'surprise' ? 7 : 0);
+        ctx.beginPath(); ctx.moveTo(-52, -36 + brow); ctx.lineTo(-20, -34 + brow - (m.expressionName==='angry'?8:0)); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo( 20, -34 + brow - (m.expressionName==='angry'?8:0)); ctx.lineTo( 52, -36 + brow); ctx.stroke();
+        // 嘴
+        ctx.strokeStyle = '#a55060'; ctx.fillStyle = '#c2546a';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        if (mouth > 0.02){
+            ctx.ellipse(0, 48, 12 + mouth*10, 6 + mouth*14 + mouthForm*3, 0, 0, Math.PI*2);
+            ctx.fill();
+        } else {
+            const curve = mouthForm * 6;
+            ctx.moveTo(-12, 48 - curve);
+            ctx.quadraticCurveTo(0, 54 + curve*0.5, 12, 48 - curve);
+            ctx.stroke();
+        }
+        // 当前动作 / 表情徽标
+        if (m.currentMotion || m.expressionName){
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            roundRectIn(-86, -146, 172, 20, 6); ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.font = '11px "JetBrainsMono",monospace'; ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const tag = [
+                m.currentMotion ? 'M:' + m.currentMotion.group : null,
+                m.expressionName ? 'E:' + m.expressionName : null
+            ].filter(Boolean).join('  ');
+            ctx.fillText(tag || 'Live2D Placeholder', 0, -136);
+        }
+    }
+    function drawEye(ex, ey, w, h, open, irisCol){
+        const o = Math.max(0.001, open);
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.ellipse(ex, ey, w, h*o, 0, 0, Math.PI*2); ctx.fill();
+        // iris
+        ctx.fillStyle = irisCol || '#2a4a7a';
+        ctx.beginPath(); ctx.ellipse(ex, ey + h*o*0.1, w*0.6, h*o*0.85, 0, 0, Math.PI*2); ctx.fill();
+        // pupil
+        ctx.fillStyle = '#0b0f1c';
+        ctx.beginPath(); ctx.ellipse(ex, ey + h*o*0.1, w*0.28, h*o*0.5, 0, 0, Math.PI*2); ctx.fill();
+        // 高光
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(ex - w*0.25, ey - h*o*0.3, w*0.16, 0, Math.PI*2); ctx.fill();
+        // 眼线
+        ctx.strokeStyle = '#1a1520'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(ex, ey, w, h*o, 0, 0, Math.PI*2); ctx.stroke();
+    }
+    function roundRectIn(x,y,w,h,r){
+        const rr = Math.min(r, w/2, h/2);
+        ctx.beginPath();
+        ctx.moveTo(x+rr,y);
+        ctx.lineTo(x+w-rr,y);
+        ctx.quadraticCurveTo(x+w,y,x+w,y+rr);
+        ctx.lineTo(x+w,y+h-rr);
+        ctx.quadraticCurveTo(x+w,y+h,x+w-rr,y+h);
+        ctx.lineTo(x+rr,y+h);
+        ctx.quadraticCurveTo(x,y+h,x,y+h-rr);
+        ctx.lineTo(x,y+rr);
+        ctx.quadraticCurveTo(x,y,x+rr,y);
+        ctx.closePath();
+    }
+
+    // ============================================================
     // 公开 API
     // ============================================================
 
@@ -3246,6 +4880,64 @@ const Lument = (function() {
         uiSetTheme, uiGetTheme, uiResetTheme,
         uiSetAutoSize, uiMeasureText, uiSetMargin,
         uiBuildFromJson, uiDumpTree, uiFindById,
+
+        // ============================================================
+        // LumentGAL: 视觉小说 / GAL 子系统  (LumentGAL 分支)
+        // ============================================================
+        GAL_CMD, GAL_SLOT, GAL_TWEEN,
+        // 生命周期
+        galInit, galShutdown, galIsRunning,
+        // 剧本
+        galParseScript, galLoadScript, galStart, galStop,
+        galAdvance, galSkip, galAuto, galSetAutoDelay,
+        galGotoLabel, galSelectChoice, galGetChoiceCount, galGetChoiceText,
+        // 对话框
+        galSetDialogStyle, galShowDialog, galIsDialogVisible, galSay,
+        galGetHistoryCount, galGetHistoryEntry, galClearHistory,
+        galHandleClick,
+        // 立绘 / 背景 / CG
+        galCreateSprite, galDestroySprite,
+        galShowSprite, galHideSprite,
+        galSetSpritePosition, galSetSpriteScale, galSetSpriteExpression,
+        galSetBackground, galShowCG, galHideCG,
+        // 存档 / 读档
+        galSave, galLoad, galDeleteSave, galGetSaveInfo,
+        galQuickSave, galQuickLoad,
+        // 音频
+        galPlayBgm, galStopBgm, galPlaySe, galPlayVoice, galStopVoice,
+        // 偏好设置
+        galSetPrefTextSpeed, galGetPrefTextSpeed,
+        galSetPrefAuto, galGetPrefAuto,
+        galSetPrefSkip, galGetPrefSkip,
+        galSetPrefVolume, galGetPrefVolume,
+        // 演出
+        galShake, galFadeTo, galFadeFrom,
+        // 变量
+        galSetVar, galSetVarInt, galSetVarFloat, galSetVarBool,
+        galGetVar, galGetVarInt, galGetVarFloat, galGetVarBool,
+        // 回调
+        set galOnEnd(fn){ gal.onEnd = fn; }, get galOnEnd(){ return gal.onEnd; },
+        set galOnTitle(fn){ gal.onTitle = fn; }, get galOnTitle(){ return gal.onTitle; },
+        // 每帧：update / render
+        galUpdate, galRender,
+
+        // ============================================================
+        // LumentGAL: Live2D 子系统 (LumentGAL 分支)
+        // ============================================================
+        live2dInit, live2dShutdown,
+        live2dLoadModel, live2dReleaseModel, live2dIsReady,
+        live2dSetTransform, live2dGetTransform,
+        live2dSetLayer, live2dSetVisible,
+        live2dGetMotionGroupCount, live2dStartMotion,
+        live2dIsMotionPlaying, live2dStopMotion,
+        live2dGetExpressionCount, live2dGetExpressionName,
+        live2dSetExpression, live2dSetExpressionRandom,
+        live2dSetParam, live2dGetParam, live2dParamAdd, live2dParamMult,
+        live2dSetEyeTarget, live2dSetHeadTarget,
+        live2dEnableAutoEye, live2dEnableAutoHead,
+        live2dEnableAutoBlink, live2dEnableAutoMouth,
+        live2dHitTest, galAttachLive2d,
+        live2dUpdate, live2dRender,
     };
 })();
 
