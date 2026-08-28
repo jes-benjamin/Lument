@@ -1,4 +1,7 @@
-# Lument v1.3.0
+# Lument v1.3.0 · LumentGAL 分支
+
+> **当前分支 `LumentGAL`**：在 Lument 引擎主版本之上，额外提供适合**视觉小说 / 美少女游戏 (GAL)** 类型开发的完整子系统，并内置 **Live2D 角色动画接入**。
+> 主分支 (`main`) 保留通用 2D 游戏引擎能力；`LumentGAL` 分支在完全兼容主分支的同时，追加 GAL 与 Live2D 两大模块。
 
 轻量级跨平台 2D 游戏引擎，支持 C++/Python/Java/HTML 多语言开发，适配桌面、移动、Web 多设备平台。
 
@@ -58,10 +61,84 @@
 ## 应用场景
 
 - 2D 像素风/矢量风游戏
+- **视觉小说 / 美少女游戏（GAL）** ← `LumentGAL` 分支重点优化
 - 剧情 RPG / 休闲游戏
 - 物理模拟游戏
 - 网络游戏（接入网络模块）
 - AI 行为驱动的 NPC 系统
+
+## 🌟 LumentGAL 分支 · 视觉小说 / Live2D 能力
+
+### 🎬 GAL 子系统
+
+| 能力 | 说明 |
+|------|------|
+| **剧本 DSL 解析** | 自定义 GalScript：`角色: 台词` / `@bg` / `@show` / `@choose` / `@if` / `@set` / `@jump` / `@call` 等 20+ 命令，支持行内 `{变量}` 插值 |
+| **对话框与打字机** | 圆角对话框 + 名字框，可配置颜色/字体/半径/行高，文字速度 1–10，自动换行，动画显示，点击提示 ▼ |
+| **分支选择** | `@choose label|文本;...` 多行选项 UI，支持键盘 `1–9` 快捷键和鼠标点击 |
+| **背景 / 立绘 / CG** | 颜色/图片背景切换，立绘槽位 LEFT/CENTER/RIGHT，多种 Tween（淡入/左右上下滑入/缩放/溶解/切），独立 CG 层淡入淡出 |
+| **音频** | BGM / SE / VOICE 独立通道，支持音量偏好持久化 |
+| **偏好设置** | 文本速度 / 自动播放 / 快进 / 三路音量，localStorage 持久化 |
+| **自动 & 快进** | 打字完成后按 autoDelay 自动推进，快进模式按顺序快进至下一选项 |
+| **存档 / 读档** | 状态快照存档（剧本、变量、历史、背景、立绘、CG、偏好），任意槽位 + QuickSave/QuickLoad，保存元信息（标题/摘要/时间戳/音量等） |
+| **演出系统** | `@shake` 屏幕震动 / `effect fade_to_black / fade_from_black / flash` 淡入淡出闪烁 |
+| **剧本状态管理** | 变量系统 `+= -= *= /= %=`，条件跳转 `@if`，标签 `@label`/`@jump`，`@call` / `@return` 子程序栈 |
+| **C ABI 声明** | `core/include/lument.h` 追加 `lument_gal_*` 系列接口，方便 C++/Java/Python 未来对接 |
+| **TypeScript 类型** | `runtime/js/lument.d.ts` 完整声明 `LumentGalDialogStyle / LumentGalSaveInfo / LumentGalHistoryEntry / LumentGalScript` 等结构 |
+
+### 🎭 Live2D 子系统
+
+| 能力 | 说明 |
+|------|------|
+| **模型加载** | `live2dLoadModel(model3.json?)`：检测到 Cubism 资源时异步解析 Motions/Expressions/HitAreas；无外部模型时自动走**参数化占位渲染**，开箱即可演示 |
+| **动作管理** | 动作分组 `Idle / TapBody / Flick_Head` 等，优先级队列，开始 / 停止 / 查询播放状态，`live2dStartMotion(id, group, idx, priority)` |
+| **表情管理** | `neutral / happy / sad / angry / surprise`，参数映射到嘴型/眼开，支持随机表情 |
+| **参数控制** | `live2dSetParam / GetParam / ParamAdd / ParamMult`，直接操控 `ParamAngleX/Y / ParamEyeLOpen / ParamMouthOpenY / ParamBreath / ...` |
+| **自动动画** | 鼠标视线自动追踪（头+眼）、自动眨眼状态机、语音驱动口型（`ParamMouthOpenY` 随 VOICE 通道变化） |
+| **命中测试** | `live2dHitTest(id, sx, sy)` 基于模型 HitAreas 或近似分区，返回 `Head / Body` 等命中文本 |
+| **GAL 挂载** | `galAttachLive2d(modelId, slot, z)` 直接把 Live2D 模型作为 GAL 立绘参与槽位、透明度动画、z 排序 |
+| **变换** | `LumentLive2DTransform` 支持位置/缩放/旋转/不透明度/宽高/镜像 |
+| **C ABI & TS 类型** | `lument.h` 声明、`lument.d.ts` 全量类型 |
+
+### 📚 GalScript 语法速查
+
+```
+# 注释
+// 另一种注释
+@bg #1a2550 FADE 1000              # 切换背景（颜色或图片路径）
+@show sprite_id CENTER normal 1 FADE 700    # 展示立绘
+@hide sprite_id FADE 500
+@cg cg_goodend FADE 800 ; @cg_clear FADE 500
+@live2d modelId expression happy
+@live2d modelId motion TapBody:0
+@bgm bgm_main true 0.7 800 ; @bgm_stop 800
+@se click_se 1.0 ; @voice voice001 1.0 由希
+
+由希: 学长，你终于来了！          # 角色台词
+旁白: 天台的风轻轻拂过…           # 无冒号行 → 旁白
+
+@choose good|留下来陪我;leave|先回家吧
+@label good  ;  @set 花奈好感度 += 1
+@if 花奈好感度 >= 3 harem_end
+@jump common
+@wait click ; @wait 800
+@shake 4 400 ; @effect flash 500
+@call side_story morning_scene    # 调用其它剧本
+@title ; @end                      # 返回标题 / 剧本结束
+```
+
+### 🚀 快速体验：LumentGAL Demo
+
+打开仓库中的 [examples/lument_gal_demo.html](examples/lument_gal_demo.html) 即可体验：
+
+- 标题开始 / 回到标题
+- 剧本对话 + 打字机 + 自动/快进
+- 双 Live2D 角色出场、分支选择（由希线 / 花奈线）、变量与条件跳转
+- 文字速度、BGM / SE / 语音 三路音量
+- 三槽位存档 + 快速存档 (F5) / 快速读档 (F9)
+- 屏幕震动、淡入、闪光演出
+- Live2D 侧边控制：表情/动作切换、随机表情、眼/头自动追踪开关、点击模型触发动作
+- 完整运行日志
 
 ## 目录结构
 

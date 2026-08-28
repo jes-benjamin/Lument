@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>LumentGAL — 基础视觉小说 Demo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #070a18;
+    --panel: rgba(14, 18, 40, 0.88);
+    --panel-strong: rgba(18, 24, 52, 0.96);
+    --border: rgba(120, 160, 255, 0.32);
+    --accent: #8ab4ff;
+    --accent-2: #b58dff;
+    --text: #eaf0ff;
+    --muted: #a3afd9;
+    --ok: #7ef0b3;
+    --danger: #ff8aa4;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #24306b 0%, transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, #4b2e7a 0%, transparent 55%),
+      linear-gradient(180deg, #05070f 0%, #070a18 100%);
+    color: var(--text);
+    font-family: 'Outfit', 'InstrumentSans', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  }
+  .wrap {
+    max-width: 1320px; margin: 0 auto; padding: 28px 24px 48px;
+  }
+  header.brand {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 22px;
+  }
+  .title {
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  .title h1 {
+    margin: 0; font-size: 30px; letter-spacing: .5px;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .title .tag {
+    display: inline-block; padding: 4px 10px; border-radius: 999px;
+    background: rgba(138,180,255,.12); color: var(--accent);
+    border: 1px solid rgba(138,180,255,.25); font-size: 12px; letter-spacing: .5px;
+  }
+  .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .main {
+    display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px;
+  }
+  @media (max-width: 1024px){
+    .main { grid-template-columns: 1fr; }
+  }
+  .stage {
+    position: relative; border-radius: 18px; overflow: hidden;
+    border: 1px solid var(--border); background: #000;
+    aspect-ratio: 16 / 9;
+    box-shadow:
+      0 30px 80px rgba(0,0,0,0.55),
+      inset 0 0 0 1px rgba(255,255,255,0.03);
+  }
+  #canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+    touch-action: none;
+  }
+  .stageHint {
+    position: absolute; top: 12px; right: 14px; z-index: 2;
+    background: rgba(7,10,22,.55); border: 1px solid var(--border);
+    color: var(--muted); padding: 6px 10px; border-radius: 10px; font-size: 12px;
+    backdrop-filter: blur(6px);
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    backdrop-filter: blur(8px);
+  }
+  .panel h2 {
+    margin: 0 0 12px; font-size: 16px; letter-spacing: .4px;
+    color: var(--text);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel h2 .pill {
+    font-size: 11px; font-weight: 500;
+    background: rgba(181,141,255,.12); color: #d2b8ff;
+    border: 1px solid rgba(181,141,255,.25);
+    padding: 2px 8px; border-radius: 999px;
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  label.lbl { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  input[type="range"] { width: 100%; }
+  .btns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .btns.wide { grid-template-columns: 1fr; }
+  button.btn {
+    appearance: none; cursor: pointer;
+    color: var(--text); font: inherit;
+    background: linear-gradient(180deg, rgba(138,180,255,.18) 0%, rgba(138,180,255,.08) 100%);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 9px 12px; transition: transform .05s ease, background .15s ease, border-color .15s ease;
+  }
+  button.btn:hover { background: linear-gradient(180deg, rgba(138,180,255,.28) 0%, rgba(138,180,255,.12) 100%); border-color: rgba(150,190,255,.55); }
+  button.btn:active { transform: translateY(1px); }
+  button.btn.primary {
+    background: linear-gradient(180deg, #6f9eff 0%, #5b7dff 100%);
+    border-color: rgba(255,255,255,.18); color: white; font-weight: 600;
+  }
+  button.btn.primary:hover { filter: brightness(1.06); }
+  button.btn.ghost { background: transparent; }
+  .stacks { display: flex; flex-direction: column; gap: 12px; }
+  select.sel, input.in {
+    width: 100%;
+    background: rgba(10,14,30,.8);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 10px; font: inherit;
+  }
+  .kv { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin: 4px 0 8px; }
+  .kv b { color: var(--text); font-weight: 600; }
+  .saves { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .saveSlot {
+    border: 1px dashed var(--border); border-radius: 12px;
+    padding: 8px 8px 6px; background: rgba(10,14,30,.45);
+    min-height: 92px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .saveSlot .n { font-size: 11px; color: var(--muted); }
+  .saveSlot .t { font-size: 13px; color: var(--text); font-weight: 600; }
+  .saveSlot .s { font-size: 11px; color: var(--muted); line-height: 1.3; min-height: 30px; }
+  .saveSlot .used-true { border-style: solid; border-color: rgba(126,240,179,.35); background: rgba(126,240,179,.06); }
+  .saveRow { display: flex; gap: 4px; }
+  .saveRow button { flex: 1; padding: 5px 6px; font-size: 11px; border-radius: 8px; }
+  .log {
+    max-height: 200px; overflow: auto; background: rgba(0,0,0,.35);
+    border: 1px solid rgba(255,255,255,.06); border-radius: 10px;
+    padding: 8px 10px; font-size: 12px; line-height: 1.5; color: #c3cdef;
+    font-family: 'JetBrainsMono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .log .t { color: var(--muted); opacity: .75; }
+  .log .ok { color: var(--ok); }
+  .log .err { color: var(--danger); }
+  .legend {
+    display: grid; grid-template-columns: repeat(2, auto); gap: 4px 14px;
+    font-size: 12px; color: var(--muted);
+  }
+  .legend b { color: var(--text); font-weight: 600; }
+  .kbd {
+    display: inline-block; padding: 1px 6px; font-size: 11px;
+    border: 1px solid var(--border); border-bottom-width: 2px;
+    border-radius: 6px; background: rgba(255,255,255,.04); color: var(--text);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <div>
+      <div class="title">
+        <h1>LumentGAL · 视觉小说基础 Demo</h1>
+        <span class="tag">Lument v1.3 · LumentGAL 分支</span>
+        <span class="tag">Live2D 接入 · 剧本 DSL · 存档读档</span>
+      </div>
+      <div class="subtitle">
+        适合美少女游戏 / 视觉小说类型的轻量开发骨架：剧本解析、打字机对话框、分支选择、立绘/背景/CG、
+        自动模式、快进、音量与文字速度偏好、快照存档，以及参数化 Live2D 角色动画（无外部模型即可预览）。
+      </div>
+    </div>
+  </header>
+
+  <div class="main">
+    <section>
+      <div class="stage">
+        <canvas id="canvas" width="1280" height="720"></canvas>
+        <div class="stageHint">
+          点击画布 / <span class="kbd">Space</span> 推进　·
+          <span class="kbd">A</span> 自动　·
+          <span class="kbd">S</span> 快进　·
+          <span class="kbd">F5</span> 快速存档　·
+          <span class="kbd">F9</span> 快速读档
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <h2>内置剧本示例（DSL） <span class="pill">GalScript</span></h2>
+        <div class="legend">
+          <div><b>@bg 颜色/图片 FADE 800</b>　背景切换</div>
+          <div><b>@show 立绘 SLOT 表情 α TWEEN ms</b>　展示立绘</div>
+          <div><b>@live2d id motion Idle:0</b>　播放动作</div>
+          <div><b>@live2d id expression happy</b>　切换表情</div>
+          <div><b>@choose 标签1|文本1;标签2|文本2</b>　选项分支</div>
+          <div><b>@set 好感度 += 1 / @if 好感度 >= 3 good</b>　变量与条件跳转</div>
+          <div><b>@shake 强度 毫秒 / @effect flash 800</b>　屏幕演出</div>
+          <div><b>Name: 台词</b>　角色对白；纯文本=旁白；# //=注释</div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="stacks">
+      <div class="panel">
+        <h2>开始 <span class="pill">1</span></h2>
+        <div class="btns wide">
+          <button class="btn primary" id="btnStart">▶ 开始新游戏</button>
+          <button class="btn" id="btnTitle">⌂ 回到标题</button>
+        </div>
+        <div class="kv" style="margin-top:10px;">
+          <span>运行状态</span><b id="stateRun">待机</b>
+        </div>
+        <div class="kv">
+          <span>当前剧本 / 行</span><b id="stateLine">—</b>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>偏好设置 <span class="pill">2</span></h2>
+        <label class="lbl">文字速度：<b id="lblTs">5</b> / 10</label>
+        <input type="range" id="rngTs" min="1" max="10" step="1" value="5">
+        <label class="lbl" style="margin-top:8px;">BGM 音量：<b id="lblBgm">0.7</b></label>
+        <input type="range" id="rngBgm" min="0" max="1" step="0.01" value="0.7">
+        <label class="lbl" style="margin-top:8px;">SE 音量：<b id="lblSe">1.0</b></label>
+        <input type="range" id="rngSe" min="0" max="1" step="0.01" value="1.0">
+        <label class="lbl" style="margin-top:8px;">语音 音量：<b id="lblVo">1.0</b></label>
+        <input type="range" id="rngVo" min="0" max="1" step="0.01" value="1.0">
+        <div class="row" style="margin-top:10px;">
+          <button class="btn" id="btnAuto">A / 自动 关</button>
+          <button class="btn" id="btnSkip">S / 快进 关</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Live2D 互动 <span class="pill">3</span></h2>
+        <div class="row">
+          <label class="lbl" style="grid-column: 1 / -1;">模型表情</label>
+        </div>
+        <div class="row-3">
+          <button class="btn" data-expr="neutral">neutral</button>
+          <button class="btn" data-expr="happy">happy</button>
+          <button class="btn" data-expr="sad">sad</button>
+          <button class="btn" data-expr="angry">angry</button>
+          <button class="btn" data-expr="surprise">surprise</button>
+          <button class="btn" id="btnExprRand">🎲 随机</button>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn" data-m="Idle">动作：Idle</button>
+          <button class="btn" data-m="TapBody">动作：TapBody</button>
+          <button class="btn" data-m="Flick_Head">动作：Flick Head</button>
+          <button class="btn" id="btnEyeTrk">自动追踪 开</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>存档 / 读档 <span class="pill">4</span></h2>
+        <div class="saves" id="saveGrid"></div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn" id="btnQSave">💾 快速存档 (F5)</button>
+          <button class="btn" id="btnQLoad">📂 快速读档 (F9)</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>运行日志</h2>
+        <div class="log" id="log"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="../runtime/js/lument.js"></script>
+<script>
+/* =========================================================
+   LumentGAL Demo
+   ========================================================= */
+const canvas = document.getElementById('canvas');
+const logBox = document.getElementById('log');
+function log(msg, tag){
+  const line = document.createElement('div');
+  const t = new Date().toLocaleTimeString();
+  line.innerHTML = `<span class="t">[${t}]</span> <span class="${tag||''}">${msg}</span>`;
+  logBox.appendChild(line);
+  logBox.scrollTop = logBox.scrollHeight;
+  while (logBox.childNodes.length > 200) logBox.removeChild(logBox.firstChild);
+}
+log('LumentGAL Demo 初始化…', 'ok');
+
+// ---------- 1. 初始化引擎 ----------
+const ok = Lument.init({
+  width: 1280, height: 720,
+  title: 'LumentGAL Demo',
+  targetFps: 60,
+  rendererType: 3, // Canvas2D
+  assetPath: ''
+});
+if (!ok){ log('引擎初始化失败', 'err'); }
+else { log('Lument 引擎初始化完成 (Canvas2D 渲染)'); }
+
+// 把引擎 canvas 替换为页面 canvas（demo 使用自己的 canvas 进行缩放布局）
+// 注意：这里 Lument.init 已经创建了内部 canvas，为了让渲染显示在 #canvas 上，
+// 我们在每一帧把内部 canvas 的内容 blit 到页面 canvas。
+const engineCanvas = Lument.getCanvas();
+const demoCtx = canvas.getContext('2d');
+function fitCanvasSize(){
+  const r = canvas.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width  = Math.max(320, Math.round(r.width  * dpr));
+  canvas.height = Math.max(180, Math.round(r.height * dpr));
+}
+window.addEventListener('resize', fitCanvasSize);
+fitCanvasSize();
+
+// ---------- 2. 初始化 GAL + Live2D ----------
+Lument.galInit({
+  bgColor:{r:9,g:14,b:36,a:220},
+  nameColor:{r:34,g:62,b:120,a:250},
+  borderColor:{r:138,g:180,b:255,a:110},
+  typewriterSpeed: 5,
+  textFontSize: 24, nameFontSize: 22,
+});
+Lument.live2dInit();
+
+// 载入两个 Live2D 模型 (占位回退，无需外部 .model3.json)
+const mHana = Lument.live2dLoadModel();          // 1
+const mYuki = Lument.live2dLoadModel();          // 2
+Lument.live2dSetExpression(mHana, 'neutral');
+Lument.live2dSetExpression(mYuki, 'neutral');
+// 自动语音口型（占位，会根据 gal.audio.voice 模拟张嘴）
+Lument.live2dEnableAutoMouth(mHana, true);
+Lument.live2dEnableAutoMouth(mYuki, true);
+
+// 把 Live2D 模型作为立绘挂到 GAL 场景
+const spHana = Lument.galAttachLive2d(mHana, Lument.GAL_SLOT.RIGHT, 0);   // 默认在右
+const spYuki = Lument.galAttachLive2d(mYuki, Lument.GAL_SLOT.LEFT,  0);   // 默认在左
+Lument.galHideSprite(spHana, Lument.GAL_TWEEN.NONE, 0);
+Lument.galHideSprite(spYuki, Lument.GAL_TWEEN.NONE, 0);
+
+log('Live2D 占位模型载入完成，自动眨眼 + 视线追踪已开启', 'ok');
+
+// ---------- 3. 内置 GalScript ----------
+const prologue = `
+# ==========================================================
+#  LumentGAL 示例剧本：《青空之下的小约定》
+# ==========================================================
+
+@bg #1a2550 FADE 1000
+@effect fade_from_black 900
+@wait 300
+
+学姐: 今天的风，带着海水的味道呢…
+# 第一次出现 Yuki（左）
+@live2d ${mYuki} expression happy
+@show live2d:${mYuki} LEFT  1 FADE 700
+@wait 100
+由希: 学长，你终于来了！我还以为你又要迟到呢…
+@live2d ${mYuki} motion Idle:0
+由希: 等等…你身后那位是？
+
+@live2d ${mHana} expression neutral
+@show live2d:${mHana} RIGHT 1 FADE 700
+@wait 100
+@live2d ${mHana} expression surprise
+花奈: 初次见面，我叫花奈～是今天才转来的插班生。
+@live2d ${mHana} expression happy
+花奈: 以后还请多多关照啦！
+
+@set 花奈好感度 = 1
+@set 由希好感度 = 1
+
+旁白: 天台的风轻轻拂过，夕阳把两人的影子拉得很长。
+@bg #2b1f4e FADE 1200
+@shake 3 400
+
+学姐: 那么——你们想先和谁一起去看傍晚的校园呢？
+
+@choose yuki|和由希逛旧校舍;hana|和花奈去天台花园
+
+# ---------- 由希 线 ----------
+@label yuki
+@set 由希好感度 += 2
+@live2d ${mYuki} expression happy
+@hide live2d:${mHana} FADE 600
+由希: 太好了！那我们走吧，学长♪
+@wait 200
+由希: 旧校舍的走廊里藏着秘密基地哦，我只带你一个人去看。
+旁白: 空气里弥漫着旧木与墨香的味道。
+@if 由希好感度 >= 3 yuki_good
+由希: （小声）其实…我一直想和你两个人单独…
+@jump common
+
+@label yuki_good
+@live2d ${mYuki} expression happy
+由希: 学长，下次…下次还可以再陪我吗？
+@jump common
+
+# ---------- 花奈 线 ----------
+@label hana
+@set 花奈好感度 += 2
+@live2d ${mHana} expression happy
+@hide live2d:${mYuki} FADE 600
+花奈: 嘿嘿～和我一组，你赚到啦！
+@wait 200
+花奈: 其实天台花园里有我偷偷种的花，给你独家参观权。
+旁白: 暮色渐浓，云朵也染上了温柔的颜色。
+@bg #4a2f66 FADE 1200
+@effect flash 450
+@if 花奈好感度 >= 3 hana_good
+花奈: （笑）今天谢谢你陪我哦。
+@jump common
+
+@label hana_good
+@live2d ${mHana} expression happy
+花奈: 呐呐，明天…我们还在这里见面吧？说好了哦！
+@jump common
+
+# ---------- 收束 ----------
+@label common
+@wait 300
+@show live2d:${mYuki} LEFT happy 1 FADE 500
+@show live2d:${mHana} RIGHT happy 1 FADE 500
+旁白: 风还在吹，故事还很长——
+学姐: 这便是，属于我们的、小小的序章。
+@wait 500
+@end
+`;
+
+const sid = Lument.galLoadScript('prologue', prologue);
+log(`剧本 prologue 载入 (id=${sid})，共解析 ${Lument.galParseScript ? 'OK' : 'OK'}`);
+
+// ---------- 4. 回调 ----------
+Lument.galOnEnd = () => {
+  log('剧本播放结束（galOnEnd 回调）', 'ok');
+  document.getElementById('stateRun').textContent = '结束';
+};
+Lument.galOnTitle = () => {
+  log('返回标题（galOnTitle 回调）');
+  document.getElementById('stateRun').textContent = '标题';
+};
+
+// ---------- 5. 输入：点击 / 键盘 ----------
+function canvasPos(evt){
+  const r = canvas.getBoundingClientRect();
+  const sx = (evt.clientX - r.left) * (canvas.width / r.width);
+  const sy = (evt.clientY - r.top)  * (canvas.height / r.height);
+  // 与引擎内部 1280x720 虚拟坐标对齐
+  return {
+    x: sx * (1280 / canvas.width),
+    y: sy * (720  / canvas.height),
+  };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  const p = canvasPos(e);
+  // 1) 选项命中 / 对话推进
+  if (Lument.galHandleClick(p.x, p.y)) { /* handled */ return; }
+  // 2) Live2D 点击交互（当前正在显示的角色）
+  for (const mid of [mHana, mYuki]){
+    const hit = Lument.live2dHitTest(mid, p.x, p.y);
+    if (hit){
+      if (hit === 'Head' || /Face/i.test(hit)){
+        Lument.live2dStartMotion(mid, 'Flick_Head', 0, 3);
+        log(`点击 Live2D #${mid} 脸部 → Flick_Head 动作`);
+      } else {
+        Lument.live2dStartMotion(mid, 'TapBody', 0, 2);
+        Lument.live2dSetExpressionRandom(mid);
+        log(`点击 Live2D #${mid} 身体 → TapBody + 随机表情`);
+      }
+      return;
+    }
+  }
+}, { passive: true });
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space'){ e.preventDefault(); Lument.galAdvance(); }
+  else if (e.key === 'a' || e.key === 'A'){
+    const next = !Lument.galGetPrefAuto();
+    Lument.galSetPrefAuto(next);
+    updateToggleBtns();
+    log('自动模式 → ' + (next ? '开' : '关'));
+  }
+  else if (e.key === 's' || e.key === 'S'){
+    const next = !Lument.galGetPrefSkip();
+    Lument.galSetPrefSkip(next);
+    updateToggleBtns();
+    log('快进模式 → ' + (next ? '开' : '关'));
+  }
+  else if (e.code === 'F5'){
+    e.preventDefault();
+    const ok = Lument.galQuickSave();
+    log(ok ? '快速存档 ✅' : '快速存档 ❌（未在运行中）', ok ? 'ok' : 'err');
+    renderSaveSlots();
+  }
+  else if (e.code === 'F9'){
+    e.preventDefault();
+    const ok = Lument.galQuickLoad();
+    log(ok ? '快速读档 ✅' : '快速读档 ❌（没有快速存档）', ok ? 'ok' : 'err');
+  }
+  else if (e.key >= '1' && e.key <= '9'){
+    const i = (+e.key) - 1;
+    if (Lument.galGetChoiceCount() > i){
+      Lument.galSelectChoice(i);
+      log(`选择选项 ${e.key}: ${Lument.galGetChoiceText(i)}`);
+    }
+  }
+});
+
+// ---------- 6. UI 绑定 ----------
+document.getElementById('btnStart').onclick = () => {
+  Lument.galStart('prologue');
+  document.getElementById('stateRun').textContent = '运行中';
+  log('开始播放 prologue', 'ok');
+};
+document.getElementById('btnTitle').onclick = () => {
+  Lument.galStop();
+  Lument.galShowDialog(false);
+  document.getElementById('stateRun').textContent = '标题';
+  log('返回标题画面');
+};
+
+const rngTs = document.getElementById('rngTs'), lblTs = document.getElementById('lblTs');
+rngTs.addEventListener('input', () => {
+  const v = +rngTs.value; lblTs.textContent = v;
+  Lument.galSetPrefTextSpeed(v);
+});
+const rngBgm = document.getElementById('rngBgm'), lblBgm = document.getElementById('lblBgm');
+rngBgm.addEventListener('input', () => { const v = +rngBgm.value; lblBgm.textContent = v.toFixed(2); Lument.galSetPrefVolume(1, v); });
+const rngSe  = document.getElementById('rngSe'),  lblSe  = document.getElementById('lblSe');
+rngSe.addEventListener('input',  () => { const v = +rngSe.value;  lblSe.textContent  = v.toFixed(2); Lument.galSetPrefVolume(0, v); });
+const rngVo  = document.getElementById('rngVo'),  lblVo  = document.getElementById('lblVo');
+rngVo.addEventListener('input',  () => { const v = +rngVo.value;  lblVo.textContent  = v.toFixed(2); Lument.galSetPrefVolume(2, v); });
+
+const btnAuto = document.getElementById('btnAuto');
+const btnSkip = document.getElementById('btnSkip');
+function updateToggleBtns(){
+  btnAuto.textContent = 'A / 自动 ' + (Lument.galGetPrefAuto() ? '开' : '关');
+  btnSkip.textContent = 'S / 快进 ' + (Lument.galGetPrefSkip() ? '开' : '关');
+}
+btnAuto.onclick = () => { Lument.galSetPrefAuto(!Lument.galGetPrefAuto()); updateToggleBtns(); };
+btnSkip.onclick = () => { Lument.galSetPrefSkip(!Lument.galGetPrefSkip()); updateToggleBtns(); };
+updateToggleBtns();
+
+// Live2D 表情 & 动作
+document.querySelectorAll('[data-expr]').forEach(b => {
+  b.onclick = () => {
+    const name = b.getAttribute('data-expr');
+    Lument.live2dSetExpression(mHana, name);
+    Lument.live2dSetExpression(mYuki, name);
+    log(`设置 Live2D 表情 → ${name}`);
+  };
+});
+document.getElementById('btnExprRand').onclick = () => {
+  Lument.live2dSetExpressionRandom(mHana);
+  Lument.live2dSetExpressionRandom(mYuki);
+  log('随机表情 🎲');
+};
+let eyeTrack = true;
+document.getElementById('btnEyeTrk').onclick = (e) => {
+  eyeTrack = !eyeTrack;
+  for (const m of [mHana, mYuki]){
+    Lument.live2dEnableAutoEye(m, eyeTrack);
+    Lument.live2dEnableAutoHead(m, eyeTrack);
+  }
+  e.currentTarget.textContent = '自动追踪 ' + (eyeTrack ? '开' : '关');
+  log('Live2D 眼/头自动追踪 → ' + (eyeTrack ? '开' : '关'));
+};
+document.querySelectorAll('[data-m]').forEach(b => {
+  b.onclick = () => {
+    const g = b.getAttribute('data-m');
+    Lument.live2dStartMotion(mHana, g, 0, 2);
+    Lument.live2dStartMotion(mYuki, g, 0, 2);
+    log(`播放 Live2D 动作 → ${g}`);
+  };
+});
+
+// 存档槽渲染
+function renderSaveSlots(){
+  const grid = document.getElementById('saveGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < 3; i++){
+    const info = Lument.galGetSaveInfo(i);
+    const d = document.createElement('div');
+    d.className = 'saveSlot' + (info.used ? ' used-true' : '');
+    d.innerHTML = `
+      <div class="n">槽位 ${i}${info.used ? ' · ' + (info.timestamp||'').slice(0,16).replace('T',' ') : ' · 空'}</div>
+      <div class="t">${info.used ? (info.title || '—') : '空存档'}</div>
+      <div class="s">${info.used ? (info.summary || '') : '点击【存】写入当前进度'}</div>
+      <div class="saveRow">
+        <button class="btn" data-s="${i}" data-a="s">存</button>
+        <button class="btn" data-s="${i}" data-a="l">读</button>
+        <button class="btn ghost" data-s="${i}" data-a="d">删</button>
+      </div>
+    `;
+    grid.appendChild(d);
+  }
+  grid.querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      const s = +b.getAttribute('data-s');
+      const a = b.getAttribute('data-a');
+      if (a === 's'){ const ok = Lument.galSave(s, '存档 ' + s); log(ok ? `槽位 ${s} 存档 ✅` : `槽位 ${s} 存档 ❌`, ok ? 'ok':'err'); }
+      else if (a === 'l'){ const ok = Lument.galLoad(s); log(ok ? `槽位 ${s} 读档 ✅` : `槽位 ${s} 读档 ❌`, ok ? 'ok':'err'); }
+      else { Lument.galDeleteSave(s); log(`槽位 ${s} 已删除`); }
+      renderSaveSlots();
+    };
+  });
+}
+renderSaveSlots();
+document.getElementById('btnQSave').onclick = () => { const ok = Lument.galQuickSave(); log(ok?'快速存档 ✅':'快速存档 ❌', ok?'ok':'err'); renderSaveSlots(); };
+document.getElementById('btnQLoad').onclick = () => { const ok = Lument.galQuickLoad(); log(ok?'快速读档 ✅':'快速读档 ❌', ok?'ok':'err'); };
+
+// ---------- 7. 主循环 ----------
+let lastTs = performance.now();
+function loop(ts){
+  const dt = Math.min(100, ts - lastTs); lastTs = ts;
+
+  Lument.beginFrame();
+  Lument.galUpdate(dt);
+  Lument.galRender();
+  Lument.endFrame();
+
+  // 将引擎 canvas 输出到页面 canvas（维持 1280x720 → 按比例 cover）
+  demoCtx.save();
+  demoCtx.fillStyle = '#000';
+  demoCtx.fillRect(0, 0, canvas.width, canvas.height);
+  const cw = canvas.width, ch = canvas.height;
+  const ew = engineCanvas.width, eh = engineCanvas.height;
+  const sc = Math.min(cw / ew, ch / eh);
+  const dw = ew * sc, dh = eh * sc;
+  const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
+  demoCtx.imageSmoothingEnabled = true;
+  demoCtx.imageSmoothingQuality = 'high';
+  demoCtx.drawImage(engineCanvas, dx, dy, dw, dh);
+  demoCtx.restore();
+
+  // HUD 状态
+  const line = (Lument.galIsRunning())
+    ? `prologue · ${Math.max(0, (Lument.galGetHistoryCount()))} 条台词`
+    : '—';
+  document.getElementById('stateLine').textContent = line;
+  document.getElementById('stateRun').textContent =
+    Lument.galIsRunning() ? '运行中' : (document.getElementById('stateRun').textContent || '待机');
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame((ts) => { lastTs = ts; loop(ts); });
+
+log('主循环已启动，可以点击画布或按【开始新游戏】体验');
+</script>
+</body>
+</html>
