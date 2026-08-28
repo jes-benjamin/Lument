@@ -1,6 +1,6 @@
 {
   "name": "lument-engine",
-  "version": "1.3.0-lumentgal.1",
+  "version": "1.3.0-lumentgal.2",
   "description": "轻量级跨平台 2D 游戏引擎（LumentGAL 分支：视觉小说/GAL 子系统 + Live2D 接入，含剧本 DSL、对话框、分支选择、存档读档、Live2D 动作/表情/参数控制与占位渲染）",
   "main": "runtime/js/lument.js",
   "types": "runtime/js/lument.d.ts",

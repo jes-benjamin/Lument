@@ -212,7 +212,25 @@ const Lument = (function() {
     let nextAudioInstanceId = 1;
     let audioListener = { x: 0, y: 0, dirX: 0, dirY: 1 };
     let masterVolume = 1.0;
-    let groupVolumes = [1.0, 1.0, 1.0]; // SFX, Music, Voice
+    let groupVolumes = [1.0, 1.0, 1.0]; // SFX(0), Music(1), Voice(2)
+    // LumentGAL: 单实例 BGM 管理（确保同时只存在 1 个 BGM，支持循环 + 平滑交叉淡入淡出）
+    let galAudio = {
+        bgm: { instId: 0, srcId: 0, fading: false, crossMs: 0, crossElapsed: 0, nextSrcId: 0, nextLoop: true, nextVol: 0.7, stopPending: false },
+        se:  { queue: [], maxSimul: 16 },
+        voice: { instId: 0 },
+        listeners: { onBgmEnd: null, onVoiceEnd: null },
+        // 可选 WebAudio 合成音源（无外部文件时用于 demo / 占位）
+        synths: new Map(), // name -> {node, gain, playing}
+    };
+    function galResumeAudioCtx(){
+        // iOS/Chrome 自动播放策略：首次用户手势后 AudioContext 必须 resume()
+        try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch(e){}
+    }
+    if (typeof window !== 'undefined' && window.addEventListener){
+        const once = () => { galResumeAudioCtx(); try { window.removeEventListener('pointerdown', once); window.removeEventListener('keydown', once); } catch(e){} };
+        window.addEventListener('pointerdown', once, { passive: true });
+        window.addEventListener('keydown', once, { passive: true });
+    }
 
     // ========== 网络模块状态 ==========
     let nextRequestId = 1;
@@ -244,27 +262,44 @@ const Lument = (function() {
         if (initialized) return 0;
         if (cfg) Object.assign(config, cfg);
 
-        canvas = document.getElementById('game-canvas');
-        if (!canvas) {
-            canvas = document.createElement('canvas');
-            canvas.id = 'game-canvas';
-            document.body.appendChild(canvas);
+        // ---------- Node / 无 DOM 环境兼容（no-op stub，不抛异常）----------
+        if (typeof document === 'undefined' || typeof window === 'undefined') {
+            running = true;
+            initialized = true;
+            lastFrameTime = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+            canvas = null; ctx = null; mainCanvas = null; mainCtx = null;
+            effectCanvas = null; effectCtx = null;
+            audioCtx = null;
+            config.platform = PLATFORM.WEB;
+            return 0;
         }
-        canvas.width = config.width;
-        canvas.height = config.height;
-        ctx = canvas.getContext('2d', { alpha: false });
-        ctx.imageSmoothingEnabled = false;
+        try {
+            canvas = document.getElementById('game-canvas');
+            if (!canvas) {
+                canvas = document.createElement('canvas');
+                canvas.id = 'game-canvas';
+                try { document.body && document.body.appendChild(canvas); } catch(_e){}
+            }
+            canvas.width = config.width;
+            canvas.height = config.height;
+            ctx = canvas.getContext('2d', { alpha: false });
+            if (ctx) ctx.imageSmoothingEnabled = false;
+        } catch(e) {
+            canvas = null; ctx = null;
+        }
 
         // 保存主画布引用（供渲染目标切换使用）
         mainCanvas = canvas;
         mainCtx = ctx;
 
         // 检测平台
-        const ua = navigator.userAgent;
-        if (/Android/i.test(ua)) config.platform = PLATFORM.ANDROID;
-        else if (/iPhone|iPad|iPod/i.test(ua)) config.platform = PLATFORM.IOS;
-        else if (/Electron/i.test(ua)) config.platform = PLATFORM.DESKTOP;
-        else config.platform = PLATFORM.WEB;
+        try {
+            const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+            if (/Android/i.test(ua)) config.platform = PLATFORM.ANDROID;
+            else if (/iPhone|iPad|iPod/i.test(ua)) config.platform = PLATFORM.IOS;
+            else if (/Electron/i.test(ua)) config.platform = PLATFORM.DESKTOP;
+            else config.platform = PLATFORM.WEB;
+        } catch(e) { config.platform = PLATFORM.WEB; }
 
         // 初始化音频上下文
         try {
@@ -275,7 +310,7 @@ const Lument = (function() {
 
         running = true;
         initialized = true;
-        lastFrameTime = performance.now();
+        lastFrameTime = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         return 0;
     }
 
@@ -1323,31 +1358,40 @@ const Lument = (function() {
 
     function loadSound(path) { return loadAudio(path, false); }
     function loadMusic(path) { return loadAudio(path, true); }
-    function getSupportedFormats() { return 'WAV,MP3,OGG'; }
+    function getSupportedFormats() { return 'WAV,MP3,OGG,AAC,FLAC'; }
 
     function playSound(id, volume, pitch, loop) {
         const src = audioSources.get(id);
         if (!src) return 0;
-        const instId = nextAudioInstanceId++;
+        if (!audioCtx) return 0;
+        galResumeAudioCtx();
+        // 优先使用 WebAudio buffer
+        let instId = playBufferSource(id, volume, pitch, loop, src.isMusic ? 1 : 0);
+        if (instId > 0) return instId;
+        // fallback: HTML5 Audio
         const groupId = src.isMusic ? 1 : 0;
+        instId = nextAudioInstanceId++;
         audioInstances.set(instId, {
             sourceId: id, groupId: groupId,
             volume: volume, pitch: pitch || 1.0, pan: 0,
             playing: true, paused: false, loop: loop || false,
             position: 0, duration: src.duration || 0,
-            fadeAmount: 1.0, fadeTarget: 1.0, fadeStart: 1.0, fadeDuration: 0, fadeElapsed: 0, fading: false,
+            fadeAmount: 1.0, fadeTarget: 1.0, fadeStart: 1.0, fadeDuration: 0, fadeElapsed: 0, fading: false, fadeOut: false,
             is3D: false, sourceX: 0, sourceY: 0, maxDist: 0,
             htmlAudio: null,
         });
-        // 尝试使用HTML5 Audio播放
-        if (src.url) {
-            const audio = new Audio(src.url);
-            audio.volume = volume * masterVolume * groupVolumes[groupId];
-            audio.loop = loop || false;
-            audio.playbackRate = pitch || 1.0;
-            audio.play().catch(function(){});
-            const inst = audioInstances.get(instId);
-            inst.htmlAudio = audio;
+        if (src.path && src.path.indexOf('data:') !== 0 && src.path.indexOf('blob:') !== 0) {
+            try {
+                const audio = new Audio(src.path);
+                audio.preload = 'auto';
+                audio.volume = Math.max(0, Math.min(1, (volume == null ? 1 : volume))) * masterVolume * groupVolumes[groupId];
+                audio.loop = loop || false;
+                audio.playbackRate = pitch || 1.0;
+                const p = audio.play();
+                if (p && typeof p.catch === 'function') p.catch(function(){});
+                const inst = audioInstances.get(instId);
+                inst.htmlAudio = audio;
+            } catch(e){}
         }
         return instId;
     }
@@ -1432,30 +1476,112 @@ const Lument = (function() {
     }
 
     function updateAudioInstances(dt) {
+        const dtSec = Math.min(0.05, dt || 0.016);
         for (const [id, inst] of audioInstances) {
             if (inst.paused) continue;
             // 更新播放位置
-            inst.position += dt * inst.pitch;
-            if (!inst.loop && inst.position >= inst.duration && inst.duration > 0) {
+            inst.position += dtSec * (inst.pitch || 1);
+            if (!inst.loop && isFinite(inst.duration) && inst.duration > 0 && inst.position >= inst.duration) {
                 stopSound(id); continue;
             }
             // 淡入淡出
             if (inst.fading) {
-                inst.fadeElapsed += dt;
-                const t = Math.min(1, inst.fadeElapsed / inst.fadeDuration);
+                inst.fadeElapsed += dtSec;
+                const dur = Math.max(0.001, inst.fadeDuration || 0);
+                const t = Math.min(1, inst.fadeElapsed / dur);
                 inst.fadeAmount = inst.fadeStart + (inst.fadeTarget - inst.fadeStart) * t;
-                if (t >= 1) { inst.fading = false; if (inst.fadeOut) { stopSound(id); continue; } }
+                if (t >= 1) {
+                    inst.fading = false;
+                    if (inst.fadeOut) { stopSound(id); continue; }
+                }
             }
             // 3D距离衰减
             let spatialGain = 1.0;
             if (inst.is3D) {
                 const dx = inst.sourceX - audioListener.x, dy = inst.sourceY - audioListener.y;
                 const dist = Math.sqrt(dx*dx + dy*dy);
-                spatialGain = Math.max(0, 1 - dist / inst.maxDist);
+                spatialGain = Math.max(0, 1 - dist / Math.max(1, inst.maxDist));
             }
-            // 应用音量
-            const vol = inst.volume * inst.fadeAmount * spatialGain * masterVolume * groupVolumes[inst.groupId];
-            if (inst.htmlAudio) inst.htmlAudio.volume = Math.max(0, Math.min(1, vol));
+            // 应用音量（同时写入 WebAudio gain 与 HTMLAudio volume）
+            const vol = Math.max(0, Math.min(1, (inst.volume == null ? 1 : inst.volume) * (inst.fadeAmount == null ? 1 : inst.fadeAmount) * spatialGain * masterVolume * groupVolumes[inst.groupId|0]));
+            if (inst._gain) { try { inst._gain.gain.value = vol; } catch(e){} }
+            if (inst.htmlAudio) { try { inst.htmlAudio.volume = vol; } catch(e){} }
+        }
+
+        // GAL BGM 交叉淡入淡出 / 停止调度
+        const bgm = galAudio.bgm;
+        if (bgm.fading){
+            bgm.crossElapsed += dtSec * 1000;
+            const t = Math.min(1, bgm.crossElapsed / Math.max(1, bgm.crossMs));
+            const eased = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+            // 旧的淡出
+            const oldInst = audioInstances.get(bgm.instId);
+            if (oldInst) {
+                const fadeAmt = 1 - eased;
+                if (oldInst._gain) try { oldInst._gain.gain.value = Math.max(0, Math.min(1, (oldInst.volume||1) * fadeAmt * masterVolume * groupVolumes[oldInst.groupId|0])); } catch(e){}
+                if (oldInst.htmlAudio) try { oldInst.htmlAudio.volume = Math.max(0, Math.min(1, (oldInst.volume||1) * fadeAmt * masterVolume * groupVolumes[oldInst.groupId|0])); } catch(e){}
+                if (t >= 1) { stopSound(bgm.instId); bgm.instId = 0; bgm.srcId = 0; }
+            }
+            // 新的淡入
+            if (bgm.nextSrcId && t <= 1){
+                if (!audioInstances.has(bgm._nextInstId || 0)){
+                    const playNew = () => {
+                        const nextVol = (bgm.nextVol == null ? 0.7 : bgm.nextVol);
+                        const id = playBufferSource(bgm.nextSrcId, nextVol, 1, !!bgm.nextLoop, 1);
+                        if (id) {
+                            bgm._nextInstId = id;
+                            const ni = audioInstances.get(id);
+                            if (ni){
+                                // 初始为 0 音量，在 update 里淡入
+                                if (ni._gain) try { ni._gain.gain.value = 0.0001; } catch(e){}
+                                if (ni.htmlAudio) try { ni.htmlAudio.volume = 0.0001; } catch(e){}
+                            }
+                        }
+                    };
+                    // 若 nextSrcId 资源尚未 ready，则异步等待并播放
+                    const s = audioSources.get(bgm.nextSrcId);
+                    if (s && s.loaded) playNew();
+                    else audioOnReady(bgm.nextSrcId, playNew, playNew);
+                }
+                const ni = audioInstances.get(bgm._nextInstId || 0);
+                if (ni){
+                    const nextVol = (bgm.nextVol == null ? 0.7 : bgm.nextVol);
+                    const fadeAmt = eased;
+                    const v = Math.max(0, Math.min(1, nextVol * fadeAmt * masterVolume * groupVolumes[1]));
+                    if (ni._gain) try { ni._gain.gain.value = v; } catch(e){}
+                    if (ni.htmlAudio) try { ni.htmlAudio.volume = v; } catch(e){}
+                    if (t >= 1){
+                        bgm.instId = bgm._nextInstId || 0;
+                        bgm.srcId  = bgm.nextSrcId;
+                        bgm._nextInstId = 0;
+                        bgm.nextSrcId = 0;
+                    }
+                }
+            } else if (bgm.stopPending){
+                // 仅淡出：无 nextSrcId
+                if (t >= 1) bgm.stopPending = false;
+            }
+            if (t >= 1){ bgm.fading = false; bgm.crossElapsed = 0; bgm.crossMs = 0; }
+        }
+
+        // SE 队列：最多同时播放 maxSimul 条，超出节流（丢弃最旧未实际播放的）
+        const se = galAudio.se;
+        if (se.queue.length){
+            const playing = new Set();
+            for (const [, inst] of audioInstances) if (inst.groupId === 0) playing.add(inst._srcQueuedId);
+            const remain = [];
+            for (let i = 0; i < se.queue.length; i++){
+                const item = se.queue[i];
+                if (playing.size >= se.maxSimul) { remain.push(item); continue; }
+                const instId = playSound(item.srcId, item.vol, 1, false);
+                if (instId) {
+                    const inst = audioInstances.get(instId);
+                    if (inst) inst._srcQueuedId = item.srcId + '_' + i + '_' + (Math.random()|0);
+                    playing.add(item);
+                }
+            }
+            se.queue.length = 0;
+            for (const r of remain) se.queue.push(r);
         }
     }
 
@@ -1852,72 +1978,212 @@ const Lument = (function() {
     function loadAudio(path, isMusic) {
         if (!audioCtx) return 0;
         const id = nextAudioId++;
-        audioSources.set(id, {
+        const srcObj = {
             path: path,
-            isMusic: isMusic,
+            isMusic: !!isMusic,
             buffer: null,
             source: null,
             gain: null,
             volume: 1.0,
             loaded: false,
-        });
+            error: false,
+            loading: true,
+            duration: 0,
+            onReady: null,
+            onError: null,
+        };
+        audioSources.set(id, srcObj);
 
-        // 异步加载
-        fetch(path)
-            .then(r => r.arrayBuffer())
-            .then(data => audioCtx.decodeAudioData(data))
-            .then(buffer => {
-                const a = audioSources.get(id);
-                if (a) { a.buffer = buffer; a.loaded = true; }
-            })
-            .catch(() => {});
+        const finalizeNoop = () => {
+            srcObj.loading = false;
+            srcObj.loaded  = true;  // 即使失败，也作为空资源标记为 ready，避免上层一直等待
+            srcObj.duration = 0;
+            srcObj.error = true;
+            if (srcObj.onError) try { srcObj.onError(); } catch(e){}
+        };
 
+        if (!path || typeof path !== 'string' || !path.length) {
+            finalizeNoop();
+            return id;
+        }
+        // 合成音源前缀："synth://pad-C-120"  （未来可扩展）
+        if (path.indexOf('synth://') === 0){
+            srcObj.loading = false; srcObj.loaded = true; srcObj.duration = Infinity;
+            return id;
+        }
+
+        const tryDecode = (arrayBuf) => {
+            try {
+                if (typeof audioCtx.decodeAudioData.length === 'function' /* not used */) {}
+                // 现代异步：返回 Promise；旧版回调风格
+                const done = (buf) => {
+                    if (!buf) { finalizeNoop(); return; }
+                    srcObj.buffer = buf;
+                    srcObj.duration = buf.duration || 0;
+                    srcObj.loaded = true;
+                    srcObj.loading = false;
+                    if (srcObj.onReady) try { srcObj.onReady(); } catch(e){}
+                };
+                const fail = () => finalizeNoop();
+                let p;
+                try { p = audioCtx.decodeAudioData(arrayBuf.slice(0), done, fail); }
+                catch (e2) { finalizeNoop(); return; }
+                if (p && typeof p.then === 'function') p.then(done, fail);
+            } catch (e) { finalizeNoop(); }
+        };
+
+        const finalizeDataUri = (dataUri) => {
+            try {
+                const comma = dataUri.indexOf(',');
+                const base64 = comma >= 0 ? dataUri.slice(comma + 1) : dataUri;
+                const bin = atob(base64);
+                const u8 = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+                tryDecode(u8.buffer);
+            } catch(e){ finalizeNoop(); }
+        };
+
+        // data: URIs
+        if (path.indexOf('data:') === 0){ finalizeDataUri(path); return id; }
+
+        // Blob/ObjectURL
+        if (path.indexOf('blob:') === 0){
+            try {
+                fetch(path).then(r => r.arrayBuffer()).then(tryDecode).catch(finalizeNoop);
+            } catch(e){ finalizeNoop(); }
+            return id;
+        }
+
+        // 网络路径
+        if (typeof fetch !== 'undefined'){
+            fetch(path, { method: 'GET', credentials: 'same-origin' })
+                .then(r => {
+                    if (!r || !r.ok) { finalizeNoop(); return null; }
+                    return r.arrayBuffer();
+                })
+                .then(buf => { if (buf) tryDecode(buf); })
+                .catch(finalizeNoop);
+        } else {
+            finalizeNoop();
+        }
         return id;
     }
 
-    function playAudio(id, loop) {
-        if (!audioCtx) return;
-        const a = audioSources.get(id);
-        if (!a || !a.loaded) return;
-
-        if (a.source) {
-            try { a.source.stop(); } catch (e) {}
-        }
-
-        a.source = audioCtx.createBufferSource();
-        a.source.buffer = a.buffer;
-        a.source.loop = loop || false;
-
-        a.gain = audioCtx.createGain();
-        a.gain.gain.value = a.volume;
-
-        a.source.connect(a.gain);
-        a.gain.connect(audioCtx.destination);
-        a.source.start();
+    function audioOnReady(id, cb, cbErr){
+        const s = audioSources.get(id);
+        if (!s) return;
+        if (s.loaded) { (s.error && cbErr ? cbErr : cb) && (s.error && cbErr ? cbErr() : cb()); return; }
+        const prevA = s.onReady, prevB = s.onError;
+        s.onReady = prevA ? (() => { prevA(); cb && cb(); }) : cb;
+        s.onError = prevB ? (() => { prevB(); cbErr && cbErr(); }) : cbErr;
     }
 
-    function stopAudio(id) {
-        const a = audioSources.get(id);
-        if (a && a.source) {
-            try { a.source.stop(); } catch (e) {}
-            a.source = null;
-        }
+    // WebAudio 直接播放（避免额外的 HTMLAudio 标签开销；推荐用于 BGM/SE）
+    function playBufferSource(id, volume, pitch, loop, groupId){
+        const src = audioSources.get(id);
+        if (!src) return 0;
+        if (!src.loaded || !audioCtx) return 0;
+        // 合成音源：不做 buffer source 播放，由 galAudio 合成器负责
+        if (src.path && src.path.indexOf('synth://') === 0) return 0;
+        if (!src.buffer) return 0;
+
+        const instId = nextAudioInstanceId++;
+        try {
+            const buffer = src.buffer;
+            const bs = audioCtx.createBufferSource();
+            bs.buffer = buffer;
+            bs.loop = !!loop;
+            if (pitch && pitch !== 1) { bs.playbackRate.value = pitch; }
+            const gain = audioCtx.createGain();
+            const finalGroup = groupId != null ? groupId : (src.isMusic ? 1 : 0);
+            const g = Math.max(0, Math.min(1, (+volume == null ? 1 : +volume))) * masterVolume * groupVolumes[finalGroup];
+            gain.gain.value = g;
+            bs.connect(gain).connect(audioCtx.destination);
+            try { bs.start(0); } catch(e){ return 0; }
+            const duration = buffer.duration || 0;
+            audioInstances.set(instId, {
+                sourceId: id, groupId: finalGroup,
+                volume: +volume == null ? 1 : +volume,
+                pitch: pitch || 1, pan: 0,
+                playing: true, paused: false, loop: !!loop,
+                position: 0, duration: duration,
+                fadeAmount: 1, fadeStart: 1, fadeTarget: 1, fadeDuration: 0, fadeElapsed: 0, fading: false, fadeOut: false,
+                is3D: false, sourceX: 0, sourceY: 0, maxDist: 0,
+                htmlAudio: null,
+                _bs: bs, _gain: gain, _startAt: audioCtx.currentTime,
+            });
+            // 播放结束（非 loop）自动回收
+            if (!loop && isFinite(duration) && duration > 0){
+                const cleanupAfter = Math.max(0.01, duration / Math.max(0.0001, Math.abs(pitch||1)));
+                bs.onended = () => {
+                    // 双保险：实例仍在且 playing 则回收
+                    const inst = audioInstances.get(instId);
+                    if (inst) { inst.playing = false; audioInstances.delete(instId); }
+                };
+                // 兜底定时器（避免部分浏览器 onended 不触发）
+                setTimeout(() => {
+                    if (audioInstances.has(instId)){
+                        const inst = audioInstances.get(instId);
+                        if (inst && inst.playing && !inst.loop && audioCtx.currentTime - inst._startAt >= cleanupAfter + 0.1){
+                            inst.playing = false;
+                            try { inst._bs && inst._bs.stop && inst._bs.stop(); } catch(e){}
+                            audioInstances.delete(instId);
+                        }
+                    }
+                }, (cleanupAfter + 0.2) * 1000);
+            }
+            return instId;
+        } catch(e){ return 0; }
+    }
+
+    function playAudio(id, loop) {
+        if (!audioCtx) return 0;
+        return playBufferSource(id, 1, 1, loop, audioSources.get(id) && audioSources.get(id).isMusic ? 1 : 0) || 0;
+    }
+
+    function stopAudio(instId) {
+        const inst = audioInstances.get(instId);
+        if (!inst) return;
+        try { if (inst._bs && inst._bs.stop) inst._bs.stop(); } catch(e){}
+        if (inst.htmlAudio) { try { inst.htmlAudio.pause(); } catch(e){} inst.htmlAudio = null; }
+        inst.playing = false;
+        audioInstances.delete(instId);
     }
 
     function setVolume(id, volume) {
+        // 二义性：id 可能是 sourceId 也可能是 instanceId
+        // 先当做 instId 处理
+        const inst = audioInstances.get(id);
+        if (inst){
+            inst.volume = +volume || 0;
+            if (inst._gain){ try { inst._gain.gain.value = Math.max(0, Math.min(1, inst.volume)) * masterVolume * groupVolumes[inst.groupId]; } catch(e){} }
+            if (inst.htmlAudio){ try { inst.htmlAudio.volume = Math.max(0, Math.min(1, inst.volume)) * masterVolume * groupVolumes[inst.groupId]; } catch(e){} }
+            return;
+        }
         const a = audioSources.get(id);
-        if (a) {
-            a.volume = volume;
-            if (a.gain) a.gain.gain.value = volume;
+        if (a){
+            a.volume = +volume || 0;
+            if (a.gain) try { a.gain.gain.value = a.volume; } catch(e){}
         }
     }
 
     function stopAllAudio() {
-        for (const [id, a] of audioSources) {
-            if (a.source) {
-                try { a.source.stop(); } catch (e) {}
-                a.source = null;
+        for (const [id, inst] of audioInstances) {
+            try { if (inst._bs && inst._bs.stop) inst._bs.stop(); } catch(e){}
+            try { if (inst.htmlAudio) inst.htmlAudio.pause(); } catch(e){}
+        }
+        audioInstances.clear();
+        // 旧版 audioSources.source 清理（兼容）
+        for (const [, a] of audioSources) {
+            if (a.source) try { a.source.stop(); } catch(e){}
+            a.source = null;
+        }
+        // 停止所有合成音源
+        if (galAudio.synths.size){
+            for (const [, s] of galAudio.synths){
+                try { if (s.node && s.node.stop) s.node.stop(); } catch(e){}
             }
+            galAudio.synths.clear();
         }
     }
 
@@ -3097,7 +3363,7 @@ const Lument = (function() {
         SAY:1, NARRATE:2, SHOW:3, HIDE:4, BG:5, CG:6, CG_CLEAR:7,
         BGM:8, BGM_STOP:9, SE:10, VOICE:11, CHOOSE:12, LABEL:13, JUMP:14,
         IF:15, SET:16, WAIT:17, SHAKE:18, EFFECT:19, CALL:20, RETURN:21,
-        LIVE2D:22, END:23, TITLE:24
+        LIVE2D:22, END:23, TITLE:24, SAVE:25, LOAD:26, AUTOSPEED:27
     };
     const GAL_SLOT = { LEFT:0, CENTER:1, RIGHT:2, CUSTOM:3 };
     const GAL_TWEEN = { NONE:0, FADE:1, SLIDE_L:2, SLIDE_R:3, SLIDE_U:4, SLIDE_D:5, ZOOM:6, DISSOLVE:7, CUT:8 };
@@ -3112,6 +3378,7 @@ const Lument = (function() {
         stack: [],              // call 栈
         vars: Object.create(null),
         skip: false,
+        skipReadOnly: false,    // true = skip 只跳过已读
         auto: false,
         autoDelayMs: 2500,
         waitingClick: false,
@@ -3132,11 +3399,16 @@ const Lument = (function() {
             textSpeed: 5,   // 1..10 -> ms = 110 - speed*10
             auto: false,
             skip: false,
+            skipReadOnly: false,
             volSE: 1.0, volBGM: 1.0, volVoice: 1.0
         },
         style: null,
+        listeners: { onVarChange: null, onRead: null },
         onEnd: null,
         onTitle: null,
+        onVarChange: null,
+        onRead: null,
+        readSet: Object.create(null),   // 已读签名：scriptName_lineNo_textSig -> true
         shake: { intensity:0, t:0, dur:500, ox:0, oy:0 },
         fade: { r:0,g:0,b:0,a:0, t:0, dur:500, fromA:0, toA:0 }
     };
@@ -3164,7 +3436,11 @@ const Lument = (function() {
     function galLoadPref(){
         try {
             const s = localStorage.getItem(gal.prefKey);
-            if (s) Object.assign(gal.pref, JSON.parse(s));
+            if (s){
+                const p = JSON.parse(s);
+                Object.assign(gal.pref, p);
+                if (typeof gal.pref.skipReadOnly === 'boolean') gal.skipReadOnly = gal.pref.skipReadOnly;
+            }
         } catch(e){}
     }
 
@@ -3308,6 +3584,45 @@ const Lument = (function() {
                     }
                     case 'end': cmd = { type: GAL_CMD.END }; break;
                     case 'title': cmd = { type: GAL_CMD.TITLE }; break;
+                    // —— 别名（与文档速查表一致）——
+                    case 'showcg': {
+                        const img = parts[1] || '';
+                        const twStr = parts[2] || 'FADE';
+                        const dur = parts[3] ? parseInt(parts[3]) : 800;
+                        cmd = { type: GAL_CMD.CG, image: img, tween: tweenByName(twStr), duration: dur };
+                        break;
+                    }
+                    case 'hidecg': {
+                        const twStr = parts[1] || 'FADE';
+                        const dur = parts[2] ? parseInt(parts[2]) : 500;
+                        cmd = { type: GAL_CMD.CG_CLEAR, tween: tweenByName(twStr), duration: dur };
+                        break;
+                    }
+                    case 'ret': cmd = { type: GAL_CMD.RETURN }; break;
+                    case 'autospeed': {
+                        const ms = Math.max(100, parseInt(parts[1]) || 2500);
+                        cmd = { type: GAL_CMD.AUTOSPEED, ms };
+                        break;
+                    }
+                    case 'save': {
+                        let slot = 99;
+                        if (parts[1] !== undefined){
+                            const n = parseInt(parts[1]);
+                            if (!isNaN(n)) slot = n|0;
+                        }
+                        const title = (slot === parseInt(parts[1])) ? parts.slice(2).join(' ') : parts.slice(1).join(' ');
+                        cmd = { type: GAL_CMD.SAVE, slot, title: title || 'Auto Save' };
+                        break;
+                    }
+                    case 'load': {
+                        let slot = 99;
+                        if (parts[1] !== undefined){
+                            const n = parseInt(parts[1]);
+                            if (!isNaN(n)) slot = n|0;
+                        }
+                        cmd = { type: GAL_CMD.LOAD, slot };
+                        break;
+                    }
                     default: break;
                 }
             } else {
@@ -3393,10 +3708,17 @@ const Lument = (function() {
         return false;
     }
 
-    function galSetVar(k, v){ gal.vars[k] = v; }
-    function galSetVarInt(k, v){ gal.vars[k] = Number(v)|0; }
-    function galSetVarFloat(k, v){ gal.vars[k] = Number(v); }
-    function galSetVarBool(k, v){ gal.vars[k] = !!v; }
+    function galSetVar(k, v){ const old = gal.vars[k]; gal.vars[k] = v; fireVarChange(k, old, v); }
+    function galSetVarInt(k, v){ const old = gal.vars[k]; gal.vars[k] = Number(v)|0; fireVarChange(k, old, gal.vars[k]); }
+    function galSetVarFloat(k, v){ const old = gal.vars[k]; gal.vars[k] = Number(v); fireVarChange(k, old, gal.vars[k]); }
+    function galSetVarBool(k, v){ const old = gal.vars[k]; gal.vars[k] = !!v; fireVarChange(k, old, gal.vars[k]); }
+    function fireVarChange(k, oldVal, newVal){
+        if (oldVal === newVal) return;
+        try {
+            if (gal.listeners && gal.listeners.onVarChange) gal.listeners.onVarChange(k, oldVal, newVal);
+            if (gal.onVarChange && gal.onVarChange !== gal.listeners.onVarChange) gal.onVarChange(k, oldVal, newVal);
+        } catch(_e){}
+    }
     function galGetVar(k, def){ return (k in gal.vars) ? gal.vars[k] : def; }
     function galGetVarInt(k, def){ const v = galGetVar(k, def); return v === undefined ? def : Number(v)|0; }
     function galGetVarFloat(k, def){ const v = galGetVar(k, def); return v === undefined ? def : Number(v); }
@@ -3410,6 +3732,7 @@ const Lument = (function() {
         if (gal.pref.textSpeed) gal.style.typewriterSpeed = gal.pref.textSpeed;
         if (gal.pref.auto) gal.auto = true;
         if (gal.pref.skip) gal.skip = true;
+        if (typeof gal.pref.skipReadOnly === 'boolean') gal.skipReadOnly = gal.pref.skipReadOnly;
     }
     function galShutdown(){
         gal.inited = false; gal.running = false;
@@ -3419,6 +3742,22 @@ const Lument = (function() {
         gal.cg = null;
         if (gal.audio.bgm){ try { stopAudio(gal.audio.bgm); } catch(e){} gal.audio.bgm = null; }
         if (gal.audio.voice){ try { stopAudio(gal.audio.voice); } catch(e){} gal.audio.voice = null; }
+        // 清理订阅者，防止重复绑定内存泄漏
+        gal.listeners.onVarChange = null;
+        gal.onVarChange = null;
+        gal.onRead = null;
+        gal.onEnd = null;
+        gal.onTitle = null;
+        // 清理合成音源
+        try {
+            if (galAudio && galAudio.synths){
+                for (const [k, s] of galAudio.synths){
+                    try { if (s.gain && s.gain.gain) s.gain.gain.value = 0; } catch(_e){}
+                    try { if (s.node && s.node.stop) s.node.stop(); } catch(_e){}
+                }
+                galAudio.synths.clear();
+            }
+        } catch(_e){}
     }
     function galLoadScript(name, source){
         const s = galParseScript(name, source || '');
@@ -3434,7 +3773,8 @@ const Lument = (function() {
         if (!gal.inited) galInit();
         gal.curScript = sc;
         if (entryLabel && entryLabel in sc.labels){
-            gal.curLine = sc.labels[entryLabel];
+            const idx = sc.labels[entryLabel];
+            gal.curLine = (typeof idx === 'number' && idx >= 0 && idx < sc.lines.length) ? idx : 0;
         } else {
             gal.curLine = 0;
         }
@@ -3464,6 +3804,12 @@ const Lument = (function() {
         }
     }
     function galSkip(enable){ gal.skip = !!enable; gal.pref.skip = !!enable; galSavePref(); }
+    function galSetSkipReadOnly(enable){
+        gal.skipReadOnly = !!enable;
+        gal.pref.skipReadOnly = !!enable;
+        galSavePref();
+    }
+    function galGetSkipReadOnly(){ return !!gal.skipReadOnly; }
     function galAuto(enable){ gal.auto = !!enable; gal.pref.auto = !!enable; galSavePref(); }
     function galSetAutoDelay(ms){ gal.autoDelayMs = ms; }
 
@@ -3473,12 +3819,31 @@ const Lument = (function() {
             case GAL_CMD.NARRATE: {
                 const name = cmd.type === GAL_CMD.NARRATE ? '' : (cmd.name || '');
                 const text = interpolateVars(cmd.text || '');
-                if (name) gal.history.push({ name, text, voice: (gal._lastVoice||null) });
-                else gal.history.push({ name: '', text, voice: (gal._lastVoice||null) });
+                // 已读签名：scriptName + 行号前一行 + 文本内容简易哈希
+                const sName = gal.curScript ? gal.curScript.name : '_';
+                const lineNo = gal.curLine - 1; // galAdvanceNextLine 已经 ++
+                let sig = 5381;
+                for (let i = 0; i < text.length; i++) sig = ((sig << 5) + sig) ^ text.charCodeAt(i);
+                const readKey = sName + '_' + lineNo + '_' + (sig|0);
+                const wasRead = !!gal.readSet[readKey];
+                gal.readSet[readKey] = true;
+                // 缓存到 dialog 便于 skip 判断和 onRead 回调
+                gal._curReadKey = readKey;
+                gal._curWasRead = wasRead;
+                try {
+                    if (!wasRead && (gal.onRead || gal.listeners.onRead)){
+                        if (gal.onRead) gal.onRead(name, text);
+                        if (gal.listeners.onRead) gal.listeners.onRead(name, text);
+                    }
+                } catch(_e){}
+                if (name) gal.history.push({ name, text, voice: (gal._lastVoice||null), read: wasRead });
+                else gal.history.push({ name: '', text, voice: (gal._lastVoice||null), read: wasRead });
                 gal._lastVoice = null;
                 const speedMs = Math.max(2, 110 - gal.style.typewriterSpeed*10);
-                gal.dialog = { name, text, shownChars: 0, timer: 0, speedMs };
+                gal.dialog = { name, text, shownChars: 0, timer: 0, speedMs, _readKey: readKey, _wasRead: wasRead };
                 gal.waitingClick = true;
+                // 如果开启 skip 只读，且当前是未读对白 -> 不进入 skip 推进（打断 galAdvanceNextLine 循环）
+                // 此处 yield 后在 galUpdate 里再做具体判断
                 return true; // yield
             }
             case GAL_CMD.SHOW: {
@@ -3514,36 +3879,19 @@ const Lument = (function() {
                 return false;
             }
             case GAL_CMD.BGM: {
-                try {
-                    const vol = (cmd.volume ?? 0.7) * gal.pref.volBGM;
-                    if (gal.audio.bgm){ stopAudio(gal.audio.bgm); gal.audio.bgm = null; }
-                    const id = loadSound(cmd.audio) || 0;
-                    gal.audio.bgm = playSound(id, vol, !!cmd.loop) || null;
-                    // fade support: if playing, ramp up from 0
-                    if (id > 0 && gal.audio.bgm){
-                        // simple approach: set volume, trust platform
-                    }
-                } catch(e){}
+                galPlayBgm(cmd.audio, cmd.loop, cmd.volume, cmd.fadeMs || 800);
                 return false;
             }
             case GAL_CMD.BGM_STOP: {
-                if (gal.audio.bgm){ try { fadeOut(gal.audio.bgm, (cmd.fadeMs||500)/1000); } catch(e){} setTimeout(()=>{ try { stopAudio(gal.audio.bgm); gal.audio.bgm=null; } catch(e){} }, cmd.fadeMs||500); }
+                galStopBgm(cmd.fadeMs || 800);
                 return false;
             }
             case GAL_CMD.SE: {
-                try {
-                    const id = loadSound(cmd.audio)||0;
-                    if (id) playSound(id, (cmd.volume??1)*gal.pref.volSE, false);
-                } catch(e){}
+                galPlaySe(cmd.audio, cmd.volume);
                 return false;
             }
             case GAL_CMD.VOICE: {
-                try {
-                    if (gal.audio.voice){ stopAudio(gal.audio.voice); gal.audio.voice = null; }
-                    const id = loadSound(cmd.audio)||0;
-                    if (id) gal.audio.voice = playSound(id, (cmd.volume??1)*gal.pref.volVoice, false) || null;
-                    gal._lastVoice = cmd.audio;
-                } catch(e){ gal._lastVoice = cmd.audio; }
+                galPlayVoice(cmd.audio, cmd.volume, cmd.speaker || '');
                 return false;
             }
             case GAL_CMD.CHOOSE: {
@@ -3554,7 +3902,7 @@ const Lument = (function() {
             case GAL_CMD.LABEL: return false;
             case GAL_CMD.JUMP: {
                 const idx = gal.curScript.labels[cmd.label];
-                if (idx != null) gal.curLine = idx;
+                if (typeof idx === 'number' && idx >= 0 && idx < gal.curScript.lines.length) gal.curLine = idx;
                 return false;
             }
             case GAL_CMD.IF: {
@@ -3564,7 +3912,7 @@ const Lument = (function() {
                 else b = galEvalVariable(b, b);
                 if (galCompare(a, cmd.op, b)){
                     const idx = gal.curScript.labels[cmd.label];
-                    if (idx != null) gal.curLine = idx;
+                    if (typeof idx === 'number' && idx >= 0 && idx < gal.curScript.lines.length) gal.curLine = idx;
                 }
                 return false;
             }
@@ -3573,13 +3921,19 @@ const Lument = (function() {
                 let val = cmd.value;
                 if (val in gal.vars) val = gal.vars[val];
                 else val = galEvalVariable(val, val);
-                if (cmd.op === '=' || !cmd.op){
-                    gal.vars[cmd.variable] = val;
-                } else if (cmd.op === '+='){ gal.vars[cmd.variable] = (+prev||0) + (+val||0); }
-                else if (cmd.op === '-='){ gal.vars[cmd.variable] = (+prev||0) - (+val||0); }
-                else if (cmd.op === '*='){ gal.vars[cmd.variable] = (+prev||0) * (+val||0); }
-                else if (cmd.op === '/='){ gal.vars[cmd.variable] = (+prev||0) / (+val||1); }
-                else if (cmd.op === '%='){ gal.vars[cmd.variable] = (+prev||0) % (+val||1); }
+                let next = val;
+                if (cmd.op === '=' || !cmd.op){ next = val; }
+                else if (cmd.op === '+='){ next = (+prev||0) + (+val||0); }
+                else if (cmd.op === '-='){ next = (+prev||0) - (+val||0); }
+                else if (cmd.op === '*='){ next = (+prev||0) * (+val||0); }
+                else if (cmd.op === '/='){ next = (+prev||0) / (+val||1); }
+                else if (cmd.op === '%='){ next = (+prev||0) % (+val||1); }
+                gal.vars[cmd.variable] = next;
+                // 变量变更事件
+                if (gal.listeners && gal.listeners.onVarChange){
+                    try { gal.listeners.onVarChange(cmd.variable, prev, next); } catch(_e){}
+                }
+                if (gal.onVarChange){ try { gal.onVarChange(cmd.variable, prev, next); } catch(_e){} }
                 return false;
             }
             case GAL_CMD.WAIT: {
@@ -3601,7 +3955,7 @@ const Lument = (function() {
             case GAL_CMD.CALL: {
                 const target = gal.scripts[cmd.script];
                 if (target){
-                    gal.stack.push({ script: gal.curScript, line: gal.curLine + 1 });
+                    gal.stack.push({ script: gal.curScript, line: Math.min(gal.curScript.lines.length, Math.max(0, gal.curLine + 1)) });
                     gal.curScript = target;
                     gal.curLine = (cmd.entry && target.labels[cmd.entry] != null) ? target.labels[cmd.entry] : 0;
                     return false;
@@ -3640,6 +3994,31 @@ const Lument = (function() {
                 if (gal.onTitle) gal.onTitle();
                 return true;
             }
+            case GAL_CMD.AUTOSPEED: {
+                gal.autoDelayMs = Math.max(100, cmd.ms|0);
+                galSetAutoDelay(gal.autoDelayMs);
+                return false;
+            }
+            case GAL_CMD.SAVE: {
+                try { galSave(cmd.slot|0, cmd.title || 'Auto Save'); } catch(_e){}
+                return false;
+            }
+            case GAL_CMD.LOAD: {
+                let ok = false;
+                try {
+                    gal._loadDepth = (gal._loadDepth|0) + 1;
+                    if (gal._loadDepth <= 8) {
+                        ok = !!galLoad(cmd.slot|0);
+                    } else {
+                        ok = false;
+                    }
+                } catch(_e){ ok = false; } finally {
+                    gal._loadDepth = Math.max(0, (gal._loadDepth|0) - 1);
+                }
+                // 加载成功后立刻 yield，避免后续行继续执行（curLine 已被 restore 覆盖）
+                if (ok) return true;
+                return false;
+            }
             case GAL_CMD.END:
             default:
                 gal.running = false;
@@ -3650,11 +4029,13 @@ const Lument = (function() {
 
     function galAdvanceNextLine(){
         if (!gal.running || !gal.curScript) return;
+        // 边界夹紧：防止 curLine 越界
+        gal.curLine = Math.max(0, Math.min(gal.curScript.lines.length, gal.curLine|0));
         while (gal.curLine < gal.curScript.lines.length){
             const cmd = gal.curScript.lines[gal.curLine++];
+            if (!cmd) continue; // 防御性跳过空命令
             const yieldControl = galStartLine(cmd);
             if (yieldControl) return;
-            // skip auto runs next without waiting (non-blocked lines)
         }
         gal.running = false;
         if (gal.onEnd) gal.onEnd();
@@ -3770,9 +4151,179 @@ const Lument = (function() {
     function galGetHistoryCount(){ return gal.history.length; }
     function galGetHistoryEntry(idx){
         const e = gal.history[idx]; if (!e) return null;
-        return { name: e.name||'', text: e.text||'', voice: e.voice||'' };
+        return { name: e.name||'', text: e.text||'', voice: e.voice||'', read: !!e.read };
     }
     function galClearHistory(){ gal.history.length = 0; }
+    function galGetHistoryPageCount(pageSize){
+        const n = Math.max(1, pageSize|0 || 50);
+        return Math.max(0, Math.ceil(gal.history.length / n));
+    }
+    function galGetHistoryPage(pageIndex, pageSize){
+        const n = Math.max(1, pageSize|0 || 50);
+        const p = Math.max(0, pageIndex|0);
+        const start = p * n;
+        if (start >= gal.history.length) return [];
+        const out = [];
+        for (let i = start; i < Math.min(gal.history.length, start+n); i++){
+            const e = gal.history[i];
+            out.push({ index:i, name: e.name||'', text: e.text||'', voice: e.voice||'', read: !!e.read });
+        }
+        return out;
+    }
+    function galSetOnVarChange(fn){
+        if (typeof fn === 'function') gal.listeners.onVarChange = fn;
+        else gal.listeners.onVarChange = null;
+        gal.onVarChange = gal.listeners.onVarChange;
+    }
+    function galRemoveOnVarChange(){
+        gal.listeners.onVarChange = null;
+        gal.onVarChange = null;
+    }
+    function galSetOnRead(fn){
+        if (typeof fn === 'function') gal.listeners.onRead = fn;
+        else gal.listeners.onRead = null;
+        gal.onRead = gal.listeners.onRead;
+    }
+    function galIsCurrentLineRead(){
+        if (gal.dialog && typeof gal.dialog._wasRead === 'boolean') return gal.dialog._wasRead;
+        return !!gal._curWasRead;
+    }
+    // ---------- 合成音源（无需外部音频文件，WebAudio 合成占位 BGM / SE）----------
+    function galStartSynthBgm(name, type, volume){
+        if (typeof window === 'undefined' || typeof AudioContext === 'undefined') return null;
+        try {
+            let ctx = null;
+            try { ctx = getAudioContext ? getAudioContext() : null; } catch(_e){}
+            if (!ctx) {
+                if (typeof AudioContext !== 'undefined') ctx = new AudioContext();
+                else if (typeof window !== 'undefined' && window.webkitAudioContext) ctx = new window.webkitAudioContext();
+            }
+            if (!ctx) return null;
+            if (!galAudio.synths) galAudio.synths = new Map();
+            galStopSynthBgm(name);
+            const vol = Math.max(0, Math.min(1, +volume || 0.35));
+            const master = ctx.createGain();
+            master.gain.value = 0;
+            master.connect(ctx.destination);
+            const realType = (['sine','triangle','square','sawtooth'].indexOf(String(type||'').toLowerCase()) >= 0) ? String(type).toLowerCase() : 'sine';
+            // 简单 2 振荡器合成：基调音 + 第五度 组合，构成简单"和弦式"循环 BGM
+            const melody = [261.63, 329.63, 392.0, 349.23, 440.0, 392.0, 329.63, 293.66];
+            const bass   = [130.81, 164.81, 196.0, 174.61, 220.0, 196.0, 164.81, 146.83];
+            const o1 = ctx.createOscillator();
+            const o2 = ctx.createOscillator();
+            o1.type = realType;
+            o2.type = realType === 'sawtooth' ? 'triangle' : 'sine';
+            const g1 = ctx.createGain(); g1.gain.value = 0.55 * vol;
+            const g2 = ctx.createGain(); g2.gain.value = 0.35 * vol;
+            o1.connect(g1).connect(master);
+            o2.connect(g2).connect(master);
+            // LFO 做轻微音量呼吸
+            const lfo = ctx.createOscillator(); lfo.frequency.value = 0.15;
+            const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.12 * vol;
+            lfo.connect(lfoGain).connect(master.gain);
+            o1.start(0); o2.start(0); lfo.start(0);
+            let step = 0;
+            const stepDur = 0.9; // 秒
+            const updateNote = () => {
+                if (!galAudio.synths || galAudio.synths.get(name) !== handle) return;
+                const t = ctx.currentTime;
+                const i = step % melody.length;
+                o1.frequency.setValueAtTime(melody[i], t);
+                o2.frequency.setValueAtTime(bass[i], t);
+                step++;
+                handle._nextTimer = setTimeout(updateNote, stepDur * 1000);
+            };
+            const handle = { ctx, master, osc: [o1, o2], lfo, name, vol, _nextTimer: null };
+            galAudio.synths.set(name, handle);
+            // 淡入
+            try { master.gain.cancelScheduledValues(ctx.currentTime); } catch(_e){}
+            master.gain.setValueAtTime(0, ctx.currentTime);
+            master.gain.linearRampToValueAtTime(vol, ctx.currentTime + 1.2);
+            updateNote();
+            return name;
+        } catch(e){
+            return null;
+        }
+    }
+    function galStopSynthBgm(name, fadeMs){
+        try {
+            if (!galAudio.synths) return;
+            const h = galAudio.synths.get(name);
+            if (!h) return;
+            const fade = Math.max(0, +fadeMs || 800);
+            const ctx = h.ctx;
+            if (ctx && h.master && h.master.gain){
+                try { h.master.gain.cancelScheduledValues(ctx.currentTime); } catch(_e){}
+                try { h.master.gain.setValueAtTime(h.master.gain.value, ctx.currentTime); } catch(_e){}
+                try { h.master.gain.linearRampToValueAtTime(0, ctx.currentTime + fade/1000); } catch(_e){}
+            }
+            if (h._nextTimer){ clearTimeout(h._nextTimer); h._nextTimer = null; }
+            const stopDelay = (fade < 1) ? 0 : fade + 50;
+            setTimeout(() => {
+                try { if (h.osc && h.osc.length) for (const o of h.osc){ try { o.stop(); } catch(_e){} } } catch(_e){}
+                try { if (h.lfo){ try { h.lfo.stop(); } catch(_e){} } } catch(_e){}
+                try { h.master.disconnect(); } catch(_e){}
+                try { galAudio.synths.delete(name); } catch(_e){}
+            }, stopDelay);
+        } catch(_e){}
+    }
+    function galSynthSeClick(volume){
+        if (typeof window === 'undefined' || typeof AudioContext === 'undefined') return null;
+        try {
+            let ctx = null;
+            try { ctx = getAudioContext ? getAudioContext() : null; } catch(_e){}
+            if (!ctx) {
+                if (typeof AudioContext !== 'undefined') ctx = new AudioContext();
+                else if (typeof window !== 'undefined' && window.webkitAudioContext) ctx = new window.webkitAudioContext();
+            }
+            if (!ctx) return null;
+            const vol = Math.max(0, Math.min(1, (+volume != null) ? +volume : 0.25));
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            const t0 = ctx.currentTime;
+            osc.frequency.setValueAtTime(1200, t0);
+            osc.frequency.exponentialRampToValueAtTime(520, t0 + 0.08);
+            gain.gain.setValueAtTime(0, t0);
+            gain.gain.linearRampToValueAtTime(vol, t0 + 0.005);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(t0);
+            osc.stop(t0 + 0.14);
+            return true;
+        } catch(e){ return null; }
+    }
+    function galSynthSeConfirm(volume){
+        if (typeof window === 'undefined' || typeof AudioContext === 'undefined') return null;
+        try {
+            let ctx = null;
+            try { ctx = getAudioContext ? getAudioContext() : null; } catch(_e){}
+            if (!ctx) {
+                if (typeof AudioContext !== 'undefined') ctx = new AudioContext();
+                else if (typeof window !== 'undefined' && window.webkitAudioContext) ctx = new window.webkitAudioContext();
+            }
+            if (!ctx) return null;
+            const vol = Math.max(0, Math.min(1, (+volume != null) ? +volume : 0.3));
+            const notes = [659.25, 783.99, 1046.50];
+            const t0 = ctx.currentTime;
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0, t0);
+            gain.gain.linearRampToValueAtTime(vol, t0 + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
+            gain.connect(ctx.destination);
+            for (let i = 0; i < notes.length; i++){
+                const osc = ctx.createOscillator();
+                osc.type = i === 2 ? 'sine' : 'triangle';
+                osc.frequency.setValueAtTime(notes[i], t0 + i*0.055);
+                const og = ctx.createGain();
+                og.gain.value = i === 0 ? 0.5 : (i === 1 ? 0.4 : 0.35);
+                osc.connect(og).connect(gain);
+                osc.start(t0 + i*0.055);
+                osc.stop(t0 + 0.30);
+            }
+            return true;
+        } catch(e){ return null; }
+    }
 
     function galSelectChoice(index){
         if (!gal.choices || !gal.choices[index]) return;
@@ -3785,12 +4336,27 @@ const Lument = (function() {
         }
         galAdvanceNextLine();
     }
+    function galChoose(labelOrIndex){
+        if (!gal.choices || !gal.choices.length) return;
+        let idx = -1;
+        if (typeof labelOrIndex === 'number'){
+            idx = labelOrIndex|0;
+        } else {
+            idx = gal.choices.findIndex(c => c.label === labelOrIndex);
+            if (idx < 0){
+                // 兼容按文本匹配
+                idx = gal.choices.findIndex(c => c.text === labelOrIndex);
+            }
+        }
+        if (idx >= 0) galSelectChoice(idx);
+    }
     function galGetChoiceCount(){ return gal.choices ? gal.choices.length : 0; }
     function galGetChoiceText(i){ return gal.choices && gal.choices[i] ? gal.choices[i].text : ''; }
+    function galGetChoices(){ return gal.choices ? gal.choices.map(c => ({ label:c.label, text:c.text })) : null; }
     function galGotoLabel(label){
         if (!gal.curScript) return;
         const idx = gal.curScript.labels[label];
-        if (idx != null) gal.curLine = idx;
+        if (typeof idx === 'number' && idx >= 0 && idx < gal.curScript.lines.length) gal.curLine = idx;
     }
 
     function galSaveStateSnapshot(){
@@ -3814,7 +4380,12 @@ const Lument = (function() {
         if (ss.scriptName && gal.scripts[ss.scriptName]){
             gal.curScript = gal.scripts[ss.scriptName];
         }
-        gal.curLine = ss.line || 0;
+        if (gal.curScript){
+            const maxL = gal.curScript.lines.length;
+            gal.curLine = Math.max(0, Math.min(maxL, (ss.line|0) || 0));
+        } else {
+            gal.curLine = 0;
+        }
         gal.vars = ss.vars || {};
         gal.history = ss.history || [];
         Object.assign(gal.bg, ss.bg || {});
@@ -3888,26 +4459,99 @@ const Lument = (function() {
 
     function galPlayBgm(audio, loop, volume, fadeMs){
         try {
-            if (gal.audio.bgm){ stopAudio(gal.audio.bgm); gal.audio.bgm = null; }
-            const id = loadSound(audio)||0;
-            if (id) gal.audio.bgm = playSound(id, (volume??0.7) * gal.pref.volBGM, !!loop) || null;
+            galResumeAudioCtx();
+            const fade = Math.max(0, fadeMs|0) || 0;
+            // 支持 number srcId / numeric string srcId / string path
+            let srcId = 0;
+            if (typeof audio === 'number') srcId = audio;
+            else if (/^\d+$/.test(String(audio))) srcId = +audio;
+            else if (typeof audio === 'string' && audio.length) srcId = loadMusic(audio) || 0;  // Music group
+            if (!srcId) return;
+            const vol = (volume == null ? 0.7 : (+volume || 0));
+            // 同曲只更新音量
+            const bgm = galAudio.bgm;
+            if (bgm.instId && bgm.srcId === srcId && !bgm.fading){
+                const inst = audioInstances.get(bgm.instId);
+                if (inst){
+                    inst.volume = vol;
+                    const vv = Math.max(0, Math.min(1, vol * masterVolume * groupVolumes[1]));
+                    if (inst._gain) try { inst._gain.gain.value = vv; } catch(e){}
+                    if (inst.htmlAudio) try { inst.htmlAudio.volume = vv; } catch(e){}
+                }
+                return;
+            }
+            bgm.nextSrcId = srcId;
+            bgm.nextLoop  = (loop == null ? true : !!loop);
+            bgm.nextVol   = vol;
+            bgm.crossMs   = Math.max(1, fade);
+            bgm.crossElapsed = 0;
+            bgm.fading    = true;
+            bgm.stopPending = false;
+            bgm._nextInstId = 0;
         } catch(e){}
     }
     function galStopBgm(fadeMs){
-        if (!gal.audio.bgm) return;
-        try { fadeOut(gal.audio.bgm, (fadeMs||500)/1000); } catch(e){}
-        setTimeout(()=>{ try { stopAudio(gal.audio.bgm); gal.audio.bgm = null; } catch(e){} }, fadeMs||500);
+        const bgm = galAudio.bgm;
+        if (!bgm.instId && !bgm.fading) return;
+        try {
+            const fade = Math.max(1, (fadeMs|0) || 300);
+            bgm.nextSrcId = 0;
+            bgm._nextInstId = 0;
+            bgm.crossMs = fade;
+            bgm.crossElapsed = 0;
+            bgm.fading = true;
+            bgm.stopPending = true;
+        } catch(e){}
     }
-    function galPlaySe(audio, volume){ try { const id = loadSound(audio)||0; if (id) playSound(id, (volume??1)*gal.pref.volSE, false); } catch(e){} }
+    function galPlaySe(audio, volume){
+        try {
+            galResumeAudioCtx();
+            let srcId = 0;
+            if (typeof audio === 'number') srcId = audio;
+            else if (/^\d+$/.test(String(audio))) srcId = +audio;
+            else if (typeof audio === 'string' && audio.length) srcId = loadSound(audio)||0;
+            if (!srcId) return;
+            const vol = (volume == null ? 1 : (+volume || 0)) * (gal.pref.volSE ?? 1);
+            const se = galAudio.se;
+            se.queue.push({ srcId, vol });
+            while (se.queue.length > se.maxSimul*2) se.queue.shift();
+        } catch(e){}
+    }
     function galPlayVoice(audio, volume, speaker){
         try {
-            if (gal.audio.voice){ stopAudio(gal.audio.voice); gal.audio.voice = null; }
-            const id = loadSound(audio)||0;
-            if (id) gal.audio.voice = playSound(id, (volume??1)*gal.pref.volVoice, false) || null;
+            galResumeAudioCtx();
+            if (gal.audio.voice){ try { stopSound(gal.audio.voice); } catch(e){} gal.audio.voice = null; }
+            let srcId = 0;
+            if (typeof audio === 'number') srcId = audio;
+            else if (/^\d+$/.test(String(audio))) srcId = +audio;
+            else if (typeof audio === 'string' && audio.length) srcId = loadAudio(audio, false) || 0;
+            if (!srcId) { gal._lastVoice = audio; return; }
+            const vol = (volume == null ? 1 : (+volume || 0)) * (gal.pref.volVoice ?? 1);
+            const play = () => {
+                const id = playBufferSource(srcId, vol, 1, false, 2); // Voice group
+                if (id){
+                    gal.audio.voice = id;
+                    const inst = audioInstances.get(id);
+                    if (inst){
+                        const durMs = Math.max(150, ((inst.duration||2) * 1000) + 200);
+                        setTimeout(function checkEnd(){
+                            if (!audioInstances.has(id)){
+                                gal.audio.voice = null;
+                                if (galAudio.listeners.onVoiceEnd) try { galAudio.listeners.onVoiceEnd(audio, speaker||''); } catch(_e){}
+                                return;
+                            }
+                            setTimeout(checkEnd, 120);
+                        }, durMs);
+                    }
+                }
+            };
+            const s = audioSources.get(srcId);
+            if (s && s.loaded) play();
+            else audioOnReady(srcId, play, play);
             gal._lastVoice = audio;
         } catch(e){ gal._lastVoice = audio; }
     }
-    function galStopVoice(){ if (gal.audio.voice){ try { stopAudio(gal.audio.voice); } catch(e){} gal.audio.voice = null; } }
+    function galStopVoice(){ if (gal.audio.voice){ try { stopSound(gal.audio.voice); } catch(e){} gal.audio.voice = null; } }
 
     function galSetPrefTextSpeed(v){
         const n = Math.max(1, Math.min(10, v|0));
@@ -3956,24 +4600,28 @@ const Lument = (function() {
         const dt = +dtMs || 16;
         // 打字机推进
         if (gal.dialog){
-            const sp = gal.skip ? 0 : gal.dialog.speedMs;
+            const d = gal.dialog;
+            // 打字机速度：skip 模式但当前未读 & skipReadOnly=true 时不减慢
+            const readOnly = !!gal.skipReadOnly && !!(d._wasRead === false ? false : (d._wasRead || (gal._curWasRead===true)));
+            const skipEffective = gal.skip && (!gal.skipReadOnly || (gal._curWasRead || (d._wasRead === true)));
+            const sp = skipEffective ? 0 : d.speedMs;
             if (sp <= 0 || !gal.waitingClick){
-                gal.dialog.shownChars = (gal.dialog.text||'').length;
+                d.shownChars = (d.text||'').length;
             } else {
-                gal.dialog.timer += dt;
-                while (gal.dialog.timer >= sp && gal.dialog.shownChars < (gal.dialog.text||'').length){
-                    gal.dialog.shownChars++;
-                    gal.dialog.timer -= sp;
+                d.timer += dt;
+                while (d.timer >= sp && d.shownChars < (d.text||'').length){
+                    d.shownChars++;
+                    d.timer -= sp;
                 }
             }
-            if (gal.auto && !gal.skip && gal.waitingClick && gal.dialog.shownChars >= (gal.dialog.text||'').length){
+            if (gal.auto && !gal.skip && gal.waitingClick && d.shownChars >= (d.text||'').length){
                 if (!gal._autoTimer) gal._autoTimer = 0;
                 gal._autoTimer += dt;
                 if (gal._autoTimer >= gal.autoDelayMs){
                     gal._autoTimer = 0;
                     galAdvance();
                 }
-            } else if (gal.skip && gal.waitingClick && gal.dialog.shownChars >= (gal.dialog.text||'').length){
+            } else if (skipEffective && gal.waitingClick && d.shownChars >= (d.text||'').length){
                 galAdvance();
             }
         } else {
@@ -4024,6 +4672,7 @@ const Lument = (function() {
 
     function galRender(){
         if (!gal.inited) return;
+        if (!ctx || !canvas) return;
         const ox = gal.shake.ox || 0, oy = gal.shake.oy || 0;
         ctx.save();
         ctx.translate(ox, oy);
@@ -4266,70 +4915,105 @@ const Lument = (function() {
     const live2d = {
         inited: false,
         corePath: null,
-        models: [],        // id -> model state
+        models: [],
+        modelMap: new Map(),     // id -> model (O(1) 查找)
+        nameMap: new Map(),      // name -> id (O(1) 名字查找)
         idSeq: 1,
         mouse: { x:-9999, y:-9999 },
         tick: 0,
+        lastTick: 0,
     };
 
     function live2dInit(corePath){
         if (live2d.inited) return;
         live2d.inited = true;
         live2d.corePath = corePath || null;
-        // 监听全局鼠标（为自动 eye/head 跟踪）
-        try {
-            if (canvas){
-                canvas.addEventListener('mousemove', (e) => {
-                    const r = canvas.getBoundingClientRect();
-                    live2d.mouse.x = (e.clientX - r.left) * (canvas.width / r.width);
-                    live2d.mouse.y = (e.clientY - r.top)  * (canvas.height / r.height);
-                }, { passive:true });
-                canvas.addEventListener('mouseleave', ()=>{ live2d.mouse.x = -9999; live2d.mouse.y = -9999; });
-            }
-        } catch(e){}
+        if (typeof window === 'undefined') return;
+        // 监听全局鼠标（为自动 eye/head 跟踪）— 去重绑定：把 handler 挂到 live2d，多次 Init 不重复绑
+        if (live2d._onMm || live2d._onMl) return;
+        live2d._onMm = (e) => {
+            if (!canvas) return;
+            const r = canvas.getBoundingClientRect();
+            const w = r.width || canvas.width, h = r.height || canvas.height;
+            const cw = canvas.width, ch = canvas.height;
+            live2d.mouse.x = (e.clientX - r.left) * (cw / Math.max(1,w));
+            live2d.mouse.y = (e.clientY - r.top)  * (ch / Math.max(1,h));
+        };
+        live2d._onMl = () => { live2d.mouse.x = -9999; live2d.mouse.y = -9999; };
+        const tryBind = () => {
+            if (!canvas) return false;
+            canvas.addEventListener('mousemove', live2d._onMm, { passive:true });
+            canvas.addEventListener('mouseleave', live2d._onMl, { passive:true });
+            return true;
+        };
+        if (!tryBind()){
+            // canvas 可能在 init 之后创建：设置一次性 poll（避免重复绑定）
+            let tries = 0;
+            const poll = () => {
+                if (tryBind() || (++tries) > 120) return;
+                setTimeout(poll, 250);
+            };
+            setTimeout(poll, 250);
+        }
     }
     function live2dShutdown(){
+        // 解除 canvas 绑定
+        if (typeof window !== 'undefined' && canvas && live2d._onMm){
+            try { canvas.removeEventListener('mousemove', live2d._onMm); } catch(e){}
+            try { canvas.removeEventListener('mouseleave', live2d._onMl); } catch(e){}
+            live2d._onMm = null; live2d._onMl = null;
+        }
         for (const m of live2d.models){
             live2dDispose(m);
         }
         live2d.models.length = 0;
+        live2d.modelMap.clear();
         live2d.inited = false;
     }
     function live2dByNameOrId(x){
         if (x == null) return null;
         if (typeof x === 'number' || /^\d+$/.test(x)){
             const id = +x;
-            const m = live2d.models.find(mm => mm.id === id);
-            return m ? m.id : null;
+            return live2d.modelMap.has(id) ? id : null;
         }
-        // 按名字查找
-        const m = live2d.models.find(mm => mm.name === x);
-        return m ? m.id : null;
+        // 按名字查找 (O(1))
+        const id = live2d.nameMap.get(x);
+        return id != null ? id : null;
     }
 
     function live2dLoadModel(model3JsonPath){
         const id = live2d.idSeq++;
         const m = {
-            id, name: model3JsonPath,
-            path: model3JsonPath,
-            tf: { x: canvas.width*0.5, y: canvas.height*0.7, scale: 1, rotation: 0, opacity: 1, width: 0, height: 0, flipX: false },
+            id, name: model3JsonPath || ('model_' + id),
+            path: model3JsonPath || null,
+            tf: { x: (canvas && canvas.width ? canvas.width*0.5 : 640), y: (canvas && canvas.height ? canvas.height*0.7 : 500), scale: 1, rotation: 0, opacity: 1, width: 0, height: 0, flipX: false },
             zLayer: 0,
             visible: true,
             ready: false,
-            motions: Object.create(null),   // group -> [motionDef]
-            expressions: [],               // [{name}]
+            motions: Object.create(null),
+            expressions: [],
             currentMotion: null,
             motionPriority: 0,
             motionQueue: [],
             currentExpression: null,
             expressionName: '',
-            params: Object.create(null),   // ParamAngleX/Y, EyeOpen, MouthOpen, ...
+            params: Object.create(null),
             auto: { eye: true, head: true, blink: true, mouth: false },
             blinkTimer: 0, blinkState: 0, blinkVal: 1,
             hitAreas: [],
             data: null,
-            // 模拟动画
-            anim: { breath: 0, tiltX: 0, tiltY: 0, eyeX: 0, eyeY: 0, mouth: 0 }
+            anim: { breath: 0, tiltX: 0, tiltY: 0, eyeX: 0, eyeY: 0, mouth: 0 },
+            // ===== 离屏缓存 + 脏值签名 =====
+            _cache: {
+                canvas: null,   // 离屏画布
+                ctx: null,
+                w: 0, h: 0,
+                lastSig: 0,     // 上次签名
+                dirty: true,    // 脏标记
+                // 节流：每 ~60ms 才允许重新签一次名（约 16fps 重绘上限，其余帧直接 blit 缓存）
+                lastRenderMs: 0,
+                minIntervalMs: 60,
+            }
         };
         // 默认参数
         m.params['ParamAngleX'] = 0;
@@ -4341,6 +5025,8 @@ const Lument = (function() {
         m.params['ParamMouthForm']  = 0;
         m.params['ParamBreath'] = 0;
         live2d.models.push(m);
+        live2d.modelMap.set(id, m);
+        live2d.nameMap.set(m.name, id);
         // 尝试异步加载 JSON（若网络可用，失败则保留占位回退渲染）
         if (typeof fetch !== 'undefined' && model3JsonPath){
             const base = model3JsonPath.slice(0, model3JsonPath.lastIndexOf('/') + 1);
@@ -4351,7 +5037,7 @@ const Lument = (function() {
                     const fr = data.FileReferences;
                     if (fr.Motions){
                         for (const k of Object.keys(fr.Motions)){
-                            m.motions[k] = (fr.Motions[k]||[]).map((x,i)=>({name:`${k}_${i}`, file: base + (x.File||''), duration: 1500 + Math.random()*1000|0}));
+                            m.motions[k] = (fr.Motions[k]||[]).map((x,i)=>({name:`${k}_${i}`, file: base + (x.File||''), duration: 1500 + (Math.random()*1000|0)}));
                         }
                     }
                     if (Array.isArray(fr.Expressions)){
@@ -4365,9 +5051,9 @@ const Lument = (function() {
                     }
                 }
                 m.ready = true;
-            }).catch(()=>{});
+                m._cache.dirty = true;
+            }).catch(()=>{ m.ready = true; });
         } else {
-            // 无网络：填充占位动作与表情
             m.motions['Idle'] = [{name:'Idle_0', duration:2000}];
             m.motions['TapBody'] = [{name:'TapBody_0', duration:900}];
             m.motions['Flick_Head'] = [{name:'Flick_Head_0', duration:700}];
@@ -4377,39 +5063,47 @@ const Lument = (function() {
         return id;
     }
     function live2dReleaseModel(id){
-        const idx = live2d.models.findIndex(m => m.id === id);
-        if (idx >= 0){ live2dDispose(live2d.models[idx]); live2d.models.splice(idx, 1); }
+        const m = live2d.modelMap.get(id);
+        if (!m) return;
+        live2dDispose(m);
+        const idx = live2d.models.indexOf(m);
+        if (idx >= 0) live2d.models.splice(idx, 1);
+        live2d.modelMap.delete(id);
+        if (m.name) live2d.nameMap.delete(m.name);
     }
     function live2dDispose(m){
-        // 目前无 WebGL 纹理占用，占位即可
+        // 释放离屏缓存
+        if (m._cache){ m._cache.canvas = null; m._cache.ctx = null; }
     }
     function live2dIsReady(id){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         return !!(m && m.ready);
     }
 
     function live2dSetTransform(id, tf){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         if (!m || !tf) return;
+        let changed = false;
         for (const k of ['x','y','scale','rotation','opacity','width','height','flipX']){
-            if (tf[k] != null) m.tf[k] = tf[k];
+            if (tf[k] != null && m.tf[k] !== tf[k]){ m.tf[k] = tf[k]; changed = true; }
         }
+        if (changed && m._cache) m._cache.dirty = true;
     }
     function live2dGetTransform(id){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         if (!m) return null;
         return Object.assign({}, m.tf);
     }
-    function live2dSetLayer(id, z){ const m = live2d.models.find(x => x.id === id); if (m) m.zLayer = z|0; }
-    function live2dSetVisible(id, v){ const m = live2d.models.find(x => x.id === id); if (m) m.visible = !!v; }
+    function live2dSetLayer(id, z){ const m = live2d.modelMap.get(id); if (m){ m.zLayer = z|0; } }
+    function live2dSetVisible(id, v){ const m = live2d.modelMap.get(id); if (m){ m.visible = !!v; if (m._cache) m._cache.dirty = true; } }
 
     function live2dGetMotionGroupCount(id, group){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         if (!m || !m.motions[group]) return 0;
         return m.motions[group].length;
     }
     function live2dStartMotion(id, group, index, priority){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         if (!m) return -1;
         if (priority != null && priority < (m.motionPriority||0)) return -1;
         const list = m.motions[group] || [];
@@ -4418,29 +5112,29 @@ const Lument = (function() {
         const motion = list[i];
         m.currentMotion = { ...motion, elapsed: 0, group };
         m.motionPriority = priority || 1;
+        if (m._cache) m._cache.dirty = true;
         return i;
     }
     function live2dIsMotionPlaying(id){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         return !!(m && m.currentMotion && m.currentMotion.elapsed < m.currentMotion.duration);
     }
-    function live2dStopMotion(id){ const m = live2d.models.find(x => x.id === id); if (m){ m.currentMotion = null; m.motionPriority = 0; } }
+    function live2dStopMotion(id){ const m = live2d.modelMap.get(id); if (m){ m.currentMotion = null; m.motionPriority = 0; if (m._cache) m._cache.dirty = true; } }
 
     function live2dGetExpressionCount(id){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         return m ? m.expressions.length : 0;
     }
     function live2dGetExpressionName(id, i){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         return (m && m.expressions[i]) ? m.expressions[i].name : null;
     }
     function live2dSetExpression(id, name){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         if (!m) return;
         const e = m.expressions.find(x => x.name === name);
         if (!e) return;
         m.expressionName = name;
-        // 参数化应用
         m.params['ParamMouthForm'] = {
             neutral:0, happy:0.4, sad:-0.3, angry:-0.5, surprise:0.1
         }[name] || 0;
@@ -4449,53 +5143,60 @@ const Lument = (function() {
         }[name] || 1;
         m.params['ParamEyeROpen'] = m.params['ParamEyeLOpen'];
         m._expressionOverride = true;
+        if (m._cache) m._cache.dirty = true;
     }
     function live2dSetExpressionRandom(id){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         if (!m || !m.expressions.length) return;
         const e = m.expressions[(Math.random()*m.expressions.length)|0].name;
         live2dSetExpression(id, e);
     }
     function live2dSetParam(id, paramId, value){
-        const m = live2d.models.find(x => x.id === id);
-        if (m) m.params[paramId] = value;
+        const m = live2d.modelMap.get(id);
+        if (!m) return;
+        if (m.params[paramId] !== value){
+            m.params[paramId] = value;
+            if (m._cache) m._cache.dirty = true;
+        }
     }
     function live2dGetParam(id, paramId, defVal){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         if (!m) return defVal;
         return (paramId in m.params) ? m.params[paramId] : defVal;
     }
     function live2dParamAdd(id, paramId, delta){
-        const m = live2d.models.find(x => x.id === id);
-        if (m) m.params[paramId] = (m.params[paramId]||0) + (+delta||0);
+        const m = live2d.modelMap.get(id);
+        if (!m) return;
+        const nv = (m.params[paramId]||0) + (+delta||0);
+        if (m.params[paramId] !== nv){ m.params[paramId] = nv; if (m._cache) m._cache.dirty = true; }
     }
     function live2dParamMult(id, paramId, factor){
-        const m = live2d.models.find(x => x.id === id);
-        if (m) m.params[paramId] = (m.params[paramId]||0) * (+factor||1);
+        const m = live2d.modelMap.get(id);
+        if (!m) return;
+        const nv = (m.params[paramId]||0) * (+factor||1);
+        if (m.params[paramId] !== nv){ m.params[paramId] = nv; if (m._cache) m._cache.dirty = true; }
     }
 
-    function live2dSetEyeTarget(id, x, y){ const m = live2d.models.find(x => x.id === id); if (m){ m._eyeTx = x; m._eyeTy = y; m.auto.eye = false; } }
-    function live2dSetHeadTarget(id, x, y){ const m = live2d.models.find(x => x.id === id); if (m){ m._headTx = x; m._headTy = y; m.auto.head = false; } }
-    function live2dEnableAutoEye(id, v){ const m = live2d.models.find(x => x.id === id); if (m){ m.auto.eye = !!v; if (v){ delete m._eyeTx; delete m._eyeTy; } } }
-    function live2dEnableAutoHead(id, v){ const m = live2d.models.find(x => x.id === id); if (m){ m.auto.head = !!v; if (v){ delete m._headTx; delete m._headTy; } } }
-    function live2dEnableAutoBlink(id, v){ const m = live2d.models.find(x => x.id === id); if (m) m.auto.blink = !!v; }
-    function live2dEnableAutoMouth(id, v){ const m = live2d.models.find(x => x.id === id); if (m) m.auto.mouth = !!v; }
+    function live2dSetEyeTarget(id, x, y){ const m = live2d.modelMap.get(id); if (m){ m._eyeTx = x; m._eyeTy = y; m.auto.eye = false; } }
+    function live2dSetHeadTarget(id, x, y){ const m = live2d.modelMap.get(id); if (m){ m._headTx = x; m._headTy = y; m.auto.head = false; } }
+    function live2dEnableAutoEye(id, v){ const m = live2d.modelMap.get(id); if (m){ m.auto.eye = !!v; if (v){ delete m._eyeTx; delete m._eyeTy; } } }
+    function live2dEnableAutoHead(id, v){ const m = live2d.modelMap.get(id); if (m){ m.auto.head = !!v; if (v){ delete m._headTx; delete m._headTy; } } }
+    function live2dEnableAutoBlink(id, v){ const m = live2d.modelMap.get(id); if (m) m.auto.blink = !!v; }
+    function live2dEnableAutoMouth(id, v){ const m = live2d.modelMap.get(id); if (m) m.auto.mouth = !!v; }
 
     function live2dHitTest(id, sx, sy){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         if (!m || !m.tf) return null;
         const dx = sx - m.tf.x, dy = sy - (m.tf.y - (m.tf.height || 400) * 0.5 * (m.tf.scale||1));
         const scale = (m.tf.scale || 1) * 250;
         if (Math.abs(dx) < scale*0.5 && Math.abs(dy) < (m.tf.height||400)*(m.tf.scale||1)*0.5){
             if (m.hitAreas && m.hitAreas.length){
-                // 简化返回第一个命中
                 const hit = m.hitAreas.find(a => /Head|Face/i.test(a.name || a.id));
                 if (hit) return hit.name || hit.id;
                 const h2 = m.hitAreas.find(a => /Body/i.test(a.name || a.id));
                 if (h2) return h2.name || h2.id;
                 return m.hitAreas[0].name || m.hitAreas[0].id || 'Body';
             }
-            // 近似分区（无 HitAreas）
             if (Math.abs(dy) < scale*0.7 && Math.abs(dx) < scale*0.35) return 'Head';
             return 'Body';
         }
@@ -4503,7 +5204,7 @@ const Lument = (function() {
     }
 
     function galAttachLive2d(modelId, slot, zOrder){
-        const m = live2d.models.find(x => x.id === modelId);
+        const m = live2d.modelMap.get(modelId);
         if (!m) return -1;
         const id = galCreateSprite(`live2d:${modelId}`, slot, zOrder || 0);
         const sp = gal.sprites.get(id);
@@ -4516,10 +5217,28 @@ const Lument = (function() {
         return id;
     }
 
+    // 计算当前模型签名（32-bit DJB2-ish hash），用于快速判断是否真的需要重绘离屏缓存
+    function live2dModelSig(m){
+        const p = m.params;
+        let h = 5381;
+        h = ((h << 5) + h) ^ ((m.expressionName || '').length + (m.currentMotion ? (m.currentMotion.elapsed/60|0) : -1));
+        h = ((h << 5) + h) ^ Math.round((p['ParamAngleX']||0) * 10);
+        h = ((h << 5) + h) ^ Math.round((p['ParamAngleY']||0) * 10);
+        h = ((h << 5) + h) ^ Math.round((p['ParamBodyAngleX']||0) * 10);
+        h = ((h << 5) + h) ^ Math.round((p['ParamEyeLOpen']||0) * 100);
+        h = ((h << 5) + h) ^ Math.round((p['ParamEyeROpen']||0) * 100);
+        h = ((h << 5) + h) ^ Math.round((p['ParamMouthOpenY']||0) * 100);
+        h = ((h << 5) + h) ^ Math.round((p['ParamMouthForm']||0) * 100);
+        h = ((h << 5) + h) ^ Math.round((p['ParamBreath']||0) * 20);
+        return h|0;
+    }
+
     function live2dUpdate(dtMs){
         const dt = (+dtMs||16) / 1000;
         live2d.tick += dt;
+        const nowMs = (+dtMs||16); // 相对增量，这里用累计 tick 也可
         for (const m of live2d.models){
+            let dirtyThisFrame = false;
             // Motion 计时
             if (m.currentMotion){
                 m.currentMotion.elapsed += (+dtMs||16);
@@ -4527,7 +5246,6 @@ const Lument = (function() {
                     m.currentMotion = null;
                     m.motionPriority = 0;
                 } else {
-                    // 简单 motion: 动作期间摇头
                     const e = m.currentMotion.elapsed / m.currentMotion.duration;
                     if (m.currentMotion.group === 'TapBody' || /Tap|Flick|Shake/.test(m.currentMotion.group||'')){
                         m.params['ParamAngleX'] = Math.sin(e * Math.PI * 2) * 20;
@@ -4535,41 +5253,62 @@ const Lument = (function() {
                         m.params['ParamBodyAngleX'] = Math.sin(e * Math.PI) * 3;
                     }
                 }
+                dirtyThisFrame = true;
             }
             // 呼吸
             m.anim.breath += dt;
-            m.params['ParamBreath'] = (Math.sin(m.anim.breath*1.8) + 1) * 0.5;
+            const nb = (Math.sin(m.anim.breath*1.8) + 1) * 0.5;
+            if (Math.abs(nb - (m.params['ParamBreath']||0)) > 0.02){
+                m.params['ParamBreath'] = nb;
+                dirtyThisFrame = true;
+            } else {
+                m.params['ParamBreath'] = nb;
+            }
             // 自动 eye track
             if (m.auto.eye){
                 const dx = (live2d.mouse.x >= -1000) ? (live2d.mouse.x - m.tf.x) : 0;
                 const dy = (live2d.mouse.y >= -1000) ? (live2d.mouse.y - (m.tf.y - 150*(m.tf.scale||1))) : 0;
                 const maxD = 300;
-                m.params['ParamAngleX'] = (m.currentMotion && (m.currentMotion.group === 'TapBody' || /Flick|Shake/.test(m.currentMotion.group||'')))
-                    ? m.params['ParamAngleX'] : Math.max(-30, Math.min(30, (dx/maxD)*30));
-                m.params['ParamAngleY'] = Math.max(-15, Math.min(15, (dy/maxD)*15));
+                const nax = (m.currentMotion && (m.currentMotion.group === 'TapBody' || /Flick|Shake/.test(m.currentMotion.group||'')))
+                    ? (m.params['ParamAngleX']||0) : Math.max(-30, Math.min(30, (dx/maxD)*30));
+                const nay = Math.max(-15, Math.min(15, (dy/maxD)*15));
+                if (Math.abs(nax - (m.params['ParamAngleX']||0)) > 0.2 || Math.abs(nay - (m.params['ParamAngleY']||0)) > 0.2){
+                    m.params['ParamAngleX'] = nax;
+                    m.params['ParamAngleY'] = nay;
+                    dirtyThisFrame = true;
+                } else {
+                    m.params['ParamAngleX'] = nax;
+                    m.params['ParamAngleY'] = nay;
+                }
             }
             // 自动眨眼
             if (m.auto.blink){
                 m.blinkTimer -= dtMs;
                 if (m.blinkTimer <= 0){
-                    if (m.blinkState === 0){ m.blinkState = 1; m.blinkTimer = 120; } // close
-                    else if (m.blinkState === 1){ m.blinkState = 2; m.blinkTimer = 80; } // fully closed
-                    else { m.blinkState = 0; m.blinkTimer = 2000 + Math.random()*3000; } // open & idle
+                    if (m.blinkState === 0){ m.blinkState = 1; m.blinkTimer = 120; }
+                    else if (m.blinkState === 1){ m.blinkState = 2; m.blinkTimer = 80; }
+                    else { m.blinkState = 0; m.blinkTimer = 2000 + (Math.random()*3000|0); }
+                    dirtyThisFrame = true;
                 }
                 const e = (m.blinkState === 0) ? 1 : (m.blinkState === 1 ? (1 - (m.blinkTimer/120)) : (m.blinkTimer/80));
                 if (!m._expressionOverride){
+                    const oeL = m.params['ParamEyeLOpen'];
+                    const oeR = m.params['ParamEyeROpen'];
+                    if (Math.abs(e - (oeL||0)) > 0.01 || Math.abs(e - (oeR||0)) > 0.01) dirtyThisFrame = true;
                     m.params['ParamEyeLOpen'] = e;
                     m.params['ParamEyeROpen'] = e;
                 }
             }
-            // 自动 mouth (根据语音音量占位)
+            // 自动 mouth
             if (m.auto.mouth){
-                if (gal.audio && gal.audio.voice){
-                    m.params['ParamMouthOpenY'] = 0.3 + 0.3*(Math.random());
-                } else {
-                    m.params['ParamMouthOpenY'] *= 0.9;
-                }
+                const cur = m.params['ParamMouthOpenY']||0;
+                let next = cur * 0.9;
+                if (gal.audio && gal.audio.voice){ next = 0.3 + 0.3*Math.random(); }
+                if (Math.abs(next - cur) > 0.01) dirtyThisFrame = true;
+                m.params['ParamMouthOpenY'] = next;
             }
+            // 同步脏标记（节流：只有离屏允许重绘的时间窗口才写 dirty）
+            if (dirtyThisFrame && m._cache) m._cache.dirty = true;
         }
     }
 
@@ -4585,8 +5324,51 @@ const Lument = (function() {
         return false;
     }
     function live2dRenderModel(id, cx, cy, scale){
-        const m = live2d.models.find(x => x.id === id);
+        const m = live2d.modelMap.get(id);
         if (!m || !m.tf || (m.tf.opacity != null && m.tf.opacity <= 0.001)) return;
+
+        // ============ 离屏缓存初始化 ============
+        const CACHE_W = 400;
+        const CACHE_H = 560;
+        const CX = 200; // 离屏中的角色原点
+        const CY = 320;
+        const c = m._cache;
+        if (!c.canvas || c.w !== CACHE_W || c.h !== CACHE_H){
+            try {
+                const off = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+                if (off){
+                    off.width = CACHE_W; off.height = CACHE_H;
+                    const octx = off.getContext('2d');
+                    c.canvas = off; c.ctx = octx; c.w = CACHE_W; c.h = CACHE_H;
+                    c.dirty = true;
+                }
+            } catch(_e){ c.canvas = null; }
+        }
+
+        // ============ 缓存重绘判定：签名 + 脏标记 + 节流 ============
+        let nowTs = 0;
+        try { nowTs = (performance && typeof performance.now === 'function') ? performance.now() : Date.now(); } catch(_e){ nowTs = Date.now(); }
+        let needRender = !!c.dirty;
+        const sig = live2dModelSig(m);
+        if (sig !== c.lastSig){ needRender = true; }
+        const canRender = !c.canvas || (nowTs - (c.lastRenderMs||0)) >= (c.minIntervalMs || 0);
+        if (needRender && canRender && c.canvas && c.ctx){
+            // 切换到离屏上下文
+            const prevCtx = ctx;
+            ctx = c.ctx;
+            ctx.setTransform(1,0,0,1,0,0);
+            ctx.clearRect(0, 0, CACHE_W, CACHE_H);
+            ctx.save();
+            ctx.translate(CX, CY);
+            drawLive2DPlaceholder(m);
+            ctx.restore();
+            ctx = prevCtx;
+            c.dirty = false;
+            c.lastSig = sig;
+            c.lastRenderMs = nowTs;
+        }
+
+        // ============ 主画布 blit / 直接绘制兜底 ============
         ctx.save();
         ctx.globalAlpha = Math.max(0, Math.min(1, m.tf.opacity ?? 1));
         ctx.translate(cx, cy);
@@ -4597,7 +5379,13 @@ const Lument = (function() {
         const ay = m.params['ParamAngleY'] || 0;
         const bx = m.params['ParamBodyAngleX'] || 0;
         ctx.translate((ax + bx*0.5) * 0.7, ay * 0.3);
-        drawLive2DPlaceholder(m);
+        if (c.canvas){
+            // blit 离屏缓存（注意：缓存内已经 translate 过 CX/CY，这里绘制时把缓存中心对齐到当前 transform 原点，同时要把角色的"脚"对齐到 cy）
+            ctx.drawImage(c.canvas, -CX, -CY);
+        } else {
+            // 兜底：无 canvas 支持时直接绘制（Node/无DOM环境）
+            drawLive2DPlaceholder(m);
+        }
         ctx.restore();
     }
     // 占位绘制：参数化可爱角色轮廓（无需外部模型文件也能可视化 Live2D API 效果）
@@ -4890,10 +5678,12 @@ const Lument = (function() {
         // 剧本
         galParseScript, galLoadScript, galStart, galStop,
         galAdvance, galSkip, galAuto, galSetAutoDelay,
-        galGotoLabel, galSelectChoice, galGetChoiceCount, galGetChoiceText,
+        galSetSkipReadOnly, galGetSkipReadOnly,
+        galGotoLabel, galSelectChoice, galChoose, galGetChoiceCount, galGetChoiceText, galGetChoices,
         // 对话框
         galSetDialogStyle, galShowDialog, galIsDialogVisible, galSay,
         galGetHistoryCount, galGetHistoryEntry, galClearHistory,
+        galGetHistoryPageCount, galGetHistoryPage,
         galHandleClick,
         // 立绘 / 背景 / CG
         galCreateSprite, galDestroySprite,
@@ -4905,6 +5695,7 @@ const Lument = (function() {
         galQuickSave, galQuickLoad,
         // 音频
         galPlayBgm, galStopBgm, galPlaySe, galPlayVoice, galStopVoice,
+        galStartSynthBgm, galStopSynthBgm, galSynthSeClick, galSynthSeConfirm,
         // 偏好设置
         galSetPrefTextSpeed, galGetPrefTextSpeed,
         galSetPrefAuto, galGetPrefAuto,
@@ -4918,6 +5709,7 @@ const Lument = (function() {
         // 回调
         set galOnEnd(fn){ gal.onEnd = fn; }, get galOnEnd(){ return gal.onEnd; },
         set galOnTitle(fn){ gal.onTitle = fn; }, get galOnTitle(){ return gal.onTitle; },
+        galSetOnVarChange, galRemoveOnVarChange, galSetOnRead, galIsCurrentLineRead,
         // 每帧：update / render
         galUpdate, galRender,
 
