@@ -31,6 +31,9 @@
 // ============================================================
 #include "lument_internal.h"
 
+#include <functional>
+#include <cmath>
+
 namespace {
 
 // ---------- 常量 ----------
@@ -75,6 +78,7 @@ struct Widget {
     LumentWidget      id = LUMENT_INVALID_WIDGET;   // 自身句柄
     LumentWidgetType  type = LUMENT_WIDGET_NONE;
     std::string       text;                          // 文本 / 占位符
+    std::string       name;                          // 自定义标识（用于 find_by_id）
     float             x = 0.0f, y = 0.0f;           // 布局位置（相对父级或绝对）
     float             w = 0.0f, h = 0.0f;           // 尺寸
     LumentColor       bgColor   = { 30, 30, 38, 255 };
@@ -87,6 +91,7 @@ struct Widget {
     std::vector<LumentWidget> children;             // 子控件有序列表
     LumentLayoutType  layout    = LUMENT_LAYOUT_NONE;
     float             padTop = 0.0f, padRight = 0.0f, padBottom = 0.0f, padLeft = 0.0f;
+    float             marginTop = 0.0f, marginRight = 0.0f, marginBottom = 0.0f, marginLeft = 0.0f;
     float             spacing = 0.0f;
     int               gridCols = 1;
     int               gridRows  = 1;
@@ -97,10 +102,23 @@ struct Widget {
     // 布局计算后的绝对屏幕坐标（仅供渲染 / 命中测试使用）
     float             absX = 0.0f, absY = 0.0f;
 
+    // ---- v1.3 新增字段 ----
+    int               autoSize = LUMENT_AUTOSIZE_OFF;  // 自动尺寸模式
+    float             value    = 0.0f;                 // slider/progress/toggle 当前值
+    float             minVal   = 0.0f, maxVal = 1.0f;  // slider 范围
+    bool              checked  = false;                // checkbox/toggle 状态
+    int               selected = 0;                   // dropdown 当前选中项
+    std::vector<std::string> options;                 // dropdown 选项列表
+    float             scrollX = 0.0f, scrollY = 0.0f; // scrollview 滚动偏移
+    float             contentW = 0.0f, contentH = 0.0f; // scrollview 内容尺寸
+    bool              dropdownOpen = false;            // dropdown 是否展开
+    float             animTime = 0.0f;                // 动画累计时间（spinner 等）
+
     void reset() {
         id       = LUMENT_INVALID_WIDGET;
         type     = LUMENT_WIDGET_NONE;
         text.clear();
+        name.clear();
         x = y = w = h = 0.0f;
         bgColor   = { 30, 30, 38, 255 };
         textColor = { 235, 235, 235, 255 };
@@ -112,6 +130,7 @@ struct Widget {
         children.clear();
         layout     = LUMENT_LAYOUT_NONE;
         padTop = padRight = padBottom = padLeft = 0.0f;
+        marginTop = marginRight = marginBottom = marginLeft = 0.0f;
         spacing    = 0.0f;
         gridCols   = 1;
         gridRows   = 1;
@@ -119,6 +138,17 @@ struct Widget {
         callbacks.clear();
         focused    = false;
         absX = absY = 0.0f;
+        autoSize   = LUMENT_AUTOSIZE_OFF;
+        value      = 0.0f;
+        minVal     = 0.0f;
+        maxVal     = 1.0f;
+        checked    = false;
+        selected   = 0;
+        options.clear();
+        scrollX = scrollY = 0.0f;
+        contentW = contentH = 0.0f;
+        dropdownOpen = false;
+        animTime = 0.0f;
     }
 };
 
@@ -192,6 +222,109 @@ inline WidgetManager& mgr() {
         g_mgr = new WidgetManager();
     }
     return *g_mgr;
+}
+
+// ---------- 全局主题（v1.3）----------
+LumentTheme g_theme = {
+    { 18, 18, 24, 255 },   // background
+    { 30, 30, 38, 255 },   // surface
+    { 60, 90, 160, 255 },  // primary
+    { 90, 90, 110, 255 },  // secondary
+    { 235, 235, 235, 255 },// text
+    { 130, 130, 140, 255 },// textMuted
+    { 120, 120, 130, 255 },// border
+    { 100, 200, 255, 255 },// accent
+    { 220, 70, 70, 255 },  // danger
+    { 80, 180, 100, 255 }, // success
+};
+bool g_themeDirty = false;
+
+// 根据控件类型与主题刷新外观色。新建控件与 set_theme 时调用。
+void apply_theme(Widget& w) {
+    switch (w.type) {
+    case LUMENT_WIDGET_BUTTON:
+    case LUMENT_WIDGET_TOGGLE:
+        w.bgColor   = g_theme.primary;
+        w.textColor = { 255, 255, 255, 255 };
+        break;
+    case LUMENT_WIDGET_INPUT:
+    case LUMENT_WIDGET_SCROLLVIEW:
+        w.bgColor   = g_theme.surface;
+        w.textColor = g_theme.text;
+        break;
+    case LUMENT_WIDGET_LABEL:
+    case LUMENT_WIDGET_TOOLTIP:
+        w.bgColor   = { 0, 0, 0, 0 };
+        w.textColor = g_theme.text;
+        break;
+    case LUMENT_WIDGET_DIVIDER:
+        w.bgColor   = g_theme.border;
+        break;
+    case LUMENT_WIDGET_SPINNER:
+        w.bgColor   = { 0, 0, 0, 0 };
+        w.textColor = g_theme.accent;
+        break;
+    case LUMENT_WIDGET_CONTAINER:
+    case LUMENT_WIDGET_NAVBAR:
+    case LUMENT_WIDGET_TABBAR:
+        w.bgColor   = g_theme.surface;
+        w.textColor = g_theme.text;
+        break;
+    case LUMENT_WIDGET_SLIDER:
+    case LUMENT_WIDGET_PROGRESS:
+        w.bgColor   = g_theme.secondary;
+        w.textColor = g_theme.primary;
+        break;
+    case LUMENT_WIDGET_CHECKBOX:
+        w.bgColor   = g_theme.surface;
+        w.textColor = g_theme.text;
+        break;
+    case LUMENT_WIDGET_DROPDOWN:
+        w.bgColor   = g_theme.surface;
+        w.textColor = g_theme.text;
+        break;
+    default:
+        w.bgColor   = g_theme.surface;
+        w.textColor = g_theme.text;
+        break;
+    }
+}
+
+// ---------- 自动尺寸计算（v1.3）----------
+// 按内容/子控件自动计算控件宽高。
+inline float text_width(const std::string& s, float fontSize);  // 前向声明
+
+void apply_auto_size(WidgetManager& m, Widget& w) {
+    if (w.autoSize == LUMENT_AUTOSIZE_OFF) return;
+    bool needW = (w.autoSize & LUMENT_AUTOSIZE_WIDTH)  != 0;
+    bool needH = (w.autoSize & LUMENT_AUTOSIZE_HEIGHT) != 0;
+
+    // 1) 基于文本内容
+    float textW = 0.0f, textH = 0.0f;
+    if (!w.text.empty()) {
+        textW = text_width(w.text, w.fontSize) + 8.0f; // 留 padding
+        textH = w.fontSize + 8.0f;
+    }
+
+    // 2) 基于子控件（取最大边界）
+    float childMaxW = 0.0f, childMaxH = 0.0f;
+    for (LumentWidget ch : w.children) {
+        Widget* c = m.validate(ch);
+        if (!c) continue;
+        float rightEdge = c->x + c->w + c->marginRight;
+        float botEdge  = c->y + c->h + c->marginBottom;
+        if (rightEdge > childMaxW) childMaxW = rightEdge;
+        if (botEdge  > childMaxH) childMaxH = botEdge;
+    }
+    childMaxW += w.padLeft + w.padRight;
+    childMaxH += w.padTop + w.padBottom;
+
+    if (needW) {
+        w.w = std::max(textW, childMaxW);
+    }
+    if (needH) {
+        w.h = std::max(textH, childMaxH);
+    }
 }
 
 // ---------- 布局计算 ----------
@@ -293,6 +426,37 @@ void compute_layout(WidgetManager& m, LumentWidget handle, float absX, float abs
         }
         break;
     }
+    case LUMENT_LAYOUT_FLOW: {
+        // 自动换行流式布局：子控件按从左到右排列，超出内容宽度则换行。
+        // 支持 margin（外边距），可视为带 margin 的水平流。
+        float cursorX = cx;
+        float cursorY = cy;
+        float rowMaxH = 0.0f;
+        for (LumentWidget ch : w->children) {
+            Widget* c = m.validate(ch);
+            if (!c) continue;
+            float cw = c->w + c->marginLeft + c->marginRight;
+            float chh = c->h + c->marginTop + c->marginBottom;
+            // 判断是否需要换行（cw > contentW 时单独成行）
+            if (contentW > 0.0f && cursorX + cw > cx + contentW && cursorX > cx) {
+                cursorY += rowMaxH + w->spacing;
+                cursorX  = cx;
+                rowMaxH  = 0.0f;
+            }
+            float px = cursorX + c->marginLeft;
+            float py = cursorY + c->marginTop;
+            // 垂直对齐（基于行高）
+            if (w->alignment == ALIGN_CENTER && chh < rowMaxH) {
+                py += (rowMaxH - chh) * 0.5f;
+            } else if (w->alignment == ALIGN_END && chh < rowMaxH) {
+                py += (rowMaxH - chh);
+            }
+            compute_layout(m, ch, px, py);
+            cursorX += cw + w->spacing;
+            if (chh > rowMaxH) rowMaxH = chh;
+        }
+        break;
+    }
     case LUMENT_LAYOUT_NONE:
     default: {
         // 绝对定位：子控件 x/y 视为相对父级绝对位置的偏移
@@ -325,57 +489,196 @@ void render_widget(WidgetManager& m, LumentWidget handle) {
         lument_draw_rect({ w->absX, w->absY, w->w, w->h }, w->bgColor, true);
     }
 
-    // 2. 图片 / 精灵
+    // 2. 图片 / 精灵 / 图标
     if (w->textureId != 0 && w->w > 0.0f && w->h > 0.0f) {
         lument_draw_sprite(w->textureId, { w->absX, w->absY, w->w, w->h }, { 0,0,0,0 });
     }
 
-    // 3. 进度条前景（text 中存放 0~1 的比例数值）
+    // 3. 进度条前景（value 存放 0~1 的比例；兼容旧 text）
     if (w->type == LUMENT_WIDGET_PROGRESS && w->w > 0.0f && w->h > 0.0f) {
-        float pct = 0.0f;
+        float pct = w->value;
         if (!w->text.empty()) {
-            pct = float(std::atof(w->text.c_str()));
-            if (pct < 0.0f) pct = 0.0f;
-            if (pct > 1.0f) pct = 1.0f;
+            float tp = float(std::atof(w->text.c_str()));
+            if (tp >= 0.0f && tp <= 1.0f) pct = tp; // 兼容旧 API
         }
-        lument_draw_rect({ w->absX, w->absY, w->w * pct, w->h }, COLOR_PROGRESS, true);
+        if (pct < 0.0f) pct = 0.0f;
+        if (pct > 1.0f) pct = 1.0f;
+        lument_draw_rect({ w->absX, w->absY, w->w * pct, w->h }, g_theme.primary, true);
     }
 
-    // 4. 文本
-    if (!w->text.empty()) {
-        LumentColor useColor = w->enabled ? w->textColor : COLOR_PLACEHOLDER;
-        // 输入框未聚焦时以占位符颜色显示文本
+    // 4. 滑块（track + thumb）
+    if (w->type == LUMENT_WIDGET_SLIDER && w->w > 0.0f && w->h > 0.0f) {
+        float range = w->maxVal - w->minVal;
+        float t = range > 0.0f ? (w->value - w->minVal) / range : 0.0f;
+        if (t < 0.0f) t = 0.0f;
+        if (t > 1.0f) t = 1.0f;
+        float trackY = w->absY + (w->h - 4.0f) * 0.5f;
+        lument_draw_rect({ w->absX, trackY, w->w, 4.0f }, g_theme.secondary, true);
+        lument_draw_rect({ w->absX, trackY, w->w * t, 4.0f }, g_theme.primary, true);
+        float thumbX = w->absX + w->w * t;
+        float thumbY = w->absY + w->h * 0.5f;
+        lument_draw_circle(thumbX, thumbY, w->h * 0.4f, g_theme.accent, true);
+    }
+
+    // 5. 复选框（box + checkmark）
+    if (w->type == LUMENT_WIDGET_CHECKBOX && w->w > 0.0f && w->h > 0.0f) {
+        float box = std::min(w->w, w->h);
+        float bx = w->absX + (w->w - box) * 0.5f;
+        float by = w->absY + (w->h - box) * 0.5f;
+        lument_draw_rect({ bx, by, box, box }, w->bgColor, true);
+        lument_draw_rect({ bx, by, box, box }, g_theme.border, false);
+        if (w->checked) {
+            // 对勾：用两条线段
+            lument_draw_line(bx + box * 0.2f, by + box * 0.55f,
+                            bx + box * 0.45f, by + box * 0.8f,
+                            std::max(2.0f, box * 0.12f), g_theme.success);
+            lument_draw_line(bx + box * 0.45f, by + box * 0.8f,
+                            bx + box * 0.8f, by + box * 0.25f,
+                            std::max(2.0f, box * 0.12f), g_theme.success);
+        }
+    }
+
+    // 6. 开关（pill + knob）
+    if (w->type == LUMENT_WIDGET_TOGGLE && w->w > 0.0f && w->h > 0.0f) {
+        LumentColor trackCol = w->checked ? g_theme.primary : g_theme.secondary;
+        lument_draw_rect({ w->absX, w->absY, w->w, w->h }, trackCol, true);
+        float knobR = w->h * 0.4f;
+        float knobX = w->checked ? (w->absX + w->w - knobR - 2.0f)
+                                  : (w->absX + knobR + 2.0f);
+        lument_draw_circle(knobX, w->absY + w->h * 0.5f, knobR, { 255,255,255,255 }, true);
+    }
+
+    // 7. 下拉框（box + text + arrow + 展开列表）
+    if (w->type == LUMENT_WIDGET_DROPDOWN && w->w > 0.0f && w->h > 0.0f) {
+        lument_draw_rect({ w->absX, w->absY, w->w, w->h }, w->bgColor, true);
+        lument_draw_rect({ w->absX, w->absY, w->w, w->h }, g_theme.border, false);
+        // 选中项文本
+        std::string sel = (!w->options.empty() && w->selected >= 0 &&
+                           w->selected < int(w->options.size()))
+                          ? w->options[w->selected] : w->text;
+        if (!sel.empty()) {
+            float ty = w->absY + (w->h - w->fontSize) * 0.5f;
+            lument_draw_text(sel.c_str(), w->absX + 4.0f, ty, w->fontSize, w->textColor);
+        }
+        // 下拉箭头（右侧三角）
+        float ax = w->absX + w->w - 12.0f;
+        float ay = w->absY + w->h * 0.5f;
+        lument_draw_triangle(ax, ay - 4.0f, ax + 8.0f, ay - 4.0f,
+                            ax + 4.0f, ay + 4.0f, w->textColor, true);
+        // 展开列表
+        if (w->dropdownOpen && !w->options.empty()) {
+            float itemH = std::max(w->h, 20.0f);
+            for (size_t i = 0; i < w->options.size(); ++i) {
+                float iy = w->absY + w->h + i * itemH;
+                LumentColor itemBg = (int(i) == w->selected) ? g_theme.primary : g_theme.surface;
+                lument_draw_rect({ w->absX, iy, w->w, itemH }, itemBg, true);
+                lument_draw_text(w->options[i].c_str(), w->absX + 4.0f,
+                                iy + (itemH - w->fontSize) * 0.5f,
+                                w->fontSize, w->textColor);
+            }
+        }
+    }
+
+    // 8. 滚动视图：背景 + 滚动条（子控件由 scroll offset 偏移）
+    if (w->type == LUMENT_WIDGET_SCROLLVIEW && w->w > 0.0f && w->h > 0.0f) {
+        // 垂直滚动条
+        if (w->contentH > w->h) {
+            float trackH = w->h;
+            float thumbH = std::max(20.0f, trackH * (w->h / w->contentH));
+            float maxScroll = w->contentH - w->h;
+            float thumbY = w->absY + (maxScroll > 0.0f
+                            ? (w->scrollY / maxScroll) * (trackH - thumbH) : 0.0f);
+            lument_draw_rect({ w->absX + w->w - 6.0f, w->absY, 4.0f, trackH },
+                            g_theme.secondary, true);
+            lument_draw_rect({ w->absX + w->w - 6.0f, thumbY, 4.0f, thumbH },
+                            g_theme.accent, true);
+        }
+    }
+
+    // 9. 分隔线
+    if (w->type == LUMENT_WIDGET_DIVIDER && w->w > 0.0f && w->h > 0.0f) {
+        if (w->w >= w->h) {
+            // 水平分隔线
+            float y = w->absY + w->h * 0.5f;
+            lument_draw_line(w->absX, y, w->absX + w->w, y,
+                            std::max(1.0f, w->h), w->bgColor);
+        } else {
+            // 垂直分隔线
+            float x = w->absX + w->w * 0.5f;
+            lument_draw_line(x, w->absY, x, w->absY + w->h,
+                            std::max(1.0f, w->w), w->bgColor);
+        }
+    }
+
+    // 10. 加载指示器（旋转弧）
+    if (w->type == LUMENT_WIDGET_SPINNER && w->w > 0.0f && w->h > 0.0f) {
+        float cx = w->absX + w->w * 0.5f;
+        float cy = w->absY + w->h * 0.5f;
+        float r = std::min(w->w, w->h) * 0.4f;
+        // 8 段弧，每段透明度递增（旋转感）
+        for (int i = 0; i < 8; ++i) {
+            float a0 = w->animTime * 6.0f + i * 0.785f;
+            float a1 = a0 + 0.5f;
+            uint8_t alpha = uint8_t(40 + (i * 255 / 8));
+            LumentColor seg = { w->textColor.r, w->textColor.g, w->textColor.b, alpha };
+            lument_draw_line(cx + std::cos(a0) * r * 0.5f,
+                            cy + std::sin(a0) * r * 0.5f,
+                            cx + std::cos(a1) * r,
+                            cy + std::sin(a1) * r,
+                            std::max(2.0f, r * 0.15f), seg);
+        }
+    }
+
+    // 11. 文本（通用，按控件类型决定对齐）
+    if (!w->text.empty() &&
+        w->type != LUMENT_WIDGET_DROPDOWN &&   // dropdown 已自行渲染
+        w->type != LUMENT_WIDGET_DIVIDER &&
+        w->type != LUMENT_WIDGET_SPINNER) {
+        LumentColor useColor = w->enabled ? w->textColor : g_theme.textMuted;
         if (w->type == LUMENT_WIDGET_INPUT && !w->focused) {
-            useColor = COLOR_PLACEHOLDER;
+            useColor = g_theme.textMuted;
         }
         float ty = w->absY + (w->h - w->fontSize) * 0.5f;
         float tx;
-        if (w->type == LUMENT_WIDGET_BUTTON || w->type == LUMENT_WIDGET_LABEL) {
-            // 水平居中
+        if (w->type == LUMENT_WIDGET_BUTTON || w->type == LUMENT_WIDGET_LABEL ||
+            w->type == LUMENT_WIDGET_TOGGLE || w->type == LUMENT_WIDGET_TABBAR) {
             float tw = text_width(w->text, w->fontSize);
-            if (tw > w->w - 4.0f) tw = w->w - 4.0f; // 防止越界
+            if (tw > w->w - 4.0f) tw = w->w - 4.0f;
             tx = w->absX + (w->w - tw) * 0.5f;
         } else {
-            tx = w->absX + 4.0f; // 左对齐
+            tx = w->absX + 4.0f;
         }
         if (tx < w->absX) tx = w->absX;
         lument_draw_text(w->text.c_str(), tx, ty, w->fontSize, useColor);
     }
 
-    // 5. 输入框边框
+    // 12. 输入框边框
     if (w->type == LUMENT_WIDGET_INPUT && w->w > 0.0f && w->h > 0.0f) {
-        lument_draw_rect({ w->absX, w->absY, w->w, w->h }, COLOR_INPUT_BORDER, false);
+        lument_draw_rect({ w->absX, w->absY, w->w, w->h }, g_theme.border, false);
     }
 
-    // 6. 焦点高亮（描边）
+    // 13. 焦点高亮（描边）
     if (w->focused && w->w > 0.0f && w->h > 0.0f) {
         lument_draw_rect({ w->absX - 2, w->absY - 2, w->w + 4, w->h + 4 },
-                         COLOR_FOCUS_RING, false);
+                         g_theme.accent, false);
     }
 
-    // 7. 子控件（后绘制 = 更靠前 / 层级更高）
-    for (LumentWidget ch : w->children) {
-        render_widget(m, ch);
+    // 14. 子控件（后绘制 = 更靠前 / 层级更高）
+    //     scrollview 的子控件应用滚动偏移（通过调整 absX/absY）
+    if (w->type == LUMENT_WIDGET_SCROLLVIEW) {
+        // 偏移子控件：通过临时调整父级 absX/absY 实现
+        float savedX = w->absX, savedY = w->absY;
+        w->absX -= w->scrollX;
+        w->absY -= w->scrollY;
+        for (LumentWidget ch : w->children) {
+            render_widget(m, ch);
+        }
+        w->absX = savedX;
+        w->absY = savedY;
+    } else {
+        for (LumentWidget ch : w->children) {
+            render_widget(m, ch);
+        }
     }
 }
 
@@ -487,6 +790,28 @@ void for_each_root(WidgetManager& m, Fn fn) {
     }
 }
 
+// 递归应用自动尺寸（在布局前调用）
+void apply_auto_size_recursive(WidgetManager& m, LumentWidget handle) {
+    Widget* w = m.validate(handle);
+    if (!w) return;
+    apply_auto_size(m, *w);
+    for (LumentWidget ch : w->children) {
+        apply_auto_size_recursive(m, ch);
+    }
+}
+
+// 递归更新动画时间（spinner 等）
+void update_anim_recursive(WidgetManager& m, LumentWidget handle, float dt) {
+    Widget* w = m.validate(handle);
+    if (!w) return;
+    if (w->type == LUMENT_WIDGET_SPINNER) {
+        w->animTime += dt;
+    }
+    for (LumentWidget ch : w->children) {
+        update_anim_recursive(m, ch, dt);
+    }
+}
+
 } // namespace
 
 namespace ue {
@@ -512,7 +837,13 @@ extern "C" {
 
 // --- 生命周期 ---
 LUMENT_API LumentWidget lument_ui_create(LumentWidgetType type) {
-    return mgr().alloc(type);
+    WidgetManager& m = mgr();
+    LumentWidget h = m.alloc(type);
+    Widget* w = m.validate(h);
+    if (w) {
+        apply_theme(*w);           // 新建控件自动套用主题色
+    }
+    return h;
 }
 
 LUMENT_API void lument_ui_destroy(LumentWidget widget) {
@@ -705,17 +1036,22 @@ LUMENT_API void lument_ui_set_focused(LumentWidget widget) {
 // --- 渲染与事件处理 ---
 LUMENT_API void lument_ui_render(void) {
     WidgetManager& m = mgr();
+    float dt = lument_get_delta_time() * 0.001f;  // 秒
 
     if (!m.navStack.empty()) {
         // 仅渲染栈顶屏幕
         LumentWidget screen = m.navStack.back();
         Widget* sw = m.validate(screen);
         if (!sw) { m.navStack.pop_back(); return; }
+        apply_auto_size_recursive(m, screen);
+        update_anim_recursive(m, screen, dt);
         compute_layout(m, screen, sw->x, sw->y);
         render_widget(m, screen);
     } else {
         // 无导航栈：渲染所有根控件
         for_each_root(m, [&](LumentWidget h, Widget& wgt) {
+            apply_auto_size_recursive(m, h);
+            update_anim_recursive(m, h, dt);
             compute_layout(m, h, wgt.x, wgt.y);
             render_widget(m, h);
         });
@@ -740,24 +1076,85 @@ LUMENT_API bool lument_ui_handle_touch(float x, float y, int type) {
         }
     }
 
+    Widget* hw = m.validate(hit);
+
     if (type == 0) {
-        // 按下：设置焦点 + 触发 CLICK
-        if (hit != LUMENT_INVALID_WIDGET) {
+        // 按下：设置焦点 + 触发 CLICK + 控件交互
+        if (hit != LUMENT_INVALID_WIDGET && hw) {
             set_focus(m, hit);
-            fire_event(m, hit, LUMENT_EVENT_CLICK, nullptr);
+            switch (hw->type) {
+            case LUMENT_WIDGET_SLIDER: {
+                // 按位置更新值
+                if (hw->w > 0.0f) {
+                    float t = (x - hw->absX) / hw->w;
+                    if (t < 0.0f) t = 0.0f;
+                    if (t > 1.0f) t = 1.0f;
+                    hw->value = hw->minVal + t * (hw->maxVal - hw->minVal);
+                    fire_event(m, hit, LUMENT_EVENT_CHANGE, nullptr);
+                }
+                break;
+            }
+            case LUMENT_WIDGET_CHECKBOX:
+                hw->checked = !hw->checked;
+                fire_event(m, hit, LUMENT_EVENT_CHANGE, nullptr);
+                break;
+            case LUMENT_WIDGET_TOGGLE:
+                hw->checked = !hw->checked;
+                fire_event(m, hit, LUMENT_EVENT_CHANGE, nullptr);
+                break;
+            case LUMENT_WIDGET_DROPDOWN:
+                if (hw->dropdownOpen) {
+                    // 已展开：判断点击的是哪个选项
+                    float itemH = std::max(hw->h, 20.0f);
+                    int idx = int((y - hw->absY - hw->h) / itemH);
+                    if (idx >= 0 && idx < int(hw->options.size())) {
+                        hw->selected = idx;
+                        hw->dropdownOpen = false;
+                        fire_event(m, hit, LUMENT_EVENT_CHANGE, nullptr);
+                    } else {
+                        hw->dropdownOpen = false;
+                    }
+                } else {
+                    hw->dropdownOpen = true;
+                }
+                break;
+            default:
+                fire_event(m, hit, LUMENT_EVENT_CLICK, nullptr);
+                break;
+            }
             return true;
         }
         // 点击空白处清除焦点
         set_focus(m, LUMENT_INVALID_WIDGET);
         return false;
     } else if (type == 1) {
-        // 移动：命中控件触发 SCROLL
-        if (hit != LUMENT_INVALID_WIDGET) {
+        // 移动
+        if (hit != LUMENT_INVALID_WIDGET && hw) {
+            if (hw->type == LUMENT_WIDGET_SLIDER && hw->w > 0.0f) {
+                // 拖动滑块
+                float t = (x - hw->absX) / hw->w;
+                if (t < 0.0f) t = 0.0f;
+                if (t > 1.0f) t = 1.0f;
+                hw->value = hw->minVal + t * (hw->maxVal - hw->minVal);
+                fire_event(m, hit, LUMENT_EVENT_CHANGE, nullptr);
+                return true;
+            }
+            if (hw->type == LUMENT_WIDGET_SCROLLVIEW) {
+                // 简易滚动：根据 y 偏移累加 scrollY
+                // 实际滚动由宿主在 SCROLL 回调中调用 lument_ui_set_scroll
+                fire_event(m, hit, LUMENT_EVENT_SCROLL, nullptr);
+                return true;
+            }
             fire_event(m, hit, LUMENT_EVENT_SCROLL, nullptr);
             return true;
         }
         return false;
     } else { // type == 2 抬起
+        if (hit != LUMENT_INVALID_WIDGET && hw) {
+            if (hw->type == LUMENT_WIDGET_SLIDER) {
+                fire_event(m, hit, LUMENT_EVENT_CHANGE, nullptr);
+            }
+        }
         return hit != LUMENT_INVALID_WIDGET;
     }
 }
@@ -854,8 +1251,7 @@ LUMENT_API LumentWidget lument_ui_create_button(const char* text, float x, float
     if (bw) {
         bw->text = text ? text : "";
         bw->x = x; bw->y = y; bw->w = w; bw->h = h;
-        bw->bgColor   = COLOR_BTN_BG;
-        bw->textColor = { 255, 255, 255, 255 };
+        apply_theme(*bw);
     }
     return handle;
 }
@@ -867,8 +1263,7 @@ LUMENT_API LumentWidget lument_ui_create_label(const char* text, float x, float 
     if (lw) {
         lw->text = text ? text : "";
         lw->x = x; lw->y = y; lw->w = w; lw->h = h;
-        lw->bgColor   = COLOR_LABEL_BG; // 透明
-        lw->textColor = { 235, 235, 235, 255 };
+        apply_theme(*lw);
     }
     return handle;
 }
@@ -880,10 +1275,592 @@ LUMENT_API LumentWidget lument_ui_create_input(const char* placeholder, float x,
     if (iw) {
         iw->text = placeholder ? placeholder : "";
         iw->x = x; iw->y = y; iw->w = w; iw->h = h;
-        iw->bgColor   = COLOR_INPUT_BG;
-        iw->textColor = { 235, 235, 235, 255 };
+        apply_theme(*iw);
     }
     return handle;
+}
+
+// --- 新增控件便捷创建（v1.3）---
+LUMENT_API LumentWidget lument_ui_create_dropdown(float x, float y, float w, float h) {
+    WidgetManager& m = mgr();
+    LumentWidget handle = m.alloc(LUMENT_WIDGET_DROPDOWN);
+    Widget* wgt = m.validate(handle);
+    if (wgt) {
+        wgt->x = x; wgt->y = y; wgt->w = w; wgt->h = h;
+        apply_theme(*wgt);
+    }
+    return handle;
+}
+
+LUMENT_API LumentWidget lument_ui_create_toggle(bool initial, float x, float y, float w, float h) {
+    WidgetManager& m = mgr();
+    LumentWidget handle = m.alloc(LUMENT_WIDGET_TOGGLE);
+    Widget* wgt = m.validate(handle);
+    if (wgt) {
+        wgt->x = x; wgt->y = y; wgt->w = w; wgt->h = h;
+        wgt->checked = initial;
+        apply_theme(*wgt);
+    }
+    return handle;
+}
+
+LUMENT_API LumentWidget lument_ui_create_scrollview(float x, float y, float w, float h) {
+    WidgetManager& m = mgr();
+    LumentWidget handle = m.alloc(LUMENT_WIDGET_SCROLLVIEW);
+    Widget* wgt = m.validate(handle);
+    if (wgt) {
+        wgt->x = x; wgt->y = y; wgt->w = w; wgt->h = h;
+        wgt->contentW = w; wgt->contentH = h; // 默认内容=可视区
+        apply_theme(*wgt);
+    }
+    return handle;
+}
+
+LUMENT_API LumentWidget lument_ui_create_tooltip(const char* text, float x, float y) {
+    WidgetManager& m = mgr();
+    LumentWidget handle = m.alloc(LUMENT_WIDGET_TOOLTIP);
+    Widget* wgt = m.validate(handle);
+    if (wgt) {
+        wgt->text = text ? text : "";
+        wgt->x = x; wgt->y = y;
+        // 尺寸按内容自适应
+        wgt->autoSize = LUMENT_AUTOSIZE_BOTH;
+        apply_theme(*wgt);
+    }
+    return handle;
+}
+
+LUMENT_API LumentWidget lument_ui_create_progress(float x, float y, float w, float h) {
+    WidgetManager& m = mgr();
+    LumentWidget handle = m.alloc(LUMENT_WIDGET_PROGRESS);
+    Widget* wgt = m.validate(handle);
+    if (wgt) {
+        wgt->x = x; wgt->y = y; wgt->w = w; wgt->h = h;
+        wgt->value = 0.0f;
+        apply_theme(*wgt);
+    }
+    return handle;
+}
+
+LUMENT_API LumentWidget lument_ui_create_slider(float min, float max, float value,
+                                                float x, float y, float w, float h) {
+    WidgetManager& m = mgr();
+    LumentWidget handle = m.alloc(LUMENT_WIDGET_SLIDER);
+    Widget* wgt = m.validate(handle);
+    if (wgt) {
+        wgt->x = x; wgt->y = y; wgt->w = w; wgt->h = h;
+        wgt->minVal = min; wgt->maxVal = max; wgt->value = value;
+        apply_theme(*wgt);
+    }
+    return handle;
+}
+
+LUMENT_API LumentWidget lument_ui_create_checkbox(bool initial, float x, float y, float w, float h) {
+    WidgetManager& m = mgr();
+    LumentWidget handle = m.alloc(LUMENT_WIDGET_CHECKBOX);
+    Widget* wgt = m.validate(handle);
+    if (wgt) {
+        wgt->x = x; wgt->y = y; wgt->w = w; wgt->h = h;
+        wgt->checked = initial;
+        apply_theme(*wgt);
+    }
+    return handle;
+}
+
+LUMENT_API LumentWidget lument_ui_create_divider(float x, float y, float w, float h) {
+    WidgetManager& m = mgr();
+    LumentWidget handle = m.alloc(LUMENT_WIDGET_DIVIDER);
+    Widget* wgt = m.validate(handle);
+    if (wgt) {
+        wgt->x = x; wgt->y = y; wgt->w = w; wgt->h = h;
+        apply_theme(*wgt);
+    }
+    return handle;
+}
+
+LUMENT_API LumentWidget lument_ui_create_spinner(float x, float y, float size) {
+    WidgetManager& m = mgr();
+    LumentWidget handle = m.alloc(LUMENT_WIDGET_SPINNER);
+    Widget* wgt = m.validate(handle);
+    if (wgt) {
+        wgt->x = x; wgt->y = y; wgt->w = size; wgt->h = size;
+        apply_theme(*wgt);
+    }
+    return handle;
+}
+
+LUMENT_API LumentWidget lument_ui_create_icon(uint32_t textureId, float x, float y, float size) {
+    WidgetManager& m = mgr();
+    LumentWidget handle = m.alloc(LUMENT_WIDGET_ICON);
+    Widget* wgt = m.validate(handle);
+    if (wgt) {
+        wgt->x = x; wgt->y = y; wgt->w = size; wgt->h = size;
+        wgt->textureId = textureId;
+        apply_theme(*wgt);
+    }
+    return handle;
+}
+
+// --- 控件状态查询与设置（v1.3，统一数值接口）---
+LUMENT_API void lument_ui_set_value(LumentWidget widget, float value) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) return;
+    if (w->type == LUMENT_WIDGET_SLIDER) {
+        if (value < w->minVal) value = w->minVal;
+        if (value > w->maxVal) value = w->maxVal;
+    } else if (w->type == LUMENT_WIDGET_PROGRESS) {
+        if (value < 0.0f) value = 0.0f;
+        if (value > 1.0f) value = 1.0f;
+    }
+    w->value = value;
+}
+
+LUMENT_API float lument_ui_get_value(LumentWidget widget) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) return 0.0f;
+    return w->value;
+}
+
+LUMENT_API void lument_ui_set_min_max(LumentWidget widget, float min, float max) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) return;
+    w->minVal = min;
+    w->maxVal = max;
+}
+
+LUMENT_API void lument_ui_set_options(LumentWidget widget, const char* const* options, int count) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) return;
+    w->options.clear();
+    w->options.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        w->options.push_back(options[i] ? options[i] : "");
+    }
+    if (w->selected >= count) w->selected = count - 1;
+    if (w->selected < 0) w->selected = 0;
+}
+
+LUMENT_API int lument_ui_get_selected(LumentWidget widget) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) return 0;
+    return w->selected;
+}
+
+LUMENT_API void lument_ui_set_selected(LumentWidget widget, int index) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) return;
+    if (index >= 0 && index < int(w->options.size())) {
+        w->selected = index;
+    }
+}
+
+LUMENT_API void lument_ui_set_checked(LumentWidget widget, bool checked) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) return;
+    w->checked = checked;
+}
+
+LUMENT_API bool lument_ui_get_checked(LumentWidget widget) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) return false;
+    return w->checked;
+}
+
+LUMENT_API void lument_ui_set_scroll(LumentWidget widget, float offsetX, float offsetY) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) return;
+    // 钳制在内容范围内
+    if (w->contentW > w->w) {
+        if (offsetX < 0.0f) offsetX = 0.0f;
+        if (offsetX > w->contentW - w->w) offsetX = w->contentW - w->w;
+    } else { offsetX = 0.0f; }
+    if (w->contentH > w->h) {
+        if (offsetY < 0.0f) offsetY = 0.0f;
+        if (offsetY > w->contentH - w->h) offsetY = w->contentH - w->h;
+    } else { offsetY = 0.0f; }
+    w->scrollX = offsetX;
+    w->scrollY = offsetY;
+}
+
+LUMENT_API void lument_ui_get_scroll(LumentWidget widget, float* offsetX, float* offsetY) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) { if (offsetX) *offsetX = 0; if (offsetY) *offsetY = 0; return; }
+    if (offsetX) *offsetX = w->scrollX;
+    if (offsetY) *offsetY = w->scrollY;
+}
+
+// --- 滚动视图内容管理 ---
+LUMENT_API void lument_ui_set_content_size(LumentWidget scrollview, float w, float h) {
+    WidgetManager& m = mgr();
+    Widget* sv = m.validate(scrollview);
+    if (!sv) return;
+    sv->contentW = w;
+    sv->contentH = h;
+}
+
+// --- 自动化系统（v1.3）---
+LUMENT_API void lument_ui_set_theme(const LumentTheme* theme) {
+    if (!theme) return;
+    g_theme = *theme;
+    g_themeDirty = true;
+    // 立即刷新所有存活控件外观
+    WidgetManager& m = mgr();
+    for (uint32_t i = 0; i < LUMENT_MAX_WIDGETS; ++i) {
+        if (m.used[i]) {
+            apply_theme(m.widgets[i]);
+        }
+    }
+}
+
+LUMENT_API void lument_ui_get_theme(LumentTheme* outTheme) {
+    if (!outTheme) return;
+    *outTheme = g_theme;
+}
+
+LUMENT_API void lument_ui_reset_theme(void) {
+    g_theme = {
+        { 18, 18, 24, 255 },   // background
+        { 30, 30, 38, 255 },   // surface
+        { 60, 90, 160, 255 },  // primary
+        { 90, 90, 110, 255 },  // secondary
+        { 235, 235, 235, 255 },// text
+        { 130, 130, 140, 255 },// textMuted
+        { 120, 120, 130, 255 },// border
+        { 100, 200, 255, 255 },// accent
+        { 220, 70, 70, 255 },  // danger
+        { 80, 180, 100, 255 }, // success
+    };
+    g_themeDirty = true;
+    WidgetManager& m = mgr();
+    for (uint32_t i = 0; i < LUMENT_MAX_WIDGETS; ++i) {
+        if (m.used[i]) apply_theme(m.widgets[i]);
+    }
+}
+
+LUMENT_API void lument_ui_set_auto_size(LumentWidget widget, int mode) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) return;
+    w->autoSize = mode;
+}
+
+LUMENT_API void lument_ui_measure_text(const char* text, float fontSize, float* outW, float* outH) {
+    if (!outW && !outH) return;
+    std::string s = text ? text : "";
+    if (outW) *outW = text_width(s, fontSize);
+    if (outH) *outH = fontSize;
+}
+
+LUMENT_API void lument_ui_set_margin(LumentWidget widget, float top, float right, float bottom, float left) {
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(widget);
+    if (!w) return;
+    w->marginTop = top; w->marginRight = right;
+    w->marginBottom = bottom; w->marginLeft = left;
+}
+
+// --- 声明式 UI 构建（v1.3）---
+// 极简 JSON 解析器（仅支持本 API 所需子集）
+namespace ui_json {
+
+struct Value {
+    enum Type { NUL, BOOL, NUM, STR, ARR, OBJ } type = NUL;
+    bool b = false;
+    double num = 0.0;
+    std::string str;
+    std::vector<Value> arr;
+    std::vector<std::pair<std::string, Value>> obj;
+
+    const Value* find(const std::string& key) const {
+        if (type != OBJ) return nullptr;
+        for (const auto& kv : obj) {
+            if (kv.first == key) return &kv.second;
+        }
+        return nullptr;
+    }
+};
+
+// 跳过空白
+inline const char* skip_ws(const char* p) {
+    while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) ++p;
+    return p;
+}
+
+// 解析字符串（假定已跳过开头引号）
+inline std::string parse_string(const char*& p) {
+    std::string s;
+    while (*p && *p != '"') {
+        if (*p == '\\') {
+            ++p;
+            switch (*p) {
+            case 'n': s += '\n'; break;
+            case 't': s += '\t'; break;
+            case '"': s += '"'; break;
+            case '\\': s += '\\'; break;
+            default: s += *p; break;
+            }
+        } else {
+            s += *p;
+        }
+        ++p;
+    }
+    if (*p == '"') ++p; // 跳过结尾引号
+    return s;
+}
+
+inline Value parse_value(const char*& p);
+
+inline Value parse_array(const char*& p) {
+    Value v; v.type = Value::ARR;
+    p = skip_ws(p + 1); // 跳过 '['
+    while (*p && *p != ']') {
+        p = skip_ws(p);
+        v.arr.push_back(parse_value(p));
+        p = skip_ws(p);
+        if (*p == ',') ++p;
+        p = skip_ws(p);
+    }
+    if (*p == ']') ++p;
+    return v;
+}
+
+inline Value parse_object(const char*& p) {
+    Value v; v.type = Value::OBJ;
+    p = skip_ws(p + 1); // 跳过 '{'
+    while (*p && *p != '}') {
+        p = skip_ws(p);
+        if (*p != '"') { ++p; continue; }
+        ++p; // 跳过开头引号
+        std::string key = parse_string(p);
+        p = skip_ws(p);
+        if (*p == ':') ++p;
+        p = skip_ws(p);
+        v.obj.emplace_back(std::move(key), parse_value(p));
+        p = skip_ws(p);
+        if (*p == ',') ++p;
+        p = skip_ws(p);
+    }
+    if (*p == '}') ++p;
+    return v;
+}
+
+inline Value parse_value(const char*& p) {
+    p = skip_ws(p);
+    Value v;
+    if (*p == '"') {
+        ++p;
+        v.type = Value::STR;
+        v.str = parse_string(p);
+    } else if (*p == '{') {
+        return parse_object(p);
+    } else if (*p == '[') {
+        return parse_array(p);
+    } else if (*p == 't') {
+        v.type = Value::BOOL; v.b = true;
+        while (*p && *p != ',' && *p != '}' && *p != ']') ++p;
+    } else if (*p == 'f') {
+        v.type = Value::BOOL; v.b = false;
+        while (*p && *p != ',' && *p != '}' && *p != ']') ++p;
+    } else {
+        // 数字
+        char* end = nullptr;
+        v.type = Value::NUM;
+        v.num = std::strtod(p, &end);
+        p = end;
+    }
+    return v;
+}
+
+} // namespace ui_json
+
+// 类型名 -> 枚举值
+LumentWidgetType parse_widget_type(const std::string& s) {
+    if (s == "container")  return LUMENT_WIDGET_CONTAINER;
+    if (s == "button")     return LUMENT_WIDGET_BUTTON;
+    if (s == "label")      return LUMENT_WIDGET_LABEL;
+    if (s == "input")      return LUMENT_WIDGET_INPUT;
+    if (s == "image")      return LUMENT_WIDGET_IMAGE;
+    if (s == "list")       return LUMENT_WIDGET_LIST;
+    if (s == "progress")   return LUMENT_WIDGET_PROGRESS;
+    if (s == "checkbox")   return LUMENT_WIDGET_CHECKBOX;
+    if (s == "slider")     return LUMENT_WIDGET_SLIDER;
+    if (s == "tabbar")     return LUMENT_WIDGET_TABBAR;
+    if (s == "navbar")     return LUMENT_WIDGET_NAVBAR;
+    if (s == "dropdown")   return LUMENT_WIDGET_DROPDOWN;
+    if (s == "toggle")     return LUMENT_WIDGET_TOGGLE;
+    if (s == "scrollview") return LUMENT_WIDGET_SCROLLVIEW;
+    if (s == "tooltip")    return LUMENT_WIDGET_TOOLTIP;
+    if (s == "divider")    return LUMENT_WIDGET_DIVIDER;
+    if (s == "spinner")    return LUMENT_WIDGET_SPINNER;
+    if (s == "icon")       return LUMENT_WIDGET_ICON;
+    return LUMENT_WIDGET_CONTAINER;
+}
+
+// 布局名 -> 枚举值
+LumentLayoutType parse_layout(const std::string& s) {
+    if (s == "none")       return LUMENT_LAYOUT_NONE;
+    if (s == "vertical")   return LUMENT_LAYOUT_VERTICAL;
+    if (s == "horizontal") return LUMENT_LAYOUT_HORIZONTAL;
+    if (s == "grid")       return LUMENT_LAYOUT_GRID;
+    if (s == "stack")      return LUMENT_LAYOUT_STACK;
+    if (s == "flow")       return LUMENT_LAYOUT_FLOW;
+    return LUMENT_LAYOUT_NONE;
+}
+
+// 递归从 JSON 构建控件树
+LumentWidget build_widget_recursive(const ui_json::Value& node) {
+    if (node.type != ui_json::Value::OBJ) return LUMENT_INVALID_WIDGET;
+    const ui_json::Value* t = node.find("type");
+    std::string typeStr = t ? t->str : "container";
+    LumentWidgetType wt = parse_widget_type(typeStr);
+
+    WidgetManager& m = mgr();
+    LumentWidget handle = m.alloc(wt);
+    Widget* w = m.validate(handle);
+    if (!w) return LUMENT_INVALID_WIDGET;
+    apply_theme(*w);
+
+    // 通用属性
+    if (const auto* v = node.find("text"))     if (v->type == ui_json::Value::STR) w->text = v->str;
+    if (const auto* v = node.find("name"))      if (v->type == ui_json::Value::STR) w->name = v->str;
+    if (const auto* v = node.find("x"))          if (v->type == ui_json::Value::NUM) w->x = float(v->num);
+    if (const auto* v = node.find("y"))          if (v->type == ui_json::Value::NUM) w->y = float(v->num);
+    if (const auto* v = node.find("w"))          if (v->type == ui_json::Value::NUM) w->w = float(v->num);
+    if (const auto* v = node.find("h"))          if (v->type == ui_json::Value::NUM) w->h = float(v->num);
+    if (const auto* v = node.find("fontSize"))   if (v->type == ui_json::Value::NUM) w->fontSize = float(v->num);
+    if (const auto* v = node.find("visible"))    if (v->type == ui_json::Value::BOOL) w->visible = v->b;
+    if (const auto* v = node.find("enabled"))    if (v->type == ui_json::Value::BOOL) w->enabled = v->b;
+    if (const auto* v = node.find("layout"))     if (v->type == ui_json::Value::STR) w->layout = parse_layout(v->str);
+    if (const auto* v = node.find("spacing"))    if (v->type == ui_json::Value::NUM) w->spacing = float(v->num);
+    if (const auto* v = node.find("alignment"))  if (v->type == ui_json::Value::NUM) w->alignment = int(v->num);
+    if (const auto* v = node.find("padding"))    if (v->type == ui_json::Value::ARR && v->arr.size() >= 4) {
+        w->padTop = float(v->arr[0].num);
+        w->padRight = float(v->arr[1].num);
+        w->padBottom = float(v->arr[2].num);
+        w->padLeft = float(v->arr[3].num);
+    }
+    if (const auto* v = node.find("gridCols"))   if (v->type == ui_json::Value::NUM) w->gridCols = int(v->num);
+    if (const auto* v = node.find("gridRows"))   if (v->type == ui_json::Value::NUM) w->gridRows = int(v->num);
+    if (const auto* v = node.find("checked"))    if (v->type == ui_json::Value::BOOL) w->checked = v->b;
+    if (const auto* v = node.find("value"))      if (v->type == ui_json::Value::NUM) w->value = float(v->num);
+    if (const auto* v = node.find("min"))        if (v->type == ui_json::Value::NUM) w->minVal = float(v->num);
+    if (const auto* v = node.find("max"))        if (v->type == ui_json::Value::NUM) w->maxVal = float(v->num);
+    if (const auto* v = node.find("selected"))  if (v->type == ui_json::Value::NUM) w->selected = int(v->num);
+    if (const auto* v = node.find("options"))    if (v->type == ui_json::Value::ARR) {
+        for (const auto& opt : v->arr) {
+            if (opt.type == ui_json::Value::STR) w->options.push_back(opt.str);
+        }
+    }
+
+    // 子控件
+    if (const auto* children = node.find("children")) {
+        if (children->type == ui_json::Value::ARR) {
+            for (const auto& childNode : children->arr) {
+                LumentWidget child = build_widget_recursive(childNode);
+                if (child != LUMENT_INVALID_WIDGET) {
+                    lument_ui_add_child(handle, child);
+                }
+            }
+        }
+    }
+    return handle;
+}
+
+LUMENT_API LumentWidget lument_ui_build_from_json(const char* json) {
+    if (!json) return LUMENT_INVALID_WIDGET;
+    const char* p = json;
+    ui_json::Value root = ui_json::parse_value(p);
+    return build_widget_recursive(root);
+}
+
+// 调试：输出控件树为 JSON（返回静态缓冲区）
+LUMENT_API const char* lument_ui_dump_tree(LumentWidget root) {
+    static std::string buf;
+    buf.clear();
+    WidgetManager& m = mgr();
+    Widget* w = m.validate(root);
+    if (!w) { buf = "null"; return buf.c_str(); }
+
+    auto type_name = [](LumentWidgetType t) -> const char* {
+        switch (t) {
+        case LUMENT_WIDGET_CONTAINER:  return "container";
+        case LUMENT_WIDGET_BUTTON:     return "button";
+        case LUMENT_WIDGET_LABEL:      return "label";
+        case LUMENT_WIDGET_INPUT:      return "input";
+        case LUMENT_WIDGET_IMAGE:      return "image";
+        case LUMENT_WIDGET_LIST:       return "list";
+        case LUMENT_WIDGET_PROGRESS:   return "progress";
+        case LUMENT_WIDGET_CHECKBOX:   return "checkbox";
+        case LUMENT_WIDGET_SLIDER:     return "slider";
+        case LUMENT_WIDGET_TABBAR:     return "tabbar";
+        case LUMENT_WIDGET_NAVBAR:     return "navbar";
+        case LUMENT_WIDGET_DROPDOWN:   return "dropdown";
+        case LUMENT_WIDGET_TOGGLE:     return "toggle";
+        case LUMENT_WIDGET_SCROLLVIEW: return "scrollview";
+        case LUMENT_WIDGET_TOOLTIP:    return "tooltip";
+        case LUMENT_WIDGET_DIVIDER:    return "divider";
+        case LUMENT_WIDGET_SPINNER:    return "spinner";
+        case LUMENT_WIDGET_ICON:       return "icon";
+        default: return "unknown";
+        }
+    };
+
+    std::function<void(LumentWidget, int)> dump_rec = [&](LumentWidget h, int depth) {
+        Widget* cw = m.validate(h);
+        if (!cw) return;
+        for (int i = 0; i < depth; ++i) buf += "  ";
+        buf += "{";
+        buf += "\"type\":\""; buf += type_name(cw->type); buf += "\"";
+        if (!cw->name.empty()) { buf += ",\"name\":\""; buf += cw->name; buf += "\""; }
+        if (!cw->text.empty()) { buf += ",\"text\":\""; buf += cw->text; buf += "\""; }
+        buf += ",\"x\":"; buf += std::to_string(cw->x);
+        buf += ",\"y\":"; buf += std::to_string(cw->y);
+        buf += ",\"w\":"; buf += std::to_string(cw->w);
+        buf += ",\"h\":"; buf += std::to_string(cw->h);
+        if (cw->checked) buf += ",\"checked\":true";
+        if (cw->type == LUMENT_WIDGET_SLIDER) {
+            buf += ",\"value\":"; buf += std::to_string(cw->value);
+            buf += ",\"min\":"; buf += std::to_string(cw->minVal);
+            buf += ",\"max\":"; buf += std::to_string(cw->maxVal);
+        }
+        if (cw->type == LUMENT_WIDGET_DROPDOWN) {
+            buf += ",\"selected\":"; buf += std::to_string(cw->selected);
+        }
+        if (!cw->children.empty()) {
+            buf += ",\"children\":[\n";
+            for (size_t i = 0; i < cw->children.size(); ++i) {
+                dump_rec(cw->children[i], depth + 1);
+                if (i + 1 < cw->children.size()) buf += ",";
+                buf += "\n";
+            }
+            for (int i = 0; i < depth; ++i) buf += "  ";
+            buf += "]";
+        }
+        buf += "}";
+    };
+    dump_rec(root, 0);
+    return buf.c_str();
+}
+
+LUMENT_API LumentWidget lument_ui_find_by_id(const char* name) {
+    if (!name) return LUMENT_INVALID_WIDGET;
+    WidgetManager& m = mgr();
+    for (uint32_t i = 0; i < LUMENT_MAX_WIDGETS; ++i) {
+        if (m.used[i] && m.widgets[i].name == name) {
+            return make_widget(i, m.gen[i]);
+        }
+    }
+    return LUMENT_INVALID_WIDGET;
 }
 
 } // extern "C"

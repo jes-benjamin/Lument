@@ -162,39 +162,154 @@ uint32_t g_activeRenderTarget = 0;  // 0=屏幕
 
 // =====================================================================
 // 第二部分：精灵批次
+// --------------------------------------------------------------------
+// SpriteCmd 直接存储 4 个角点（世界坐标）+ UV 矩形 + 顶点色。
+// 这样既能表达轴对齐四边形（sprite/rect/text），也能表达任意三角形
+// （以退化四边形 v0,v1,v2,v2 形式提交，索引 0,1,2,2,3,0 仅渲染
+// 第一个三角形），从而让所有图元复用同一套按纹理分组的批量提交路径。
 // =====================================================================
 struct SpriteCmd {
-    uint32_t texId;     // 池 id
-    LumentRect   dest;
-    LumentRect   src;       // 像素；w/h<=0 表示整张纹理
-    LumentColor  color;
+    uint32_t texId;          // 池 id
+    // 4 个角点（TL, TR, BR, BL）
+    float x0, y0, x1, y1, x2, y2, x3, y3;
+    // UV 矩形（TL=u0,v0; TR=u1,v0; BR=u1,v1; BL=u0,v1）
+    float u0, v0, u1, v1;
+    LumentColor color;
 };
 
 std::vector<SpriteCmd> g_batch;
 std::vector<LumentSpriteVertex> g_batchVerts; // 复用缓冲，避免反复分配
 uint32_t g_drawCalls = 0;
 
-// 把命令转换为 4 个顶点（三角形带顺序）。
-inline void build_quad(std::vector<LumentSpriteVertex>& out,
-                       const SpriteCmd& cmd, const TexSlot& tex) {
-    const float x = cmd.dest.x, y = cmd.dest.y;
-    const float w = cmd.dest.w, h = cmd.dest.h;
+// 手动批次状态（lument_begin_batch / end_batch）
+std::vector<SpriteCmd> g_manualBatch;
+uint32_t g_manualTex = 0;
+bool g_manualActive = false;
 
-    float u0, v0, u1, v1;
-    if (cmd.src.w <= 0.0f || cmd.src.h <= 0.0f || tex.w == 0 || tex.h == 0) {
+// 混合模式：0=normal 1=additive 2=multiply
+int g_blendMode = 0;
+
+// 把命令转换为 4 个顶点（三角形带顺序）。
+inline void build_quad(std::vector<LumentSpriteVertex>& out, const SpriteCmd& cmd) {
+    const uint8_t r = cmd.color.r, g = cmd.color.g, b = cmd.color.b, a = cmd.color.a;
+    out.push_back({ cmd.x0, cmd.y0, cmd.u0, cmd.v0, r, g, b, a });
+    out.push_back({ cmd.x1, cmd.y1, cmd.u1, cmd.v0, r, g, b, a });
+    out.push_back({ cmd.x2, cmd.y2, cmd.u1, cmd.v1, r, g, b, a });
+    out.push_back({ cmd.x3, cmd.y3, cmd.u0, cmd.v1, r, g, b, a });
+}
+
+// 应用场景色调（tint + brightness）到顶点色。集中于此，供所有 push_* 复用。
+inline LumentColor apply_scene_tint(LumentColor c) {
+    const LumentSceneColor& sc = g_sceneColor;
+    c.r = (uint8_t)((uint16_t)c.r * sc.tint.r / 255);
+    c.g = (uint8_t)((uint16_t)c.g * sc.tint.g / 255);
+    c.b = (uint8_t)((uint16_t)c.b * sc.tint.b / 255);
+    if (sc.brightness != 1.0f) {
+        float b = sc.brightness;
+        c.r = (uint8_t)std::min(255.0f, c.r * b);
+        c.g = (uint8_t)std::min(255.0f, c.g * b);
+        c.b = (uint8_t)std::min(255.0f, c.b * b);
+    }
+    return c;
+}
+
+// 计算 UV 矩形：src.w/h<=0 或纹理缺失时退化为整张纹理 (0,0,1,1)
+inline void compute_uv(const TexSlot* tex, LumentRect src,
+                       float& u0, float& v0, float& u1, float& v1) {
+    if (!tex || tex->w == 0 || tex->h == 0 || src.w <= 0.0f || src.h <= 0.0f) {
         u0 = 0.0f; v0 = 0.0f; u1 = 1.0f; v1 = 1.0f;
     } else {
-        u0 = cmd.src.x / tex.w;
-        v0 = cmd.src.y / tex.h;
-        u1 = (cmd.src.x + cmd.src.w) / tex.w;
-        v1 = (cmd.src.y + cmd.src.h) / tex.h;
+        u0 = src.x / tex->w;
+        v0 = src.y / tex->h;
+        u1 = (src.x + src.w) / tex->w;
+        v1 = (src.y + src.h) / tex->h;
     }
-    const uint8_t r = cmd.color.r, g = cmd.color.g, b = cmd.color.b, a = cmd.color.a;
-    // 三角形带：左上、右上、右下、左下
-    out.push_back({ x,     y,     u0, v0, r, g, b, a });
-    out.push_back({ x + w, y,     u1, v0, r, g, b, a });
-    out.push_back({ x + w, y + h, u1, v1, r, g, b, a });
-    out.push_back({ x,     y + h, u0, v1, r, g, b, a });
+}
+
+// 推入轴对齐四边形（sprite / rect / text 字形用）。
+void push_sprite(uint32_t texId, LumentRect dest, LumentRect src, LumentColor color) {
+    if (!g_initialized) return;
+    if (texId == 0) texId = g_whiteTexId; // 无纹理退化为纯色
+
+    LumentColor c = apply_scene_tint(color);
+    const TexSlot* tex = g_texPool.get(texId);
+    float u0, v0, u1, v1;
+    compute_uv(tex, src, u0, v0, u1, v1);
+
+    const float x = dest.x, y = dest.y, w = dest.w, h = dest.h;
+    g_batch.push_back({ texId,
+                        x,     y,      // TL
+                        x + w, y,      // TR
+                        x + w, y + h,  // BR
+                        x,     y + h,  // BL
+                        u0, v0, u1, v1, c });
+}
+
+// 推入任意四边形（图元用），UV 固定整张（白色纹理着色）。
+inline void push_quad_raw(uint32_t texId,
+                          float x0, float y0, float x1, float y1,
+                          float x2, float y2, float x3, float y3,
+                          LumentColor color) {
+    if (!g_initialized) return;
+    if (texId == 0) texId = g_whiteTexId;
+    LumentColor c = apply_scene_tint(color);
+    g_batch.push_back({ texId,
+                        x0, y0, x1, y1, x2, y2, x3, y3,
+                        0.0f, 0.0f, 1.0f, 1.0f, c });
+}
+
+// 推入三角形（以退化四边形 v0,v1,v2,v2 提交，仅渲染△v0v1v2）。
+inline void push_triangle(float ax, float ay, float bx, float by,
+                          float cx, float cy, LumentColor color) {
+    push_quad_raw(g_whiteTexId, ax, ay, bx, by, cx, cy, cx, cy, color);
+}
+
+// 推入以 (ox,oy) 为中心、厚度 t 的线段四边形。
+inline void push_line(float x1, float y1, float x2, float y2,
+                     float t, LumentColor color) {
+    if (t <= 0.0f) t = 1.0f;
+    float dx = x2 - x1, dy = y2 - y1;
+    float len = std::sqrt(dx * dx + dy * dy);
+    if (len < 1e-6f) {
+        // 退化线段 → 画一个小方块
+        push_quad_raw(g_whiteTexId, x1, y1, x1 + t, y1, x1 + t, y1 + t, x1, y1 + t, color);
+        return;
+    }
+    float nx = -dy / len * (t * 0.5f);
+    float ny =  dx / len * (t * 0.5f);
+    // 四个角：p1+n, p2+n, p2-n, p1-n
+    push_quad_raw(g_whiteTexId,
+                  x1 + nx, y1 + ny,
+                  x2 + nx, y2 + ny,
+                  x2 - nx, y2 - ny,
+                  x1 - nx, y1 - ny, color);
+}
+
+// 提交一个命令区间（同纹理）的顶点。供自动批次与手动批次复用。
+inline void flush_range(const SpriteCmd* cmds, size_t begin, size_t end,
+                        uint32_t texId) {
+    TexSlot* slot = g_texPool.get(texId);
+    if (!slot) return;
+    g_batchVerts.clear();
+    for (size_t k = begin; k < end; ++k) {
+        build_quad(g_batchVerts, cmds[k]);
+    }
+    size_t quadCount = end - begin;
+    if (quadCount == 0) return;
+    g_backend->drawSpriteBatch(slot->backendId, g_batchVerts.data(), quadCount);
+    // 后端内部对超大批次会再分块；按 4096 估算 draw call。
+    g_drawCalls += uint32_t((quadCount + 4095) / 4096);
+}
+
+// 提交挂起的手动批次（若活跃）。供自动 flush 与 end_batch 复用。
+inline void flush_manual_batch() {
+    if (!g_manualActive) return;
+    if (!g_manualBatch.empty()) {
+        // 手动批次所有命令共用同一纹理，无需排序
+        flush_range(g_manualBatch.data(), 0, g_manualBatch.size(), g_manualTex);
+    }
+    g_manualBatch.clear();
+    g_manualActive = false;
 }
 
 // =====================================================================
@@ -399,28 +514,10 @@ void init_font_atlas() {
 
 // =====================================================================
 // 第五部分：内部渲染接口
+// --------------------------------------------------------------------
+// push_sprite / push_quad_raw / push_triangle / push_line 的实现见
+// 第二部分（精灵批次），这里仅保留命名空间闭合与 ue:: 内部接口。
 // =====================================================================
-void push_sprite(uint32_t texId, LumentRect dest, LumentRect src, LumentColor color) {
-    if (!g_initialized) return;
-    if (texId == 0) texId = g_whiteTexId; // 无纹理退化为纯色
-
-    // 应用场景色调（tint）和亮度到顶点色
-    LumentColor c = color;
-    const LumentSceneColor& sc = g_sceneColor;
-    // tint 乘法
-    c.r = (uint8_t)((uint16_t)c.r * sc.tint.r / 255);
-    c.g = (uint8_t)((uint16_t)c.g * sc.tint.g / 255);
-    c.b = (uint8_t)((uint16_t)c.b * sc.tint.b / 255);
-    // 亮度
-    if (sc.brightness != 1.0f) {
-        float b = sc.brightness;
-        c.r = (uint8_t)std::min(255.0f, c.r * b);
-        c.g = (uint8_t)std::min(255.0f, c.g * b);
-        c.b = (uint8_t)std::min(255.0f, c.b * b);
-    }
-    g_batch.push_back({ texId, dest, src, c });
-}
-
 } // namespace
 
 #if defined(LUMENT_BACKEND_GLES2)
@@ -457,6 +554,12 @@ bool init_renderer(const LumentConfig& cfg) {
     memset(g_lights, 0, sizeof(g_lights));
     memset(g_renderTargets, 0, sizeof(g_renderTargets));
     g_activeRenderTarget = 0;
+
+    // 重置手动批次与混合模式
+    g_manualBatch.clear();
+    g_manualTex = 0;
+    g_manualActive = false;
+    g_blendMode = 0;
 
     // 选择后端
 #if defined(LUMENT_BACKEND_GLES2)
@@ -511,6 +614,10 @@ void shutdown_renderer() {
     g_texPool.reset();
     g_batch.clear();
     g_batchVerts.clear();
+    g_manualBatch.clear();
+    g_manualTex = 0;
+    g_manualActive = false;
+    g_blendMode = 0;
     g_whiteTexId = g_fontTexId = 0;
     g_initialized = false;
 }
@@ -523,6 +630,8 @@ void renderer_set_viewport(int w, int h) {
 void renderer_begin_frame() {
     g_drawCalls = 0;
     g_batch.clear();
+    g_manualBatch.clear();
+    g_manualActive = false;
 }
 
 void renderer_draw_sprite(uint32_t tex, LumentRect dest, LumentRect src, LumentColor color) {
@@ -530,7 +639,10 @@ void renderer_draw_sprite(uint32_t tex, LumentRect dest, LumentRect src, LumentC
 }
 
 void renderer_flush_batch() {
-    if (!g_initialized || g_batch.empty()) return;
+    if (!g_initialized) return;
+    flush_manual_batch(); // 自动 flush 前关闭未提交的手动批次
+
+    if (g_batch.empty()) return;
     // 按纹理 id 排序，使同纹理命令连续（稳定排序保持绘制顺序）。
     std::stable_sort(g_batch.begin(), g_batch.end(),
         [](const SpriteCmd& a, const SpriteCmd& b) { return a.texId < b.texId; });
@@ -539,18 +651,9 @@ void renderer_flush_batch() {
     const size_t n = g_batch.size();
     while (i < n) {
         uint32_t curTex = g_batch[i].texId;
-        TexSlot* slot = g_texPool.get(curTex);
-        if (!slot) { ++i; continue; }
         size_t j = i;
-        g_batchVerts.clear();
-        while (j < n && g_batch[j].texId == curTex) {
-            build_quad(g_batchVerts, g_batch[j], *slot);
-            ++j;
-        }
-        size_t quadCount = (j - i);
-        g_backend->drawSpriteBatch(slot->backendId, g_batchVerts.data(), quadCount);
-        // 每个纹理分组至少一次提交；后端内部对超大批次会再分块。
-        g_drawCalls += uint32_t((quadCount + 4095) / 4096);
+        while (j < n && g_batch[j].texId == curTex) ++j;
+        flush_range(g_batch.data(), i, j, curTex);
         i = j;
     }
     g_batch.clear();
@@ -627,6 +730,183 @@ LUMENT_API void lument_draw_pixel(int x, int y, LumentColor color) {
         g_backend->drawPixel(x, y, color);
         ++g_drawCalls;
     }
+}
+
+// ============================================================
+// 基础图元：circle / line / triangle / polygon / polyline / ellipse / arc / point
+// 全部走 push_quad_raw / push_triangle / push_line，复用白色纹理批次。
+// ============================================================
+
+LUMENT_API void lument_draw_circle(float cx, float cy, float radius,
+                                   LumentColor color, bool filled) {
+    if (!g_initialized || radius <= 0.0f) return;
+    const int segs = std::max(8, int(radius * 0.5f) + 8); // 半径越大分段越多
+    if (filled) {
+        // 扇形三角扇：中心 + 每相邻两点构成三角形
+        for (int i = 0; i < segs; ++i) {
+            float a0 = float(i) / segs * 6.2831853f;
+            float a1 = float(i + 1) / segs * 6.2831853f;
+            push_triangle(cx, cy,
+                          cx + std::cos(a0) * radius, cy + std::sin(a0) * radius,
+                          cx + std::cos(a1) * radius, cy + std::sin(a1) * radius,
+                          color);
+        }
+    } else {
+        // 轮廓：分段线段
+        for (int i = 0; i < segs; ++i) {
+            float a0 = float(i) / segs * 6.2831853f;
+            float a1 = float(i + 1) / segs * 6.2831853f;
+            push_line(cx + std::cos(a0) * radius, cy + std::sin(a0) * radius,
+                      cx + std::cos(a1) * radius, cy + std::sin(a1) * radius,
+                      1.0f, color);
+        }
+    }
+}
+
+LUMENT_API void lument_draw_line(float x1, float y1, float x2, float y2,
+                                 float thickness, LumentColor color) {
+    push_line(x1, y1, x2, y2, thickness, color);
+}
+
+LUMENT_API void lument_draw_triangle(float x1, float y1, float x2, float y2,
+                                     float x3, float y3, LumentColor color, bool filled) {
+    if (!g_initialized) return;
+    if (filled) {
+        push_triangle(x1, y1, x2, y2, x3, y3, color);
+    } else {
+        push_line(x1, y1, x2, y2, 1.0f, color);
+        push_line(x2, y2, x3, y3, 1.0f, color);
+        push_line(x3, y3, x1, y1, 1.0f, color);
+    }
+}
+
+LUMENT_API void lument_draw_polygon(const LumentVec2* points, int count,
+                                     LumentColor color, bool filled) {
+    if (!g_initialized || !points || count < 3) return;
+    if (filled) {
+        // 简单扇形三角化（凸多边形适用；凹多边形可能产生伪三角形）
+        for (int i = 1; i + 1 < count; ++i) {
+            push_triangle(points[0].x, points[0].y,
+                          points[i].x, points[i].y,
+                          points[i + 1].x, points[i + 1].y, color);
+        }
+    } else {
+        for (int i = 0; i < count; ++i) {
+            int j = (i + 1) % count;
+            push_line(points[i].x, points[i].y, points[j].x, points[j].y, 1.0f, color);
+        }
+    }
+}
+
+LUMENT_API void lument_draw_polyline(const LumentVec2* points, int count,
+                                     float thickness, LumentColor color) {
+    if (!g_initialized || !points || count < 2) return;
+    for (int i = 0; i + 1 < count; ++i) {
+        push_line(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y, thickness, color);
+    }
+}
+
+LUMENT_API void lument_draw_ellipse(float cx, float cy, float rx, float ry,
+                                    LumentColor color, bool filled) {
+    if (!g_initialized || rx <= 0.0f || ry <= 0.0f) return;
+    const int segs = 32;
+    if (filled) {
+        for (int i = 0; i < segs; ++i) {
+            float a0 = float(i) / segs * 6.2831853f;
+            float a1 = float(i + 1) / segs * 6.2831853f;
+            push_triangle(cx, cy,
+                          cx + std::cos(a0) * rx, cy + std::sin(a0) * ry,
+                          cx + std::cos(a1) * rx, cy + std::sin(a1) * ry,
+                          color);
+        }
+    } else {
+        for (int i = 0; i < segs; ++i) {
+            float a0 = float(i) / segs * 6.2831853f;
+            float a1 = float(i + 1) / segs * 6.2831853f;
+            push_line(cx + std::cos(a0) * rx, cy + std::sin(a0) * ry,
+                      cx + std::cos(a1) * rx, cy + std::sin(a1) * ry,
+                      1.0f, color);
+        }
+    }
+}
+
+LUMENT_API void lument_draw_arc(float cx, float cy, float radius,
+                                float startDeg, float endDeg, float thickness,
+                                LumentColor color) {
+    if (!g_initialized || radius <= 0.0f || endDeg <= startDeg) return;
+    const float span = (endDeg - startDeg) * 0.01745329f; // 度→弧度
+    const int segs = std::max(4, int(span * radius * 0.1f) + 4);
+    for (int i = 0; i < segs; ++i) {
+        float t0 = float(i) / segs;
+        float t1 = float(i + 1) / segs;
+        float a0 = (startDeg + (endDeg - startDeg) * t0) * 0.01745329f;
+        float a1 = (startDeg + (endDeg - startDeg) * t1) * 0.01745329f;
+        push_line(cx + std::cos(a0) * radius, cy + std::sin(a0) * radius,
+                  cx + std::cos(a1) * radius, cy + std::sin(a1) * radius,
+                  thickness, color);
+    }
+}
+
+LUMENT_API void lument_draw_point(float x, float y, float size, LumentColor color) {
+    if (size <= 0.0f) size = 1.0f;
+    // 画一个小方块（更高效）或小圆。size 较大时用圆。
+    if (size <= 2.0f) {
+        push_quad_raw(g_whiteTexId, x, y, x + size, y, x + size, y + size, x, y + size, color);
+    } else {
+        lument_draw_circle(x, y, size * 0.5f, color, true);
+    }
+}
+
+// ============================================================
+// 手动批次控制：显式声明批次边界，所有命令共用同一纹理单次提交。
+// ============================================================
+
+LUMENT_API void lument_begin_batch(uint32_t textureId) {
+    if (!g_initialized) return;
+    // 提交上一个未完成的手动批次
+    flush_manual_batch();
+    g_manualTex = (textureId == 0) ? g_whiteTexId : textureId;
+    g_manualBatch.clear();
+    g_manualActive = true;
+}
+
+LUMENT_API void lument_batch_quad(LumentRect dest, LumentColor color) {
+    if (!g_initialized || !g_manualActive) return;
+    LumentColor c = apply_scene_tint(color);
+    const float x = dest.x, y = dest.y, w = dest.w, h = dest.h;
+    g_manualBatch.push_back({ g_manualTex,
+                              x, y, x + w, y, x + w, y + h, x, y + h,
+                              0.0f, 0.0f, 1.0f, 1.0f, c });
+}
+
+LUMENT_API void lument_batch_quad_uv(LumentRect dest, LumentRect src, LumentColor color) {
+    if (!g_initialized || !g_manualActive) return;
+    LumentColor c = apply_scene_tint(color);
+    const TexSlot* tex = g_texPool.get(g_manualTex);
+    float u0, v0, u1, v1;
+    compute_uv(tex, src, u0, v0, u1, v1);
+    const float x = dest.x, y = dest.y, w = dest.w, h = dest.h;
+    g_manualBatch.push_back({ g_manualTex,
+                              x, y, x + w, y, x + w, y + h, x, y + h,
+                              u0, v0, u1, v1, c });
+}
+
+LUMENT_API void lument_end_batch(void) {
+    flush_manual_batch();
+}
+
+LUMENT_API uint32_t lument_get_batch_count(void) {
+    return uint32_t(g_batch.size() + (g_manualActive ? g_manualBatch.size() : 0));
+}
+
+LUMENT_API void lument_set_blend_mode(int mode) {
+    // 混合模式由后端在提交时应用；这里缓存，供后端查询。
+    // NullBackend 忽略；GLES2 后端在 draw_quads 前按模式设置 glBlendFunc。
+    g_blendMode = (mode < 0) ? 0 : (mode > 2 ? 2 : mode);
+}
+
+LUMENT_API int lument_get_blend_mode(void) {
+    return g_blendMode;
 }
 
 LUMENT_API void lument_flush(void) {

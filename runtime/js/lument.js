@@ -8,7 +8,7 @@ const Lument = (function() {
     'use strict';
 
     // ========== 常量 ==========
-    const VERSION = '1.2.0';
+    const VERSION = '1.3.0';
 
     const PLATFORM = {
         DESKTOP: 0, ANDROID: 1, IOS: 2, WEB: 3,
@@ -29,11 +29,24 @@ const Lument = (function() {
         NONE: 0, CONTAINER: 1, BUTTON: 2, LABEL: 3, INPUT: 4,
         IMAGE: 5, LIST: 6, PROGRESS: 7, CHECKBOX: 8, SLIDER: 9,
         TABBAR: 10, NAVBAR: 11,
+        DROPDOWN: 12, TOGGLE: 13, SCROLLVIEW: 14, TOOLTIP: 15,
+        DIVIDER: 16, SPINNER: 17, ICON: 18,
     };
 
     // 布局类型
     const LAYOUT = {
         NONE: 0, VERTICAL: 1, HORIZONTAL: 2, GRID: 3, STACK: 4,
+        FLOW: 5,
+    };
+
+    // 自动尺寸模式
+    const AUTOSIZE = {
+        OFF: 0, WIDTH: 1, HEIGHT: 2, BOTH: 3,
+    };
+
+    // 物理引擎宽相类型
+    const BROADPHASE = {
+        GRID: 0, QUADTREE: 1, BRUTE: 2,
     };
 
     // 事件类型
@@ -188,6 +201,10 @@ const Lument = (function() {
         nextBodyId: 1,
         collisionCallback: null,
         collisionUserData: null,
+        // v1.3 空间分区
+        broadphase: 0,           // 0=grid 1=quadtree 2=brute
+        gridCellSize: 0,         // 0=auto
+        lastPairCount: 0,
     };
 
     // ========== 增强音频状态 ==========
@@ -440,6 +457,143 @@ const Lument = (function() {
         ctx.fillStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`;
         ctx.fillRect(sx, sy, camera.zoom, camera.zoom);
         stats.drawCalls++;
+    }
+
+    // ====== v1.3 渲染图元 ======
+    function drawCircle(cx, cy, radius, color, filled) {
+        const sx = worldToScreenX(cx);
+        const sy = worldToScreenY(cy);
+        const r = Math.max(0.5, radius * camera.zoom);
+        ctx.beginPath();
+        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        if (filled) {
+            ctx.fillStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`;
+            ctx.fill();
+        } else {
+            ctx.strokeStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        stats.drawCalls++;
+    }
+
+    function drawLine(x1, y1, x2, y2, thickness, color) {
+        const t = thickness > 0 ? thickness : 1;
+        ctx.beginPath();
+        ctx.moveTo(worldToScreenX(x1), worldToScreenY(y1));
+        ctx.lineTo(worldToScreenX(x2), worldToScreenY(y2));
+        ctx.strokeStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`;
+        ctx.lineWidth = t * camera.zoom;
+        ctx.stroke();
+        stats.drawCalls++;
+    }
+
+    function drawTriangle(x1, y1, x2, y2, x3, y3, color, filled) {
+        ctx.beginPath();
+        ctx.moveTo(worldToScreenX(x1), worldToScreenY(y1));
+        ctx.lineTo(worldToScreenX(x2), worldToScreenY(y2));
+        ctx.lineTo(worldToScreenX(x3), worldToScreenY(y3));
+        ctx.closePath();
+        if (filled) {
+            ctx.fillStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`;
+            ctx.fill();
+        } else {
+            ctx.strokeStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        stats.drawCalls++;
+    }
+
+    function drawPolygon(points, color, filled) {
+        if (!points || points.length < 3) return;
+        ctx.beginPath();
+        ctx.moveTo(worldToScreenX(points[0].x), worldToScreenY(points[0].y));
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(worldToScreenX(points[i].x), worldToScreenY(points[i].y));
+        }
+        ctx.closePath();
+        if (filled) {
+            ctx.fillStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`;
+            ctx.fill();
+        } else {
+            ctx.strokeStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        stats.drawCalls++;
+    }
+
+    function drawEllipse(cx, cy, rx, ry, color, filled) {
+        const sx = worldToScreenX(cx);
+        const sy = worldToScreenY(cy);
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, Math.max(0.5, rx * camera.zoom),
+                    Math.max(0.5, ry * camera.zoom), 0, 0, Math.PI * 2);
+        if (filled) {
+            ctx.fillStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`;
+            ctx.fill();
+        } else {
+            ctx.strokeStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        stats.drawCalls++;
+    }
+
+    function drawPoint(x, y, size, color) {
+        const s = size > 0 ? size : 1;
+        ctx.fillStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`;
+        ctx.fillRect(worldToScreenX(x) - s / 2, worldToScreenY(y) - s / 2,
+                     s * camera.zoom, s * camera.zoom);
+        stats.drawCalls++;
+    }
+
+    // ====== v1.3 手动批处理 ======
+    let batchActive = false;
+    let batchTexture = null;
+    const batchQuads = [];
+
+    function beginBatch(textureId) {
+        batchActive = true;
+        batchTexture = textureId ? textures.get(textureId) : null;
+        batchQuads.length = 0;
+    }
+
+    function batchQuad(dest, color) {
+        if (!batchActive) return;
+        batchQuads.push({
+            x: dest.x, y: dest.y, w: dest.w, h: dest.h,
+            color: color || { r: 255, g: 255, b: 255, a: 255 }
+        });
+    }
+
+    function batchTriangle(x1, y1, x2, y2, x3, y3, color) {
+        if (!batchActive) return;
+        batchQuads.push({
+            triangle: true,
+            x1, y1, x2, y2, x3, y3,
+            color: color || { r: 255, g: 255, b: 255, a: 255 }
+        });
+    }
+
+    function endBatch() {
+        if (!batchActive) return;
+        batchActive = false;
+        for (const q of batchQuads) {
+            if (q.triangle) {
+                drawTriangle(q.x1, q.y1, q.x2, q.y2, q.x3, q.y3, q.color, true);
+            } else if (batchTexture) {
+                ctx.drawImage(batchTexture,
+                    worldToScreenX(q.x), worldToScreenY(q.y),
+                    q.w * camera.zoom, q.h * camera.zoom);
+                stats.drawCalls++;
+            } else {
+                drawRect({ x: q.x, y: q.y, w: q.w, h: q.h }, q.color, true);
+            }
+        }
+        batchQuads.length = 0;
+        batchTexture = null;
     }
 
     function flush() {
@@ -2600,6 +2754,342 @@ const Lument = (function() {
         return id;
     }
 
+    // ====== v1.3 新增控件 ======
+    function uiCreateDropdown(x, y, w, h) {
+        const id = uiCreate(WIDGET.DROPDOWN);
+        const wd = widgets.get(id);
+        wd.x = x; wd.y = y; wd.w = w; wd.h = h;
+        wd.options = []; wd.selected = 0; wd.dropdownOpen = false;
+        wd.bgColor = { r: 30, g: 30, b: 40, a: 255 };
+        wd.textColor = { r: 240, g: 240, b: 240, a: 255 };
+        return id;
+    }
+    function uiCreateToggle(initial, x, y, w, h) {
+        const id = uiCreate(WIDGET.TOGGLE);
+        const wd = widgets.get(id);
+        wd.x = x; wd.y = y; wd.w = w; wd.h = h;
+        wd.checked = !!initial;
+        wd.bgColor = { r: 60, g: 90, b: 160, a: 255 };
+        wd.textColor = { r: 255, g: 255, b: 255, a: 255 };
+        return id;
+    }
+    function uiCreateScrollview(x, y, w, h) {
+        const id = uiCreate(WIDGET.SCROLLVIEW);
+        const wd = widgets.get(id);
+        wd.x = x; wd.y = y; wd.w = w; wd.h = h;
+        wd.contentW = w; wd.contentH = h;
+        wd.scrollX = 0; wd.scrollY = 0;
+        wd.bgColor = { r: 30, g: 30, b: 40, a: 255 };
+        return id;
+    }
+    function uiCreateTooltip(text, x, y) {
+        const id = uiCreate(WIDGET.TOOLTIP);
+        const wd = widgets.get(id);
+        wd.text = text; wd.x = x; wd.y = y;
+        wd.autoSize = AUTOSIZE.BOTH;
+        wd.bgColor = { r: 40, g: 40, b: 50, a: 230 };
+        wd.textColor = { r: 240, g: 240, b: 240, a: 255 };
+        return id;
+    }
+    function uiCreateProgress(x, y, w, h) {
+        const id = uiCreate(WIDGET.PROGRESS);
+        const wd = widgets.get(id);
+        wd.x = x; wd.y = y; wd.w = w; wd.h = h;
+        wd.value = 0;
+        wd.bgColor = { r: 90, g: 90, b: 110, a: 255 };
+        return id;
+    }
+    function uiCreateSlider(min, max, value, x, y, w, h) {
+        const id = uiCreate(WIDGET.SLIDER);
+        const wd = widgets.get(id);
+        wd.x = x; wd.y = y; wd.w = w; wd.h = h;
+        wd.minVal = min; wd.maxVal = max; wd.value = value;
+        wd.bgColor = { r: 90, g: 90, b: 110, a: 255 };
+        return id;
+    }
+    function uiCreateCheckbox(initial, x, y, w, h) {
+        const id = uiCreate(WIDGET.CHECKBOX);
+        const wd = widgets.get(id);
+        wd.x = x; wd.y = y; wd.w = w; wd.h = h;
+        wd.checked = !!initial;
+        wd.bgColor = { r: 30, g: 30, b: 40, a: 255 };
+        return id;
+    }
+    function uiCreateDivider(x, y, w, h) {
+        const id = uiCreate(WIDGET.DIVIDER);
+        const wd = widgets.get(id);
+        wd.x = x; wd.y = y; wd.w = w; wd.h = h;
+        wd.bgColor = { r: 120, g: 120, b: 130, a: 255 };
+        return id;
+    }
+    function uiCreateSpinner(x, y, size) {
+        const id = uiCreate(WIDGET.SPINNER);
+        const wd = widgets.get(id);
+        wd.x = x; wd.y = y; wd.w = size; wd.h = size;
+        wd.animTime = 0;
+        wd.bgColor = { r: 0, g: 0, b: 0, a: 0 };
+        wd.textColor = { r: 100, g: 200, b: 255, a: 255 };
+        return id;
+    }
+    function uiCreateIcon(textureId, x, y, size) {
+        const id = uiCreate(WIDGET.ICON);
+        const wd = widgets.get(id);
+        wd.x = x; wd.y = y; wd.w = size; wd.h = size;
+        wd.textureId = textureId;
+        return id;
+    }
+
+    // ====== v1.3 控件状态接口 ======
+    function uiSetValue(widget, value) {
+        const wd = widgets.get(widget); if (!wd) return;
+        if (wd.type === WIDGET.SLIDER) {
+            wd.value = Math.max(wd.minVal, Math.min(wd.maxVal, value));
+        } else if (wd.type === WIDGET.PROGRESS) {
+            wd.value = Math.max(0, Math.min(1, value));
+        } else { wd.value = value; }
+    }
+    function uiGetValue(widget) {
+        const wd = widgets.get(widget); return wd ? wd.value : 0;
+    }
+    function uiSetMinMax(widget, min, max) {
+        const wd = widgets.get(widget); if (!wd) return;
+        wd.minVal = min; wd.maxVal = max;
+    }
+    function uiSetOptions(widget, options) {
+        const wd = widgets.get(widget); if (!wd) return;
+        wd.options = options ? options.slice() : [];
+        if (wd.selected >= wd.options.length) wd.selected = wd.options.length - 1;
+        if (wd.selected < 0) wd.selected = 0;
+    }
+    function uiGetSelected(widget) {
+        const wd = widgets.get(widget); return wd ? (wd.selected || 0) : 0;
+    }
+    function uiSetSelected(widget, index) {
+        const wd = widgets.get(widget); if (!wd) return;
+        if (index >= 0 && wd.options && index < wd.options.length) wd.selected = index;
+    }
+    function uiSetChecked(widget, checked) {
+        const wd = widgets.get(widget); if (!wd) return;
+        wd.checked = !!checked;
+    }
+    function uiGetChecked(widget) {
+        const wd = widgets.get(widget); return wd ? !!wd.checked : false;
+    }
+    function uiSetScroll(widget, offsetX, offsetY) {
+        const wd = widgets.get(widget); if (!wd) return;
+        if (wd.contentW > wd.w) {
+            offsetX = Math.max(0, Math.min(offsetX, wd.contentW - wd.w));
+        } else offsetX = 0;
+        if (wd.contentH > wd.h) {
+            offsetY = Math.max(0, Math.min(offsetY, wd.contentH - wd.h));
+        } else offsetY = 0;
+        wd.scrollX = offsetX; wd.scrollY = offsetY;
+    }
+    function uiGetScroll(widget) {
+        const wd = widgets.get(widget);
+        if (!wd) return { x: 0, y: 0 };
+        return { x: wd.scrollX || 0, y: wd.scrollY || 0 };
+    }
+    function uiSetContentSize(scrollview, w, h) {
+        const wd = widgets.get(scrollview); if (!wd) return;
+        wd.contentW = w; wd.contentH = h;
+    }
+
+    // ====== v1.3 主题系统 ======
+    let currentTheme = {
+        background: { r: 18, g: 18, b: 24, a: 255 },
+        surface:    { r: 30, g: 30, b: 38, a: 255 },
+        primary:    { r: 60, g: 90, b: 160, a: 255 },
+        secondary:  { r: 90, g: 90, b: 110, a: 255 },
+        text:       { r: 235, g: 235, b: 235, a: 255 },
+        textMuted:  { r: 130, g: 130, b: 140, a: 255 },
+        border:     { r: 120, g: 120, b: 130, a: 255 },
+        accent:     { r: 100, g: 200, b: 255, a: 255 },
+        danger:     { r: 220, g: 70, b: 70, a: 255 },
+        success:    { r: 80, g: 180, b: 100, a: 255 },
+    };
+    function uiSetTheme(theme) {
+        if (!theme) return;
+        Object.assign(currentTheme, theme);
+    }
+    function uiGetTheme() { return Object.assign({}, currentTheme); }
+    function uiResetTheme() {
+        currentTheme = {
+            background: { r: 18, g: 18, b: 24, a: 255 },
+            surface:    { r: 30, g: 30, b: 38, a: 255 },
+            primary:    { r: 60, g: 90, b: 160, a: 255 },
+            secondary:  { r: 90, g: 90, b: 110, a: 255 },
+            text:       { r: 235, g: 235, b: 235, a: 255 },
+            textMuted:  { r: 130, g: 130, b: 140, a: 255 },
+            border:     { r: 120, g: 120, b: 130, a: 255 },
+            accent:     { r: 100, g: 200, b: 255, a: 255 },
+            danger:     { r: 220, g: 70, b: 70, a: 255 },
+            success:    { r: 80, g: 180, b: 100, a: 255 },
+        };
+    }
+    function uiSetAutoSize(widget, mode) {
+        const wd = widgets.get(widget); if (!wd) return;
+        wd.autoSize = mode;
+    }
+    function uiMeasureText(text, fontSize) {
+        // 基于内置位图字体估算：每字符宽度 = 6px * (fontSize/7)
+        const w = (text ? text.length : 0) * 6 * (fontSize / 7);
+        return { w: w, h: fontSize };
+    }
+    function uiSetMargin(widget, top, right, bottom, left) {
+        const wd = widgets.get(widget); if (!wd) return;
+        wd.marginTop = top; wd.marginRight = right;
+        wd.marginBottom = bottom; wd.marginLeft = left;
+    }
+
+    // ====== v1.3 声明式 UI 构建 ======
+    function uiBuildFromJson(json) {
+        let obj;
+        try { obj = JSON.parse(json); } catch (e) { return 0; }
+        return buildWidgetNode(obj);
+    }
+    function buildWidgetNode(node) {
+        if (!node || typeof node !== 'object') return 0;
+        const typeMap = {
+            'container': WIDGET.CONTAINER, 'button': WIDGET.BUTTON,
+            'label': WIDGET.LABEL, 'input': WIDGET.INPUT,
+            'image': WIDGET.IMAGE, 'list': WIDGET.LIST,
+            'progress': WIDGET.PROGRESS, 'checkbox': WIDGET.CHECKBOX,
+            'slider': WIDGET.SLIDER, 'tabbar': WIDGET.TABBAR,
+            'navbar': WIDGET.NAVBAR, 'dropdown': WIDGET.DROPDOWN,
+            'toggle': WIDGET.TOGGLE, 'scrollview': WIDGET.SCROLLVIEW,
+            'tooltip': WIDGET.TOOLTIP, 'divider': WIDGET.DIVIDER,
+            'spinner': WIDGET.SPINNER, 'icon': WIDGET.ICON,
+        };
+        const layoutMap = {
+            'none': LAYOUT.NONE, 'vertical': LAYOUT.VERTICAL,
+            'horizontal': LAYOUT.HORIZONTAL, 'grid': LAYOUT.GRID,
+            'stack': LAYOUT.STACK, 'flow': LAYOUT.FLOW,
+        };
+        const wt = typeMap[node.type] || WIDGET.CONTAINER;
+        const id = uiCreate(wt);
+        const wd = widgets.get(id);
+        if (!wd) return 0;
+        if (node.text) wd.text = node.text;
+        if (node.name) wd.name = node.name;
+        if ('x' in node) wd.x = node.x;
+        if ('y' in node) wd.y = node.y;
+        if ('w' in node) wd.w = node.w;
+        if ('h' in node) wd.h = node.h;
+        if (node.fontSize) wd.fontSize = node.fontSize;
+        if ('visible' in node) wd.visible = node.visible;
+        if ('enabled' in node) wd.enabled = node.enabled;
+        if (node.layout) wd.layout = layoutMap[node.layout] || LAYOUT.NONE;
+        if ('spacing' in node) wd.spacing = node.spacing;
+        if ('alignment' in node) wd.alignment = node.alignment;
+        if (node.padding && node.padding.length >= 4) {
+            wd.padTop = node.padding[0]; wd.padRight = node.padding[1];
+            wd.padBottom = node.padding[2]; wd.padLeft = node.padding[3];
+        }
+        if (node.gridCols) wd.gridCols = node.gridCols;
+        if (node.gridRows) wd.gridRows = node.gridRows;
+        if ('checked' in node) wd.checked = node.checked;
+        if ('value' in node) wd.value = node.value;
+        if ('min' in node) wd.minVal = node.min;
+        if ('max' in node) wd.maxVal = node.max;
+        if ('selected' in node) wd.selected = node.selected;
+        if (node.options) wd.options = node.options.slice();
+        if (node.children && Array.isArray(node.children)) {
+            for (const childNode of node.children) {
+                const childId = buildWidgetNode(childNode);
+                if (childId) uiAddChild(id, childId);
+            }
+        }
+        return id;
+    }
+    function uiDumpTree(root) {
+        const wd = widgets.get(root);
+        if (!wd) return 'null';
+        function rec(h, depth) {
+            const cw = widgets.get(h); if (!cw) return '';
+            let s = '  '.repeat(depth) + '{"type":' + JSON.stringify(cw.type) +
+                    ',"x":' + cw.x + ',"y":' + cw.y +
+                    ',"w":' + cw.w + ',"h":' + cw.h;
+            if (cw.text) s += ',"text":' + JSON.stringify(cw.text);
+            if (cw.checked) s += ',"checked":true';
+            if (cw.children && cw.children.length > 0) {
+                s += ',"children":[\n';
+                for (let i = 0; i < cw.children.length; i++) {
+                    s += rec(cw.children[i], depth + 1);
+                    if (i < cw.children.length - 1) s += ',';
+                    s += '\n';
+                }
+                s += '  '.repeat(depth) + ']';
+            }
+            s += '}';
+            return s;
+        }
+        return rec(root, 0);
+    }
+    function uiFindById(name) {
+        for (const [id, wd] of widgets) {
+            if (wd.name === name) return id;
+        }
+        return 0;
+    }
+
+    // ====== v1.3 物理引擎空间分区与调试 ======
+    function physicsSetBroadphase(type) {
+        physicsWorld.broadphase = type;
+    }
+    function physicsSetGridCellSize(size) {
+        physicsWorld.gridCellSize = size;
+    }
+    function physicsGetPairCount() {
+        return physicsWorld.lastPairCount;
+    }
+    function physicsDebugDraw(options) {
+        const opt = options || {};
+        const shapeCol = opt.shapeColor || { r: 80, g: 200, b: 120, a: 255 };
+        const contactCol = opt.contactColor || { r: 240, g: 90, b: 90, a: 255 };
+        const gridCol = opt.gridColor || { r: 60, g: 90, b: 140, a: 120 };
+        // 绘制网格（如果使用 grid broadphase）
+        if (physicsWorld.broadphase === 0 && opt.showGrid !== false) {
+            let cs = physicsWorld.gridCellSize;
+            if (!cs || cs <= 0) {
+                // 自动计算
+                let maxSize = 0;
+                for (const [id, b] of physicsWorld.bodies) {
+                    if (b.shape === 0) maxSize = Math.max(maxSize, b.radius * 2);
+                    else maxSize = Math.max(maxSize, Math.max(b.w, b.h));
+                }
+                cs = maxSize > 0 ? maxSize : 64;
+            }
+            const viewW = canvas.width / camera.zoom;
+            const viewH = canvas.height / camera.zoom;
+            const startX = Math.floor(camera.x / cs) * cs;
+            const startY = Math.floor(camera.y / cs) * cs;
+            for (let x = startX; x < camera.x + viewW; x += cs) {
+                drawLine(x, camera.y, x, camera.y + viewH, 1, gridCol);
+            }
+            for (let y = startY; y < camera.y + viewH; y += cs) {
+                drawLine(camera.x, y, camera.x + viewW, y, 1, gridCol);
+            }
+        }
+        // 绘制所有 body 的 AABB/形状
+        for (const [id, b] of physicsWorld.bodies) {
+            if (b.shape === 0) { // circle
+                drawCircle(b.x, b.y, b.radius, shapeCol, false);
+            } else { // box
+                drawRect({ x: b.x - b.w / 2, y: b.y - b.h / 2, w: b.w, h: b.h }, shapeCol, false);
+            }
+        }
+        // 绘制碰撞接触点
+        if (opt.showContacts !== false) {
+            const cols = physicsGetCollisions(0, 999);
+            if (cols && cols.length) {
+                for (const c of cols) {
+                    if (c.point) drawCircle(c.point.x, c.point.y, 3, contactCol, true);
+                }
+            }
+        }
+    }
+
     // ============================================================
     // 公开 API
     // ============================================================
@@ -2608,6 +3098,7 @@ const Lument = (function() {
         // 常量
         VERSION, PLATFORM, RENDERER, KEY,
         WIDGET, LAYOUT, EVENT, LIGHT,
+        AUTOSIZE, BROADPHASE,
 
         // 核心
         init, shutdown, isRunning,
@@ -2619,6 +3110,11 @@ const Lument = (function() {
         clear, setCamera, drawRect, drawSprite, drawText, drawPixel, flush,
         loadTexture, createTextureFromData, destroyTexture,
         createPixelArt, getCanvas, getContext,
+
+        // v1.3 渲染图元
+        drawCircle, drawLine, drawTriangle, drawPolygon, drawEllipse, drawPoint,
+        // v1.3 手动批处理
+        beginBatch, batchQuad, batchTriangle, endBatch,
 
         // 2D 场景渲染：色彩色调
         setSceneTint, setSceneBrightness, setSceneContrast, setSceneSaturation,
@@ -2662,6 +3158,9 @@ const Lument = (function() {
         physicsCheckCollision, physicsGetCollisions,
         physicsRaycast, physicsPointQuery,
         physicsOnCollision,
+        // v1.3 物理空间分区与调试
+        physicsSetBroadphase, physicsSetGridCellSize,
+        physicsDebugDraw, physicsGetPairCount,
         BODY, SHAPE,
 
         // 增强音频
@@ -2734,5 +3233,26 @@ const Lument = (function() {
         uiRender, uiHandleTouch, uiHandleKey,
         uiNavigateTo, uiNavigateBack, uiGetCurrentScreen,
         uiCreateButton, uiCreateLabel, uiCreateInput,
+        // v1.3 新增控件
+        uiCreateDropdown, uiCreateToggle, uiCreateScrollview,
+        uiCreateTooltip, uiCreateProgress, uiCreateSlider,
+        uiCreateCheckbox, uiCreateDivider, uiCreateSpinner, uiCreateIcon,
+        // v1.3 控件状态接口
+        uiSetValue, uiGetValue, uiSetMinMax,
+        uiSetOptions, uiGetSelected, uiSetSelected,
+        uiSetChecked, uiGetChecked,
+        uiSetScroll, uiGetScroll, uiSetContentSize,
+        // v1.3 自动化系统
+        uiSetTheme, uiGetTheme, uiResetTheme,
+        uiSetAutoSize, uiMeasureText, uiSetMargin,
+        uiBuildFromJson, uiDumpTree, uiFindById,
     };
 })();
+
+// 模块导出（支持 CommonJS / ES Module / 浏览器全局）
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Lument;
+}
+if (typeof globalThis !== 'undefined') {
+    globalThis.Lument = Lument;
+}

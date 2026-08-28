@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lument Engine v1.3.0 — Feature Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a14;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        h1 { color: #66ccff; margin-bottom: 2px; font-size: 22px; }
+        .subtitle { color: #888; font-size: 13px; margin-bottom: 16px; }
+        .tabs {
+            display: flex; gap: 4px; margin-bottom: 14px;
+            background: #14141e; padding: 4px; border-radius: 8px; border: 1px solid #2a2a3a;
+        }
+        .tab {
+            background: transparent; color: #aaa; border: none;
+            padding: 8px 18px; border-radius: 6px; cursor: pointer;
+            font-size: 13px; transition: all 0.2s;
+        }
+        .tab:hover { color: #fff; background: #1e1e2e; }
+        .tab.active { background: #2a4a6a; color: #fff; }
+        .main-container { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+        .canvas-container { position: relative; border: 2px solid #333; border-radius: 8px; overflow: hidden; }
+        #game-canvas { display: block; background: #000; cursor: crosshair; }
+        .stats {
+            position: absolute; top: 8px; right: 8px;
+            background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 4px;
+            font-size: 11px; color: #6f6; font-family: monospace;
+        }
+        .panel {
+            width: 320px; background: #14141e; border-radius: 8px; padding: 14px;
+            border: 1px solid #2a2a3a; max-height: 600px; overflow-y: auto;
+        }
+        .panel h2 {
+            color: #66ccff; font-size: 13px; margin-bottom: 8px;
+            padding-bottom: 4px; border-bottom: 1px solid #2a2a3a;
+        }
+        .hint { color: #888; font-size: 11px; line-height: 1.5; margin-bottom: 10px; }
+        .row { margin-bottom: 10px; font-size: 12px; }
+        .row label { color: #aaa; display: block; margin-bottom: 4px; }
+        .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+        .btn {
+            background: #1e1e2e; color: #ccc; border: 1px solid #333;
+            padding: 5px 10px; border-radius: 4px; cursor: pointer;
+            font-size: 11px; transition: all 0.2s;
+        }
+        .btn:hover { background: #2a2a4a; border-color: #555; }
+        .btn.active { background: #2a4a6a; border-color: #66ccff; color: #fff; }
+        .out {
+            background: #0a0a14; border: 1px solid #2a2a3a; border-radius: 4px;
+            padding: 8px; font-family: monospace; font-size: 11px; color: #6f6;
+            white-space: pre-wrap; word-break: break-all; max-height: 170px; overflow-y: auto;
+        }
+        input[type="range"] { width: 100%; }
+    </style>
+</head>
+<body>
+    <h1>Lument Engine v1.3.0 — Feature Demo</h1>
+    <p class="subtitle">UI Automation · Rendering Primitives · Physics Spatial Partitioning &amp; Debug</p>
+
+    <div class="tabs">
+        <button class="tab active" data-tab="ui">UI Automation</button>
+        <button class="tab" data-tab="primitives">Rendering Primitives</button>
+        <button class="tab" data-tab="physics">Physics Debug</button>
+    </div>
+
+    <div class="main-container">
+        <div class="canvas-container">
+            <canvas id="game-canvas" width="640" height="600"></canvas>
+            <div class="stats" id="stats">FPS: 0 | DC: 0</div>
+        </div>
+
+        <!-- ===== UI Automation panel ===== -->
+        <div class="panel" id="panel-ui">
+            <h2>UI Automation</h2>
+            <div class="hint">
+                Theme system, new v1.3 controls (dropdown, toggle, slider, checkbox, spinner,
+                divider, tooltip), declarative JSON UI and auto-size. Every box on the canvas is a
+                real Lument widget created with the v1.3 <code>uiCreate*</code> API and drawn by
+                <code>uiRender()</code>. Click the checkbox / drag the slider on the canvas.
+            </div>
+
+            <div class="row">
+                <label>Theme (uiSetTheme / uiGetTheme / uiResetTheme)</label>
+                <div class="btn-group" id="theme-btns">
+                    <button class="btn active" data-theme="dark">Dark</button>
+                    <button class="btn" data-theme="light">Light</button>
+                    <button class="btn" data-theme="ocean">Ocean</button>
+                    <button class="btn" data-theme="forest">Forest</button>
+                    <button class="btn" data-theme="reset">Reset</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <label>State API (uiSetChecked / uiGetChecked / uiSetSelected / uiGetSelected)</label>
+                <div class="btn-group">
+                    <button class="btn" id="flip-toggle">Flip toggle</button>
+                    <button class="btn" id="cycle-dd">Dropdown: next</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <label>Declarative UI (uiBuildFromJson / uiFindById / uiDumpTree)</label>
+                <div class="btn-group">
+                    <button class="btn" id="build-json">Build JSON panel</button>
+                    <button class="btn" id="dump-tree">Dump tree</button>
+                    <button class="btn" id="clear-ui">Rebuild controls</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <label>Auto-size (uiSetAutoSize / uiMeasureText / uiSetMargin)</label>
+                <div class="btn-group">
+                    <button class="btn" id="autosize-on">AutoSize ON</button>
+                    <button class="btn" id="autosize-off">AutoSize OFF</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <label>Live widget state</label>
+                <div class="out" id="ui-output">—</div>
+            </div>
+        </div>
+
+        <!-- ===== Rendering Primitives panel ===== -->
+        <div class="panel" id="panel-primitives" style="display:none;">
+            <h2>Rendering Primitives</h2>
+            <div class="hint">
+                <code>drawCircle</code>, <code>drawLine</code>, <code>drawTriangle</code>,
+                <code>drawPolygon</code>, <code>drawEllipse</code>, <code>drawPoint</code> and the
+                manual batch API <code>beginBatch / batchQuad / batchTriangle / endBatch</code>.
+                Toggle layers and watch them animate in the main loop.
+            </div>
+            <div class="row">
+                <label>Primitive layers</label>
+                <div class="btn-group" id="prim-toggles">
+                    <button class="btn active" data-prim="circle">Circle</button>
+                    <button class="btn active" data-prim="line">Line</button>
+                    <button class="btn active" data-prim="triangle">Triangle</button>
+                    <button class="btn active" data-prim="polygon">Polygon</button>
+                    <button class="btn active" data-prim="ellipse">Ellipse</button>
+                    <button class="btn active" data-prim="point">Point</button>
+                    <button class="btn active" data-prim="batch">Batch</button>
+                </div>
+            </div>
+            <div class="row">
+                <label>Animation speed: <span id="speed-val">1.0</span></label>
+                <input type="range" id="prim-speed" min="0" max="3" step="0.1" value="1">
+            </div>
+            <div class="row">
+                <label>Batch quad count: <span id="batch-val">60</span></label>
+                <input type="range" id="batch-count" min="0" max="200" step="10" value="60">
+            </div>
+            <div class="hint" style="margin-top:6px;">
+                Batch mode renders many quads + a triangle inside a single
+                <code>beginBatch()</code> … <code>endBatch()</code> pass.
+            </div>
+        </div>
+
+        <!-- ===== Physics panel ===== -->
+        <div class="panel" id="panel-physics" style="display:none;">
+            <h2>Physics Spatial Partitioning &amp; Debug</h2>
+            <div class="hint">
+                <code>physicsSetBroadphase</code> (grid / quadtree / brute),
+                <code>physicsSetGridCellSize</code>, <code>physicsDebugDraw</code> and
+                <code>physicsGetPairCount</code>. Bodies collide and bounce; the broadphase grid is
+                drawn by <code>physicsDebugDraw</code>.
+            </div>
+            <div class="row">
+                <label>Broadphase (physicsSetBroadphase)</label>
+                <div class="btn-group" id="bp-btns">
+                    <button class="btn active" data-bp="grid">Grid</button>
+                    <button class="btn" data-bp="quadtree">Quadtree</button>
+                    <button class="btn" data-bp="brute">Brute</button>
+                </div>
+            </div>
+            <div class="row">
+                <label>Grid cell size: <span id="cell-val">64</span> (physicsSetGridCellSize)</label>
+                <input type="range" id="cell-size" min="16" max="160" step="8" value="64">
+            </div>
+            <div class="row">
+                <label>Debug draw options (physicsDebugDraw)</label>
+                <div class="btn-group">
+                    <button class="btn active" id="dbg-grid">Grid</button>
+                    <button class="btn active" id="dbg-contacts">Contacts</button>
+                    <button class="btn" id="add-bodies">+ Bodies</button>
+                    <button class="btn" id="reset-phys">Reset</button>
+                </div>
+            </div>
+            <div class="row">
+                <label>Live stats (physicsGetPairCount)</label>
+                <div class="out" id="phys-output">bodies: 0 | pairs: 0</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../runtime/js/lument.js"></script>
+    <script>
+    'use strict';
+
+    // ============================================================
+    // Engine init
+    // ============================================================
+    Lument.init({
+        platform: Lument.PLATFORM.WEB,
+        rendererType: Lument.RENDERER.CANVAS2D,
+        width: 640,
+        height: 600,
+        targetFPS: 60,
+    });
+
+    const W = 640, H = 600;
+    let currentTab = 'ui';
+    let animTime = 0;
+
+    // ============================================================
+    // Theme presets
+    // ============================================================
+    const THEMES = {
+        dark: {
+            background: { r: 18, g: 18, b: 24, a: 255 },
+            surface:    { r: 30, g: 30, b: 38, a: 255 },
+            primary:    { r: 60, g: 90, b: 160, a: 255 },
+            secondary:  { r: 90, g: 90, b: 110, a: 255 },
+            text:        { r: 235, g: 235, b: 235, a: 255 },
+            textMuted:   { r: 140, g: 140, b: 150, a: 255 },
+            border:      { r: 120, g: 120, b: 130, a: 255 },
+            accent:      { r: 100, g: 200, b: 255, a: 255 },
+            danger:      { r: 220, g: 70, b: 70, a: 255 },
+            success:     { r: 80, g: 180, b: 100, a: 255 },
+        },
+        light: {
+            background: { r: 240, g: 240, b: 245, a: 255 },
+            surface:    { r: 255, g: 255, b: 255, a: 255 },
+            primary:    { r: 40, g: 80, b: 180, a: 255 },
+            secondary:  { r: 120, g: 120, b: 140, a: 255 },
+            text:        { r: 30, g: 30, b: 40, a: 255 },
+            textMuted:   { r: 120, g: 120, b: 130, a: 255 },
+            border:      { r: 200, g: 200, b: 210, a: 255 },
+            accent:      { r: 0, g: 150, b: 200, a: 255 },
+            danger:      { r: 200, g: 50, b: 50, a: 255 },
+            success:     { r: 40, g: 160, b: 80, a: 255 },
+        },
+        ocean: {
+            background: { r: 10, g: 30, b: 50, a: 255 },
+            surface:    { r: 20, g: 50, b: 80, a: 255 },
+            primary:    { r: 30, g: 120, b: 180, a: 255 },
+            secondary:  { r: 40, g: 80, b: 120, a: 255 },
+            text:        { r: 220, g: 240, b: 255, a: 255 },
+            textMuted:   { r: 120, g: 160, b: 200, a: 255 },
+            border:      { r: 60, g: 120, b: 180, a: 255 },
+            accent:      { r: 80, g: 220, b: 255, a: 255 },
+            danger:      { r: 230, g: 90, b: 90, a: 255 },
+            success:     { r: 60, g: 200, b: 180, a: 255 },
+        },
+        forest: {
+            background: { r: 18, g: 30, b: 20, a: 255 },
+            surface:    { r: 30, g: 50, b: 34, a: 255 },
+            primary:    { r: 40, g: 120, b: 60, a: 255 },
+            secondary:  { r: 80, g: 100, b: 60, a: 255 },
+            text:        { r: 220, g: 240, b: 220, a: 255 },
+            textMuted:   { r: 140, g: 160, b: 130, a: 255 },
+            border:      { r: 90, g: 120, b: 80, a: 255 },
+            accent:      { r: 140, g: 220, b: 120, a: 255 },
+            danger:      { r: 200, g: 80, b: 60, a: 255 },
+            success:     { r: 80, g: 200, b: 100, a: 255 },
+        },
+    };
+
+    // ============================================================
+    // UI Automation tab
+    // ============================================================
+    const uiRefs = {};
+    let dropdownOptions = ['Option A', 'Option B', 'Option C'];
+    let currentBg = THEMES.dark.background;
+
+    function caption(text, x, y, w) {
+        const id = Lument.uiCreateLabel(text, x, y, w, 24);
+        Lument.uiSetFontSize(id, 12);
+        return id;
+    }
+
+    function buildControlsUI() {
+        Lument.uiClearAll();
+        for (const k in uiRefs) delete uiRefs[k];
+
+        // Title
+        uiRefs.title = Lument.uiCreateLabel('Lument v1.3 — UI Controls (uiRender)', 16, 20, 608, 26);
+        Lument.uiSetFontSize(uiRefs.title, 16);
+
+        // Row: dropdown / toggle / checkbox
+        uiRefs.capDropdown = caption('Dropdown:', 16, 66, 72);
+        uiRefs.dropdown = Lument.uiCreateDropdown(92, 64, 140, 30);
+        Lument.uiSetOptions(uiRefs.dropdown, dropdownOptions);
+        Lument.uiSetSelected(uiRefs.dropdown, 0);
+
+        uiRefs.capToggle = caption('Toggle:', 242, 66, 50);
+        uiRefs.toggle = Lument.uiCreateToggle(false, 296, 64, 60, 30);
+
+        uiRefs.capCb = caption('Box:', 366, 66, 36);
+        uiRefs.checkbox = Lument.uiCreateCheckbox(false, 406, 64, 28, 28);
+
+        // Row: slider / spinner
+        uiRefs.capSlider = caption('Slider:', 16, 108, 44);
+        uiRefs.slider = Lument.uiCreateSlider(0, 100, 50, 64, 106, 300, 30);
+        Lument.uiSetText(uiRefs.slider, '0.5');   // render reads text fraction; start at 50%
+
+        uiRefs.capSpinner = caption('Spinner:', 372, 108, 54);
+        uiRefs.spinner = Lument.uiCreateSpinner(430, 106, 30);
+        uiRefs.spinnerPos = { x: 430, y: 106, size: 30 };
+
+        // Divider
+        uiRefs.divider = Lument.uiCreateDivider(16, 152, 608, 2);
+
+        // Row: tooltip / autosize
+        uiRefs.capTooltip = caption('Tooltip:', 16, 172, 50);
+        uiRefs.tooltip = Lument.uiCreateTooltip('Hover the built JSON panel for tips', 72, 170);
+        Lument.uiSetSize(uiRefs.tooltip, 240, 26);
+
+        uiRefs.capAutosize = caption('AutoSize:', 322, 172, 60);
+        uiRefs.autosize = Lument.uiCreateLabel('AutoSizeLabel', 388, 170, 120, 26);
+        Lument.uiSetFontSize(uiRefs.autosize, 14);
+
+        recolorWidgets(Lument.uiGetTheme());
+        refreshState();
+    }
+
+    // The engine stores theme via uiSetTheme but does not auto-apply it to
+    // widget colors, so we propagate the theme to our widgets here.
+    function recolorWidgets(theme) {
+        currentBg = theme.background;
+        const set = (id, bg, tc) => {
+            if (!id) return;
+            if (bg) Lument.uiSetColor(id, bg);
+            if (tc) Lument.uiSetTextColor(id, tc);
+        };
+        Lument.uiSetTextColor(uiRefs.title, theme.accent);
+        [uiRefs.capDropdown, uiRefs.capToggle, uiRefs.capCb,
+         uiRefs.capSlider, uiRefs.capSpinner, uiRefs.capTooltip, uiRefs.capAutosize]
+            .forEach((id) => Lument.uiSetTextColor(id, theme.textMuted));
+
+        set(uiRefs.dropdown, theme.surface, theme.text);
+        set(uiRefs.toggle, theme.primary, theme.text);
+        set(uiRefs.checkbox, theme.surface, theme.accent);
+        set(uiRefs.slider, theme.accent, theme.text);   // fill = accent, knob = text
+        set(uiRefs.spinner, theme.accent, null);
+        set(uiRefs.divider, theme.border, null);
+        set(uiRefs.tooltip, theme.surface, theme.textMuted);
+        set(uiRefs.autosize, theme.surface, theme.text);
+        if (uiRefs.jsonRoot) Lument.uiSetColor(uiRefs.jsonRoot, theme.surface);
+    }
+
+    function applyTheme(name) {
+        if (name === 'reset') {
+            Lument.uiResetTheme();
+        } else {
+            Lument.uiSetTheme(THEMES[name]);
+        }
+        recolorWidgets(Lument.uiGetTheme());
+        document.querySelectorAll('#theme-btns .btn').forEach((b) => b.classList.remove('active'));
+        if (name !== 'reset') {
+            document.querySelector('#theme-btns .btn[data-theme="' + name + '"]').classList.add('active');
+        }
+        refreshState();
+    }
+
+    // Sync the value/checked state API with what is rendered on the canvas
+    // (the engine renders the slider/checkbox from widget text, while the
+    // state API reads separate fields), then display live values.
+    function syncAndRefresh() {
+        if (uiRefs.slider) {
+            const frac = parseFloat(Lument.uiGetText(uiRefs.slider)) || 0;
+            Lument.uiSetValue(uiRefs.slider, 0 + frac * 100);
+        }
+        if (uiRefs.checkbox) {
+            Lument.uiSetChecked(uiRefs.checkbox, Lument.uiGetText(uiRefs.checkbox) === '1');
+        }
+        if (uiRefs.toggle) {
+            const on = Lument.uiGetChecked(uiRefs.toggle);
+            const tt = Lument.uiGetTheme();
+            Lument.uiSetColor(uiRefs.toggle, on ? tt.success : tt.primary);
+        }
+        refreshState();
+    }
+
+    function refreshState() {
+        const t = Lument.uiGetTheme();
+        const lines = [];
+        if (uiRefs.dropdown) {
+            const sel = Lument.uiGetSelected(uiRefs.dropdown);
+            lines.push('dropdown.selected = ' + sel + '  (' + (dropdownOptions[sel] || '?') + ')');
+        }
+        if (uiRefs.toggle) lines.push('toggle.checked  = ' + Lument.uiGetChecked(uiRefs.toggle));
+        if (uiRefs.checkbox) lines.push('checkbox.checked = ' + Lument.uiGetChecked(uiRefs.checkbox));
+        if (uiRefs.slider) lines.push('slider.value     = ' + Lument.uiGetValue(uiRefs.slider));
+        lines.push('theme.primary    = ' + JSON.stringify(t.primary));
+        setUIOutput(lines.join('\n'));
+    }
+
+    function setUIOutput(text) { document.getElementById('ui-output').textContent = text; }
+
+    // Declarative UI JSON
+    const DEMO_JSON = JSON.stringify({
+        type: 'container', name: 'jsonRoot', layout: 'vertical',
+        x: 16, y: 380, w: 608, h: 200, spacing: 6,
+        children: [
+            { type: 'label',  name: 'jsonTitle', text: 'Built from JSON (uiBuildFromJson)' },
+            { type: 'button', name: 'jsonBtn1',  text: 'Action One' },
+            { type: 'button', name: 'jsonBtn2',  text: 'Action Two' },
+            { type: 'slider', name: 'jsonSlider', min: 0, max: 10, value: 5 },
+            { type: 'checkbox', name: 'jsonCb', checked: true },
+        ],
+    });
+
+    // ---- wire UI panel buttons ----
+    document.querySelectorAll('#theme-btns .btn').forEach((b) => {
+        b.addEventListener('click', () => applyTheme(b.dataset.theme));
+    });
+
+    document.getElementById('flip-toggle').addEventListener('click', () => {
+        if (uiRefs.toggle) {
+            Lument.uiSetChecked(uiRefs.toggle, !Lument.uiGetChecked(uiRefs.toggle));
+            syncAndRefresh();
+        }
+    });
+    document.getElementById('cycle-dd').addEventListener('click', () => {
+        if (uiRefs.dropdown) {
+            const sel = Lument.uiGetSelected(uiRefs.dropdown);
+            Lument.uiSetSelected(uiRefs.dropdown, (sel + 1) % dropdownOptions.length);
+            syncAndRefresh();
+        }
+    });
+
+    document.getElementById('build-json').addEventListener('click', () => {
+        uiRefs.jsonRoot = Lument.uiBuildFromJson(DEMO_JSON);
+        const t = Lument.uiGetTheme();
+        Lument.uiSetColor(uiRefs.jsonRoot, t.surface);
+        setUIOutput(
+            'uiBuildFromJson() -> root id = ' + uiRefs.jsonRoot + '\n' +
+            'uiFindById("jsonBtn1") = ' + Lument.uiFindById('jsonBtn1') + '\n' +
+            'uiFindById("jsonSlider") = ' + Lument.uiFindById('jsonSlider')
+        );
+    });
+    document.getElementById('dump-tree').addEventListener('click', () => {
+        const root = uiRefs.jsonRoot || uiRefs.dropdown;
+        setUIOutput(Lument.uiDumpTree(root));
+    });
+    document.getElementById('clear-ui').addEventListener('click', () => {
+        buildControlsUI();
+        setUIOutput('Controls rebuilt (uiClearAll + uiCreate*).');
+    });
+
+    document.getElementById('autosize-on').addEventListener('click', () => {
+        if (uiRefs.autosize) {
+            const m = Lument.uiMeasureText('AutoSizeLabel', 14);
+            Lument.uiSetAutoSize(uiRefs.autosize, Lument.AUTOSIZE.BOTH);
+            Lument.uiSetMargin(uiRefs.autosize, 4, 8, 4, 8);
+            setUIOutput('uiMeasureText("AutoSizeLabel",14) = ' + JSON.stringify(m) +
+                        '\nuiSetAutoSize(BOTH) + uiSetMargin applied.');
+        }
+    });
+    document.getElementById('autosize-off').addEventListener('click', () => {
+        if (uiRefs.autosize) {
+            Lument.uiSetAutoSize(uiRefs.autosize, Lument.AUTOSIZE.OFF);
+            Lument.uiSetSize(uiRefs.autosize, 120, 26);
+            setUIOutput('uiSetAutoSize(OFF); size reset to 120x26.');
+        }
+    });
+
+    // ---- forward canvas mouse to lument ui touch handling (UI tab only) ----
+    const canvasEl = document.getElementById('game-canvas');
+    let mouseDown = false;
+    canvasEl.addEventListener('mousedown', (e) => {
+        if (currentTab !== 'ui') return;
+        mouseDown = true;
+        const r = canvasEl.getBoundingClientRect();
+        Lument.uiHandleTouch(e.clientX - r.left, e.clientY - r.top, 0);
+        syncAndRefresh();
+    });
+    canvasEl.addEventListener('mousemove', (e) => {
+        if (currentTab !== 'ui' || !mouseDown) return;
+        const r = canvasEl.getBoundingClientRect();
+        Lument.uiHandleTouch(e.clientX - r.left, e.clientY - r.top, 1);
+        syncAndRefresh();
+    });
+    window.addEventListener('mouseup', () => { mouseDown = false; });
+
+    buildControlsUI();
+
+    // ============================================================
+    // Rendering Primitives tab
+    // ============================================================
+    const primFlags = { circle: true, line: true, triangle: true,
+                        polygon: true, ellipse: true, point: true, batch: true };
+    let primSpeed = 1, batchCount = 60;
+
+    document.querySelectorAll('#prim-toggles .btn').forEach((b) => {
+        b.addEventListener('click', () => {
+            const p = b.dataset.prim;
+            primFlags[p] = !primFlags[p];
+            b.classList.toggle('active', primFlags[p]);
+        });
+    });
+    document.getElementById('prim-speed').addEventListener('input', (e) => {
+        primSpeed = parseFloat(e.target.value);
+        document.getElementById('speed-val').textContent = primSpeed.toFixed(1);
+    });
+    document.getElementById('batch-count').addEventListener('input', (e) => {
+        batchCount = parseInt(e.target.value, 10);
+        document.getElementById('batch-val').textContent = batchCount;
+    });
+
+    function hsv(h, s, v) {
+        const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+        let r = 0, g = 0, b = 0;
+        if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; }
+        else if (h < 180) { g = c; b = x; } else if (h < 240) { g = x; b = c; }
+        else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+        return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255),
+                 b: Math.round((b + m) * 255), a: 255 };
+    }
+
+    function renderPrimitives(t) {
+        const cx = W / 2, cy = H / 2 - 30;
+        Lument.clear({ r: 15, g: 15, b: 28, a: 255 });
+
+        if (primFlags.line) {
+            const n = 24;
+            for (let i = 0; i < n; i++) {
+                const a = (i / n) * Math.PI * 2 + t * 0.3;
+                Lument.drawLine(cx, cy, cx + Math.cos(a) * 190, cy + Math.sin(a) * 190, 2,
+                    { r: 100, g: 180, b: 255, a: 160 });
+            }
+        }
+        if (primFlags.circle) {
+            for (let i = 0; i < 5; i++) {
+                const r = 36 + i * 28 + Math.sin(t + i) * 7;
+                Lument.drawCircle(cx, cy, r, { r: 100, g: 200, b: 255, a: 110 }, false);
+            }
+            Lument.drawCircle(cx, cy, 22, { r: 255, g: 120, b: 120, a: 255 }, true);
+        }
+        if (primFlags.triangle) {
+            for (let i = 0; i < 3; i++) {
+                const ang = t + i * 2.094;
+                const x1 = cx + Math.cos(ang) * 120, y1 = cy + Math.sin(ang) * 120;
+                const x2 = cx + Math.cos(ang + 1.047) * 120, y2 = cy + Math.sin(ang + 1.047) * 120;
+                Lument.drawTriangle(x1, y1, x2, y2, cx, cy, { r: 255, g: 200, b: 80, a: 150 }, true);
+            }
+        }
+        if (primFlags.polygon) {
+            const sides = 6, pts = [];
+            for (let i = 0; i < sides; i++) {
+                const ang = (i / sides) * Math.PI * 2 - t * 0.5;
+                pts.push({ x: cx + Math.cos(ang) * 160, y: cy + Math.sin(ang) * 160 });
+            }
+            Lument.drawPolygon(pts, { r: 180, g: 120, b: 255, a: 150 }, true);
+        }
+        if (primFlags.ellipse) {
+            Lument.drawEllipse(cx, cy, 210, 100, { r: 80, g: 255, b: 180, a: 120 }, false);
+        }
+        if (primFlags.point) {
+            for (let i = 0; i < 36; i++) {
+                const ang = i * 0.5 + t;
+                const rr = 220 + Math.sin(t + i) * 18;
+                Lument.drawPoint(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr, 4,
+                    { r: 255, g: 255, b: 120, a: 255 });
+            }
+        }
+        if (primFlags.batch) {
+            Lument.beginBatch(0);
+            for (let i = 0; i < batchCount; i++) {
+                const bx = 20 + (i % 20) * 30;
+                const by = 470 + Math.floor(i / 20) * 22;
+                Lument.batchQuad({ x: bx, y: by, w: 26, h: 18 }, hsv((i * 13) % 360, 0.7, 0.95));
+            }
+            Lument.batchTriangle(30, 565, 70, 565, 50, 535, { r: 255, g: 80, b: 80, a: 255 });
+            Lument.batchTriangle(80, 565, 120, 565, 100, 535, { r: 80, g: 255, b: 120, a: 255 });
+            Lument.endBatch();
+        }
+    }
+
+    // ============================================================
+    // Physics Debug tab
+    // ============================================================
+    let physBodies = [];
+    let bpType = Lument.BROADPHASE.GRID;
+    let cellSize = 64;
+    let showGrid = true, showContacts = true;
+
+    Lument.physicsSetBroadphase(bpType);
+    Lument.physicsSetGridCellSize(cellSize);
+    Lument.physicsSetGravity(0, 0);   // free-floating bouncing bodies
+
+    function spawnBodies(n) {
+        for (let i = 0; i < n; i++) {
+            const x = 80 + Math.random() * (W - 160);
+            const y = 80 + Math.random() * (H - 320);
+            const id = Lument.physicsCreateBody(
+                { type: Lument.BODY.DYNAMIC, mass: 1, restitution: 0.9 }, x, y);
+            const circle = Math.random() > 0.5;
+            if (circle) {
+                const r = 12 + Math.random() * 10;
+                Lument.physicsSetShape(id, { type: Lument.SHAPE.CIRCLE, w: 0, h: 0, radius: r });
+                physBodies.push({ id, circle: true, r, w: r * 2, h: r * 2 });
+            } else {
+                const s = 22 + Math.random() * 14;
+                Lument.physicsSetShape(id, { type: Lument.SHAPE.AABB, w: s, h: s });
+                physBodies.push({ id, circle: false, r: s / 2, w: s, h: s });
+            }
+            const vx = (Math.random() - 0.5) * 240;
+            const vy = (Math.random() - 0.5) * 240;
+            Lument.physicsSetVelocity(id, vx, vy);
+        }
+        updatePhysOut();
+    }
+
+    function renderPhysics(t) {
+        Lument.clear({ r: 12, g: 14, b: 22, a: 255 });
+
+        // bounce off the canvas walls
+        for (const b of physBodies) {
+            const p = Lument.physicsGetPosition(b.id);
+            const v = Lument.physicsGetVelocity(b.id);
+            if (!p || !v) continue;
+            const half = b.circle ? b.r : b.w / 2;
+            let nvx = v.vx, nvy = v.vy;
+            if (p.x < half)        nvx = Math.abs(nvx);
+            else if (p.x > W - half) nvx = -Math.abs(nvx);
+            if (p.y < half)        nvy = Math.abs(nvy);
+            else if (p.y > H - half) nvy = -Math.abs(nvy);
+            if (nvx !== v.vx || nvy !== v.vy) Lument.physicsSetVelocity(b.id, nvx, nvy);
+        }
+
+        // broadphase grid (drawn by the engine) + body shape attempts
+        Lument.physicsDebugDraw({
+            shapeColor:   { r: 100, g: 220, b: 140, a: 220 },
+            contactColor: { r: 240, g: 90, b: 90, a: 255 },
+            gridColor:    { r: 60, g: 100, b: 150, a: 150 },
+            showGrid: showGrid,
+            showContacts: false,   // engine queries body 0; we draw contacts ourselves below
+        });
+
+        // reliable body shapes (drawn from our tracked sizes)
+        for (const b of physBodies) {
+            const p = Lument.physicsGetPosition(b.id);
+            if (!p) continue;
+            if (b.circle) {
+                Lument.drawCircle(p.x, p.y, b.r, { r: 100, g: 200, b: 255, a: 230 }, true);
+            } else {
+                Lument.drawRect({ x: p.x - b.w / 2, y: p.y - b.h / 2, w: b.w, h: b.h },
+                    { r: 200, g: 160, b: 100, a: 230 }, true);
+            }
+        }
+
+        // contact points (via physicsCheckCollision)
+        if (showContacts) {
+            for (let i = 0; i < physBodies.length; i++) {
+                for (let j = i + 1; j < physBodies.length; j++) {
+                    const c = Lument.physicsCheckCollision(physBodies[i].id, physBodies[j].id);
+                    if (c && c.point) {
+                        Lument.drawCircle(c.point.x, c.point.y, 4,
+                            { r: 240, g: 90, b: 90, a: 255 }, true);
+                    }
+                }
+            }
+        }
+
+        updatePhysOut();
+    }
+
+    function updatePhysOut() {
+        document.getElementById('phys-output').textContent =
+            'bodies: ' + physBodies.length +
+            ' | physicsGetPairCount(): ' + Lument.physicsGetPairCount();
+    }
+
+    document.querySelectorAll('#bp-btns .btn').forEach((b) => {
+        b.addEventListener('click', () => {
+            const v = b.dataset.bp;
+            bpType = (v === 'grid') ? Lument.BROADPHASE.GRID
+                   : (v === 'quadtree') ? Lument.BROADPHASE.QUADTREE
+                   : Lument.BROADPHASE.BRUTE;
+            Lument.physicsSetBroadphase(bpType);
+            document.querySelectorAll('#bp-btns .btn').forEach((x) => x.classList.remove('active'));
+            b.classList.add('active');
+        });
+    });
+    document.getElementById('cell-size').addEventListener('input', (e) => {
+        cellSize = parseInt(e.target.value, 10);
+        Lument.physicsSetGridCellSize(cellSize);
+        document.getElementById('cell-val').textContent = cellSize;
+    });
+    document.getElementById('dbg-grid').addEventListener('click', (e) => {
+        showGrid = !showGrid; e.target.classList.toggle('active', showGrid);
+    });
+    document.getElementById('dbg-contacts').addEventListener('click', (e) => {
+        showContacts = !showContacts; e.target.classList.toggle('active', showContacts);
+    });
+    document.getElementById('add-bodies').addEventListener('click', () => spawnBodies(8));
+    document.getElementById('reset-phys').addEventListener('click', () => {
+        Lument.physicsReset();
+        physBodies = [];
+        updatePhysOut();
+    });
+
+    // ============================================================
+    // Tab switching
+    // ============================================================
+    const panels = { ui: 'panel-ui', primitives: 'panel-primitives', physics: 'panel-physics' };
+    document.querySelectorAll('.tab').forEach((b) => {
+        b.addEventListener('click', () => {
+            currentTab = b.dataset.tab;
+            document.querySelectorAll('.tab').forEach((x) => x.classList.remove('active'));
+            b.classList.add('active');
+            for (const k in panels) {
+                document.getElementById(panels[k]).style.display = (k === currentTab) ? '' : 'none';
+            }
+            if (currentTab === 'physics' && physBodies.length === 0) spawnBodies(8);
+            if (currentTab === 'ui') syncAndRefresh();
+        });
+    });
+
+    // ============================================================
+    // Main game loop
+    // ============================================================
+    function loop() {
+        Lument.beginFrame();
+        animTime += Lument.getDeltaTime() * 0.001;
+
+        if (currentTab === 'ui') {
+            Lument.clear(currentBg);
+            Lument.uiRender();
+            // animate the spinner manually (it renders as a plain box)
+            if (uiRefs.spinnerPos) {
+                const sp = uiRefs.spinnerPos;
+                const acc = Lument.uiGetTheme().accent;
+                Lument.drawCircle(sp.x + sp.size / 2, sp.y + sp.size / 2,
+                    sp.size / 2 - 2, { r: acc.r, g: acc.g, b: acc.b, a: 60 }, false);
+                const a = animTime * 6;
+                Lument.drawLine(
+                    sp.x + sp.size / 2, sp.y + sp.size / 2,
+                    sp.x + sp.size / 2 + Math.cos(a) * (sp.size / 2 - 3),
+                    sp.y + sp.size / 2 + Math.sin(a) * (sp.size / 2 - 3),
+                    2, acc);
+            }
+        } else if (currentTab === 'primitives') {
+            renderPrimitives(animTime * primSpeed);
+        } else if (currentTab === 'physics') {
+            renderPhysics(animTime);
+        }
+
+        Lument.endFrame();
+
+        const s = Lument.getStats();
+        document.getElementById('stats').textContent =
+            'FPS: ' + s.fps + ' | DC: ' + s.drawCalls;
+
+        requestAnimationFrame(loop);
+    }
+
+    requestAnimationFrame(loop);
+    </script>
+</body>
+</html>

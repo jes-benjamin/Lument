@@ -1,0 +1,45 @@
+{
+  "name": "lument-engine",
+  "version": "1.3.0",
+  "description": "轻量级跨平台 2D 游戏引擎 - UI自动化/渲染图元/物理空间分区/工程化",
+  "main": "runtime/js/lument.js",
+  "types": "runtime/js/lument.d.ts",
+  "files": [
+    "runtime/js/lument.js",
+    "runtime/js/lument.d.ts",
+    "core/include/",
+    "core/src/",
+    "examples/",
+    "README.md",
+    "CMakeLists.txt"
+  ],
+  "scripts": {
+    "test": "node tests/run_tests.js",
+    "build": "bash build.sh cpp",
+    "build:web": "bash build.sh web",
+    "example": "node -e \"console.log('打开 examples/v1.3_demo.html 查看示例')\"",
+    "typecheck": "tsc --noEmit --strict runtime/js/lument.d.ts"
+  },
+  "keywords": [
+    "game-engine",
+    "2d",
+    "cross-platform",
+    "physics",
+    "rendering",
+    "ui",
+    "ecs",
+    "canvas2d",
+    "webgl",
+    "opengl-es"
+  ],
+  "author": "Lument Engine",
+  "license": "MIT",
+  "homepage": "https://lument.uzens.cc.cd/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lument/lument.git"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

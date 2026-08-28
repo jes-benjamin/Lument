@@ -1,4 +1,4 @@
-# Lument v1.2.0
+# Lument v1.3.0
 
 轻量级跨平台 2D 游戏引擎，支持 C++/Python/Java/HTML 多语言开发，适配桌面、移动、Web 多设备平台。
 
@@ -31,7 +31,14 @@
 └──────────────────────────────────────────────────────┘
 ```
 
-## v1.2.0 新增特性
+## v1.3.0 新增特性
+
+- **UI 系统自动化和控件补全**: 新增 7 种控件（Dropdown/Toggle/Scrollview/Tooltip/Divider/Spinner/Icon），主题系统（统一配色），自动尺寸（按内容/子控件自适应），流式布局（FLOW 自动换行），声明式 UI 构建（JSON → 控件树），控件树调试导出，按名查找控件
+- **基础渲染图元和批处理**: 新增 6 种图元（Circle/Line/Triangle/Polygon/Ellipse/Point），手动批处理 API（beginBatch/batchQuad/batchTriangle/endBatch），重构 SpriteCmd 支持任意四边形/三角形
+- **物理引擎空间分区和调试**: 均匀网格（Grid）与四叉树（Quadtree）宽相检测，物理调试渲染（body 形状/碰撞接触点/空间分区网格可视化），候选对数量统计
+- **工程化**: npm 包（package.json），TypeScript 类型定义（lument.d.ts），v1.3 示例页面，62 项自动化测试套件
+
+## v1.2.0 特性
 
 - **2D 物理模拟**: 刚体动力学、自定义阻尼函数、重力控制、碰撞检测与响应
 - **3D 空间音频**: 支持主流音频格式（MP3/WAV/OGG），空间音频定位，音量/音调控制

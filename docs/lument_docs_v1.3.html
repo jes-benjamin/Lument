@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lument Engine v1.3.0 文档</title>
+<style>
+:root{
+  --bg:#1a1a2e;
+  --sidebar:#16213e;
+  --accent:#0f3460;
+  --accent2:#e94560;
+  --text:#e0e0e0;
+  --text-dim:#9aa0b5;
+  --border:#2a2a4a;
+  --code-bg:#0d1b2a;
+  --table-head:#0f3460;
+  --table-row:#1f2540;
+  --table-alt:#1a1f38;
+  --link:#5dade2;
+  --kw:#c792ea;
+  --str:#c3e88d;
+  --num:#f78c6c;
+  --com:#5c6370;
+  --fn:#82aaff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.6;
+  font-size:15px;
+}
+a{color:var(--link);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Layout */
+#app{display:flex;min-height:100vh}
+#sidebar{
+  width:300px;
+  background:var(--sidebar);
+  position:fixed;
+  top:0;left:0;bottom:0;
+  display:flex;
+  flex-direction:column;
+  border-right:1px solid var(--border);
+  z-index:100;
+  transition:transform .25s ease;
+}
+#main{
+  margin-left:300px;
+  flex:1;
+  padding:40px 48px 120px;
+  max-width:1100px;
+  min-width:0;
+}
+
+/* Sidebar header */
+.sidebar-header{
+  padding:20px 18px 14px;
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;background:var(--sidebar);z-index:2;
+}
+.brand{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;color:#fff}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent2);box-shadow:0 0 8px var(--accent2)}
+.version-badge{
+  display:inline-block;margin-top:8px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:.5px;
+}
+#search{
+  width:100%;margin-top:12px;
+  padding:9px 12px;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:6px;color:var(--text);font-size:13px;outline:none;
+}
+#search:focus{border-color:var(--accent2)}
+
+/* Nav */
+#nav{
+  flex:1;overflow-y:auto;padding:8px 0 24px;
+  scrollbar-width:thin;scrollbar-color:#33406a transparent;
+}
+#nav::-webkit-scrollbar{width:8px}
+#nav::-webkit-scrollbar-thumb{background:#33406a;border-radius:4px}
+.nav-section{margin-top:6px}
+.nav-title{
+  padding:8px 18px;
+  font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  color:var(--text-dim);cursor:pointer;user-select:none;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.nav-title:hover{color:var(--text)}
+.nav-title .arrow{transition:transform .2s;font-size:10px}
+.nav-section.collapsed .arrow{transform:rotate(-90deg)}
+.nav-section.collapsed .nav-list{display:none}
+.nav-list{list-style:none}
+.nav-list li a{
+  display:block;padding:5px 18px 5px 26px;
+  font-size:13.5px;color:var(--text-dim);
+  border-left:2px solid transparent;
+}
+.nav-list li a:hover{color:var(--text);background:rgba(255,255,255,.03);text-decoration:none}
+.nav-list li a.active{color:#fff;border-left-color:var(--accent2);background:rgba(233,69,96,.07)}
+
+/* Main content */
+h1{font-size:32px;border-bottom:2px solid var(--border);padding-bottom:12px;margin-bottom:8px}
+h2{
+  font-size:26px;margin-top:48px;margin-bottom:14px;padding-bottom:8px;
+  border-bottom:1px solid var(--border);color:#fff;
+  scroll-margin-top:20px;
+}
+h2 .new-tag{
+  font-size:11px;background:var(--accent2);color:#fff;padding:2px 8px;border-radius:10px;margin-left:10px;vertical-align:middle;
+}
+h3{font-size:19px;margin-top:28px;margin-bottom:10px;color:#fff;scroll-margin-top:20px}
+p{margin:10px 0}
+.lead{color:var(--text-dim);font-size:16px;margin-bottom:24px}
+
+/* API block */
+.api{margin:18px 0 26px;padding:0 0 8px;border-bottom:1px dashed var(--border)}
+.api:last-child{border-bottom:none}
+.api-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.api-name{font-size:17px;color:var(--fn);font-weight:700;font-family:"JetBrains Mono",Consolas,monospace}
+.api-sig{
+  font-family:"JetBrains Mono",Consolas,monospace;font-size:13px;color:var(--text-dim);
+  background:var(--code-bg);padding:2px 8px;border-radius:4px;display:inline-block;
+}
+.api-desc{color:var(--text);margin:8px 0}
+.api-desc strong{color:#fff}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px}
+th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--table-head);color:#fff;font-weight:600}
+td code{color:#ffb86c;font-family:"JetBrains Mono",Consolas,monospace;font-size:12.5px}
+tbody tr:nth-child(odd){background:var(--table-row)}
+tbody tr:nth-child(even){background:var(--table-alt)}
+.return{color:#50fa7b;font-family:"JetBrains Mono",Consolas,monospace;font-size:13px}
+
+/* Code blocks */
+pre{
+  background:var(--code-bg);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:14px 16px;
+  overflow-x:auto;
+  margin:12px 0;
+  font-size:13px;line-height:1.55;
+  scrollbar-width:thin;scrollbar-color:#33406a transparent;
+}
+pre::-webkit-scrollbar{height:8px}
+pre::-webkit-scrollbar-thumb{background:#33406a;border-radius:4px}
+code{font-family:"JetBrains Mono",Consolas,"Courier New",monospace}
+p code,li code,td code{background:rgba(255,255,255,.06);padding:1px 6px;border-radius:3px}
+pre code{background:none;padding:0;color:#cfd8dc}
+
+/* syntax highlight tokens */
+.t-kw{color:var(--kw)}
+.t-str{color:var(--str)}
+.t-num{color:var(--num)}
+.t-com{color:var(--com);font-style:italic}
+.t-fn{color:var(--fn)}
+.t-obj{color:#ffcb6b}
+
+/* Constants grid */
+.const-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin:12px 0}
+.const-card{background:var(--table-row);border:1px solid var(--border);border-radius:6px;padding:10px 12px}
+.const-card .cn{color:#ffcb6b;font-family:monospace;font-weight:700}
+.const-card .cv{color:var(--text-dim);font-size:12px;display:block;margin-top:4px;font-family:monospace}
+
+/* Mobile toggle */
+#menuBtn{display:none;position:fixed;top:14px;left:14px;z-index:200;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:18px;cursor:pointer}
+#overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:90}
+
+@media(max-width:900px){
+  #sidebar{transform:translateX(-100%)}
+  #sidebar.open{transform:translateX(0)}
+  #main{margin-left:0;padding:24px 18px 80px}
+  #menuBtn{display:block}
+  #overlay.open{display:block}
+}
+
+.note{background:rgba(15,52,96,.4);border-left:3px solid var(--accent2);padding:10px 14px;border-radius:4px;margin:14px 0;font-size:13.5px}
+.note::before{content:"💡 提示： ";font-weight:700;color:var(--accent2)}
+.warn{background:rgba(233,69,96,.12);border-left:3px solid var(--accent2);padding:10px 14px;border-radius:4px;margin:14px 0;font-size:13.5px}
+.warn::before{content:"⚠️ 注意： ";font-weight:700;color:var(--accent2)}
+
+.footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--border);color:var(--text-dim);font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+<button id="menuBtn">☰</button>
+<div id="overlay"></div>
+<div id="app">
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand"><span class="dot"></span> Lument Engine</div>
+      <span class="version-badge">v1.3.0</span>
+      <input id="search" type="text" placeholder="搜索 API 名称…" autocomplete="off">
+    </div>
+    <nav id="nav"></nav>
+  </aside>
+
+  <!-- MAIN -->
+  <main id="main">
+    <h1>Lument Engine 文档</h1>
+    <p class="lead">轻量级 2D 游戏引擎 · 渲染 / 物理 / UI / AI / 网络 / ECS 全栈支持。</p>
+
+    <!-- ===== 1. 快速开始 ===== -->
+    <section id="quickstart">
+    <h2>1. 快速开始</h2>
+    <p>Lument Engine 通过单一全局对象 <code>Lument</code> 暴露全部能力。在页面中引入引擎脚本后即可初始化一个画布并启动主循环。</p>
+    <h3>最小示例</h3>
+    <pre><code><span class="t-com">// 1. 初始化引擎，挂载到 #game 画布</span>
+<span class="t-obj">Lument</span>.<span class="t-fn">init</span>({
+  canvas: <span class="t-str">'#game'</span>,
+  width:  <span class="t-num">960</span>,
+  height: <span class="t-num">540</span>,
+  renderer: <span class="t-obj">Lument</span>.RENDERER.WEBGL
+});
+
+<span class="t-com">// 2. 注册每帧更新逻辑</span>
+<span class="t-obj">Lument</span>.<span class="t-fn">run</span>(<span class="t-kw">function</span>() {
+  <span class="t-obj">Lument</span>.<span class="t-fn">beginFrame</span>();
+  <span class="t-obj">Lument</span>.<span class="t-fn">clear</span>(<span class="t-num">0x16213e</span>);
+
+  <span class="t-obj">Lument</span>.<span class="t-fn">drawRect</span>(<span class="t-num">100</span>, <span class="t-num">100</span>, <span class="t-num">64</span>, <span class="t-num">64</span>, <span class="t-num">0xe94560</span>);
+
+  <span class="t-obj">Lument</span>.<span class="t-fn">endFrame</span>();
+});
+
+<span class="t-com">// 3. 关闭引擎</span>
+<span class="t-com">// Lument.shutdown();</span></code></pre>
+    <div class="note">引擎默认使用 WebGL 渲染器，在不支持 WebGL 的环境会自动降级到 Canvas2D。</div>
+    </section>
+
+    <!-- ===== 2. 核心 API ===== -->
+    <section id="core">
+    <h2>2. 核心 API</h2>
+    <p>核心 API 负责引擎生命周期与主循环调度。</p>
+
+    <div class="api" data-api="init">
+      <div class="api-head"><span class="api-name">Lument.init</span><span class="api-sig">init(options: InitOptions): void</span></div>
+      <p class="api-desc">初始化引擎，绑定画布并配置全局参数。必须在调用任何渲染 API 之前执行。</p>
+      <table>
+        <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>options.canvas</code></td><td>string | HTMLCanvasElement</td><td>画布选择器或元素，必填</td></tr>
+          <tr><td><code>options.width</code></td><td>number</td><td>逻辑宽度（像素），默认 800</td></tr>
+          <tr><td><code>options.height</code></td><td>number</td><td>逻辑高度（像素），默认 600</td></tr>
+          <tr><td><code>options.renderer</code></td><td>RENDERER</td><td>渲染器类型，默认 WEBGL</td></tr>
+          <tr><td><code>options.dpr</code></td><td>boolean</td><td>是否启用设备像素比，默认 true</td></tr>
+          <tr><td><code>options.vsync</code></td><td>boolean</td><td>是否启用垂直同步，默认 true</td></tr>
+        </tbody>
+      </table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">init</span>({
+  canvas: <span class="t-str">'#game'</span>,
+  width:  <span class="t-num">1280</span>,
+  height: <span class="t-num">720</span>,
+  renderer: <span class="t-obj">Lument</span>.RENDERER.WEBGL
+});</code></pre>
+    </div>
+
+    <div class="api" data-api="shutdown">
+      <div class="api-head"><span class="api-name">Lument.shutdown</span><span class="api-sig">shutdown(): void</span></div>
+      <p class="api-desc">停止主循环、释放 GPU 资源并销毁上下文。调用后引擎进入未初始化状态。</p>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">shutdown</span>();</code></pre>
+    </div>
+
+    <div class="api" data-api="isRunning">
+      <div class="api-head"><span class="api-name">Lument.isRunning</span><span class="api-sig">isRunning(): boolean</span></div>
+      <p class="api-desc">返回主循环是否正在运行。</p>
+      <p><span class="return">返回值：</span><code>boolean</code> — 是否正在运行</p>
+      <pre><code><span class="t-kw">if</span> (<span class="t-obj">Lument</span>.<span class="t-fn">isRunning</span>()) {
+  <span class="t-obj">console</span>.<span class="t-fn">log</span>(<span class="t-str">'引擎运行中'</span>);
+}</code></pre>
+    </div>
+
+    <div class="api" data-api="beginFrame">
+      <div class="api-head"><span class="api-name">Lument.beginFrame</span><span class="api-sig">beginFrame(): void</span></div>
+      <p class="api-desc">标记一帧渲染开始，重置内部统计并准备绘制上下文。必须在每帧绘制前调用。</p>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">beginFrame</span>();</code></pre>
+    </div>
+
+    <div class="api" data-api="endFrame">
+      <div class="api-head"><span class="api-name">Lument.endFrame</span><span class="api-sig">endFrame(): void</span></div>
+      <p class="api-desc">提交当前帧绘制命令并执行缓冲区交换。与 <code>beginFrame</code> 成对出现。</p>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">endFrame</span>();</code></pre>
+    </div>
+
+    <div class="api" data-api="getDeltaTime">
+      <div class="api-head"><span class="api-name">Lument.getDeltaTime</span><span class="api-sig">getDeltaTime(): number</span></div>
+      <p class="api-desc">返回上一帧到当前帧的时间间隔（秒，浮点）。用于实现帧率无关的运动。</p>
+      <p><span class="return">返回值：</span><code>number</code> — 秒</p>
+      <pre><code><span class="t-kw">const</span> dt = <span class="t-obj">Lument</span>.<span class="t-fn">getDeltaTime</span>();
+x += speed * dt;</code></pre>
+    </div>
+
+    <div class="api" data-api="getStats">
+      <div class="api-head"><span class="api-name">Lument.getStats</span><span class="api-sig">getStats(): FrameStats</span></div>
+      <p class="api-desc">返回当前帧的性能统计信息。</p>
+      <p><span class="return">返回值：</span><code>{ fps:number, drawCalls:number, vertices:number, frameTime:number }</code></p>
+      <pre><code><span class="t-kw">const</span> s = <span class="t-obj">Lument</span>.<span class="t-fn">getStats</span>();
+<span class="t-obj">console</span>.<span class="t-fn">log</span>(<span class="t-str">`FPS=${s.fps} draws=${s.drawCalls}`</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="getPlatform">
+      <div class="api-head"><span class="api-name">Lument.getPlatform</span><span class="api-sig">getPlatform(): string</span></div>
+      <p class="api-desc">返回当前运行平台标识（与 <code>Lument.PLATFORM</code> 常量匹配）。</p>
+      <p><span class="return">返回值：</span><code>string</code> — WEB / MOBILE / DESKTOP 之一</p>
+      <pre><code><span class="t-kw">if</span> (<span class="t-obj">Lument</span>.<span class="t-fn">getPlatform</span>() === <span class="t-obj">Lument</span>.PLATFORM.MOBILE) {
+  <span class="t-com">// 启用触控 UI</span>
+}</code></pre>
+    </div>
+
+    <div class="api" data-api="getRendererType">
+      <div class="api-head"><span class="api-name">Lument.getRendererType</span><span class="api-sig">getRendererType(): string</span></div>
+      <p class="api-desc">返回当前激活的渲染器类型。</p>
+      <p><span class="return">返回值：</span><code>string</code> — WEBGL / CANVAS2D / WEBGPU 之一</p>
+      <pre><code><span class="t-obj">console</span>.<span class="t-fn">log</span>(<span class="t-obj">Lument</span>.<span class="t-fn">getRendererType</span>()); <span class="t-com">// "WEBGL"</span></code></pre>
+    </div>
+
+    <div class="api" data-api="run">
+      <div class="api-head"><span class="api-name">Lument.run</span><span class="api-sig">run(callback: (dt:number)=>void): void</span></div>
+      <p class="api-desc">启动主循环并以指定回调作为每帧入口。回调参数 <code>dt</code> 为帧时间（秒）。</p>
+      <table>
+        <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>callback</code></td><td>(dt:number)=>void</td><td>每帧调用，dt 为帧间隔（秒）</td></tr>
+        </tbody>
+      </table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">run</span>((dt) => {
+  <span class="t-obj">Lument</span>.<span class="t-fn">beginFrame</span>();
+  <span class="t-com">// ... 渲染逻辑</span>
+  <span class="t-obj">Lument</span>.<span class="t-fn">endFrame</span>();
+});</code></pre>
+    </div>
+    </section>
+
+    <!-- ===== 3. 渲染 API ===== -->
+    <section id="render">
+    <h2>3. 渲染 API</h2>
+    <p>底层绘制与纹理管理。所有坐标均使用引擎逻辑坐标系（左上为原点）。</p>
+
+    <div class="api" data-api="clear">
+      <div class="api-head"><span class="api-name">Lument.clear</span><span class="api-sig">clear(color?: number): void</span></div>
+      <p class="api-desc">用指定颜色清除整个画布。颜色为 0xRRGGBB 整数。</p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>color</code></td><td>number</td><td>0xRRGGBB，默认 0x000000</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">clear</span>(<span class="t-num">0x1a1a2e</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="setCamera">
+      <div class="api-head"><span class="api-name">Lument.setCamera</span><span class="api-sig">setCamera(x:number, y:number, zoom?:number, rotation?:number): void</span></div>
+      <p class="api-desc">设置摄像机位置、缩放与旋转。</p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>x</code></td><td>number</td><td>摄像机 X 坐标</td></tr>
+        <tr><td><code>y</code></td><td>number</td><td>摄像机 Y 坐标</td></tr>
+        <tr><td><code>zoom</code></td><td>number</td><td>缩放，1.0 为原始尺寸，默认 1</td></tr>
+        <tr><td><code>rotation</code></td><td>number</td><td>旋转角度（弧度），默认 0</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">setCamera</span>(player.x, player.y, <span class="t-num">1.5</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="drawRect">
+      <div class="api-head"><span class="api-name">Lument.drawRect</span><span class="api-sig">drawRect(x,y,w,h,color,fill=true): void</span></div>
+      <p class="api-desc">绘制矩形。<code>fill=false</code> 时绘制描边。</p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>x,y</code></td><td>number</td><td>左上角坐标</td></tr>
+        <tr><td><code>w,h</code></td><td>number</td><td>宽高</td></tr>
+        <tr><td><code>color</code></td><td>number</td><td>0xRRGGBB</td></tr>
+        <tr><td><code>fill</code></td><td>boolean</td><td>是否填充，默认 true</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">drawRect</span>(<span class="t-num">10</span>, <span class="t-num">10</span>, <span class="t-num">80</span>, <span class="t-num">40</span>, <span class="t-num">0xe94560</span>);
+<span class="t-obj">Lument</span>.<span class="t-fn">drawRect</span>(<span class="t-num">10</span>, <span class="t-num">60</span>, <span class="t-num">80</span>, <span class="t-num">40</span>, <span class="t-num">0xffffff</span>, <span class="t-kw">false</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="drawSprite">
+      <div class="api-head"><span class="api-name">Lument.drawSprite</span><span class="api-sig">drawSprite(tex,x,y,w?,h?,rot?,tint?): void</span></div>
+      <p class="api-desc">绘制精灵纹理。w/h 缺省时使用纹理原始尺寸。</p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>tex</code></td><td>Texture</td><td>纹理句柄</td></tr>
+        <tr><td><code>x,y</code></td><td>number</td><td>左上角坐标</td></tr>
+        <tr><td><code>w,h</code></td><td>number</td><td>目标尺寸，可选</td></tr>
+        <tr><td><code>rot</code></td><td>number</td><td>旋转弧度，可选</td></tr>
+        <tr><td><code>tint</code></td><td>number</td><td>染色 0xRRGGBB，可选</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-kw">const</span> tex = <span class="t-obj">Lument</span>.<span class="t-fn">loadTexture</span>(<span class="t-str">'assets/player.png'</span>);
+<span class="t-obj">Lument</span>.<span class="t-fn">drawSprite</span>(tex, <span class="t-num">100</span>, <span class="t-num">100</span>, <span class="t-num">64</span>, <span class="t-num">64</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="drawText">
+      <div class="api-head"><span class="api-name">Lument.drawText</span><span class="api-sig">drawText(text,x,y,size,color,font?): void</span></div>
+      <p class="api-desc">绘制文本。</p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>text</code></td><td>string</td><td>文本内容</td></tr>
+        <tr><td><code>x,y</code></td><td>number</td><td>左上角坐标</td></tr>
+        <tr><td><code>size</code></td><td>number</td><td>字号（px）</td></tr>
+        <tr><td><code>color</code></td><td>number</td><td>0xRRGGBB</td></tr>
+        <tr><td><code>font</code></td><td>string</td><td>字体名，可选</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">drawText</span>(<span class="t-str">'Hello Lument'</span>, <span class="t-num">20</span>, <span class="t-num">20</span>, <span class="t-num">24</span>, <span class="t-num">0xffffff</span>, <span class="t-str">'Arial'</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="drawPixel">
+      <div class="api-head"><span class="api-name">Lument.drawPixel</span><span class="api-sig">drawPixel(x,y,color): void</span></div>
+      <p class="api-desc">绘制单个像素点。</p>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">drawPixel</span>(<span class="t-num">50</span>, <span class="t-num">50</span>, <span class="t-num">0xff0000</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="flush">
+      <div class="api-head"><span class="api-name">Lument.flush</span><span class="api-sig">flush(): void</span></div>
+      <p class="api-desc">立即提交当前所有挂起的绘制命令。通常仅在自定义渲染管线时使用。</p>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">flush</span>();</code></pre>
+    </div>
+
+    <div class="api" data-api="loadTexture">
+      <div class="api-head"><span class="api-name">Lument.loadTexture</span><span class="api-sig">loadTexture(src:string, cb?): Texture</span></div>
+      <p class="api-desc">异步加载图片为纹理，可立即返回句柄并在加载完成后回调。</p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>src</code></td><td>string</td><td>图片 URL</td></tr>
+        <tr><td><code>cb</code></td><td>(tex)=>void</td><td>加载完成回调，可选</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>Texture</code> — 纹理句柄（异步加载）</p>
+      <pre><code><span class="t-kw">const</span> tex = <span class="t-obj">Lument</span>.<span class="t-fn">loadTexture</span>(<span class="t-str">'a.png'</span>, (t) => {
+  <span class="t-obj">console</span>.<span class="t-fn">log</span>(<span class="t-str">'loaded'</span>, t.width);
+});</code></pre>
+    </div>
+
+    <div class="api" data-api="createTextureFromData">
+      <div class="api-head"><span class="api-name">Lument.createTextureFromData</span><span class="api-sig">createTextureFromData(w,h,data,format?): Texture</span></div>
+      <p class="api-desc">从内存像素数据创建纹理。<code>data</code> 为 Uint8Array RGBA 数组。</p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>w,h</code></td><td>number</td><td>宽高</td></tr>
+        <tr><td><code>data</code></td><td>Uint8Array</td><td>RGBA 像素数据</td></tr>
+        <tr><td><code>format</code></td><td>string</td><td>像素格式，默认 "RGBA"</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>Texture</code></p>
+      <pre><code><span class="t-kw">const</span> px = <span class="t-kw">new</span> <span class="t-obj">Uint8Array</span>([<span class="t-num">255</span>,<span class="t-num">0</span>,<span class="t-num">0</span>,<span class="t-num">255</span>]);
+<span class="t-kw">const</span> tex = <span class="t-obj">Lument</span>.<span class="t-fn">createTextureFromData</span>(<span class="t-num">1</span>, <span class="t-num">1</span>, px);</code></pre>
+    </div>
+
+    <div class="api" data-api="destroyTexture">
+      <div class="api-head"><span class="api-name">Lument.destroyTexture</span><span class="api-sig">destroyTexture(tex:Texture): void</span></div>
+      <p class="api-desc">释放纹理占用的 GPU 资源。</p>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">destroyTexture</span>(tex);</code></pre>
+    </div>
+
+    <div class="api" data-api="getCanvas">
+      <div class="api-head"><span class="api-name">Lument.getCanvas</span><span class="api-sig">getCanvas(): HTMLCanvasElement</span></div>
+      <p class="api-desc">返回引擎绑定的画布元素。</p>
+      <p><span class="return">返回值：</span><code>HTMLCanvasElement</code></p>
+      <pre><code><span class="t-kw">const</span> canvas = <span class="t-obj">Lument</span>.<span class="t-fn">getCanvas</span>();</code></pre>
+    </div>
+
+    <div class="api" data-api="getContext">
+      <div class="api-head"><span class="api-name">Lument.getContext</span><span class="api-sig">getContext(): WebGLRenderingContext|CanvasRenderingContext2D</span></div>
+      <p class="api-desc">返回底层渲染上下文，供高级用户直接操作。</p>
+      <p><span class="return">返回值：</span><code>RenderingContext</code></p>
+      <pre><code><span class="t-kw">const</span> gl = <span class="t-obj">Lument</span>.<span class="t-fn">getContext</span>();</code></pre>
+    </div>
+    </section>
+
+    <!-- ===== 4. 渲染图元 ===== -->
+    <section id="primitives">
+    <h2>4. 渲染图元 <span class="new-tag">v1.3 新增</span></h2>
+    <p>批量基础图元绘制函数，内部走批处理通道，适合粒子、调试线框等。</p>
+
+    <div class="api" data-api="drawCircle">
+      <div class="api-head"><span class="api-name">Lument.drawCircle</span><span class="api-sig">drawCircle(cx,cy,r,color,fill=true,segments=32): void</span></div>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>cx,cy</code></td><td>number</td><td>圆心坐标</td></tr>
+        <tr><td><code>r</code></td><td>number</td><td>半径</td></tr>
+        <tr><td><code>color</code></td><td>number</td><td>0xRRGGBB</td></tr>
+        <tr><td><code>fill</code></td><td>boolean</td><td>是否填充，默认 true</td></tr>
+        <tr><td><code>segments</code></td><td>number</td><td>近似多边形段数，默认 32</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">drawCircle</span>(<span class="t-num">200</span>, <span class="t-num">200</span>, <span class="t-num">50</span>, <span class="t-num">0x5dade2</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="drawLine">
+      <div class="api-head"><span class="api-name">Lument.drawLine</span><span class="api-sig">drawLine(x1,y1,x2,y2,color,width=1): void</span></div>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>x1,y1,x2,y2</code></td><td>number</td><td>起止点坐标</td></tr>
+        <tr><td><code>color</code></td><td>number</td><td>0xRRGGBB</td></tr>
+        <tr><td><code>width</code></td><td>number</td><td>线宽，默认 1</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">drawLine</span>(<span class="t-num">0</span>, <span class="t-num">0</span>, <span class="t-num">100</span>, <span class="t-num">100</span>, <span class="t-num">0xffffff</span>, <span class="t-num">2</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="drawTriangle">
+      <div class="api-head"><span class="api-name">Lument.drawTriangle</span><span class="api-sig">drawTriangle(x1,y1,x2,y2,x3,y3,color,fill=true): void</span></div>
+      <p>绘制三角形，参数为三个顶点坐标。</p>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">drawTriangle</span>(<span class="t-num">0</span>,<span class="t-num">0</span>, <span class="t-num">50</span>,<span class="t-num">100</span>, <span class="t-num">100</span>,<span class="t-num">0</span>, <span class="t-num">0xe94560</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="drawPolygon">
+      <div class="api-head"><span class="api-name">Lument.drawPolygon</span><span class="api-sig">drawPolygon(points:number[], color, fill=true): void</span></div>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>points</code></td><td>number[]</td><td>[x1,y1,x2,y2,...] 顶点数组</td></tr>
+        <tr><td><code>color</code></td><td>number</td><td>0xRRGGBB</td></tr>
+        <tr><td><code>fill</code></td><td>boolean</td><td>是否填充，默认 true</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">drawPolygon</span>([<span class="t-num">10</span>,<span class="t-num">10</span>, <span class="t-num">60</span>,<span class="t-num">10</span>, <span class="t-num">35</span>,<span class="t-num">60</span>], <span class="t-num">0xffcb6b</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="drawEllipse">
+      <div class="api-head"><span class="api-name">Lument.drawEllipse</span><span class="api-sig">drawEllipse(cx,cy,rx,ry,color,fill=true): void</span></div>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>cx,cy</code></td><td>number</td><td>中心点</td></tr>
+        <tr><td><code>rx,ry</code></td><td>number</td><td>水平 / 垂直半径</td></tr>
+        <tr><td><code>color</code></td><td>number</td><td>0xRRGGBB</td></tr>
+        <tr><td><code>fill</code></td><td>boolean</td><td>是否填充，默认 true</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">drawEllipse</span>(<span class="t-num">200</span>, <span class="t-num">200</span>, <span class="t-num">80</span>, <span class="t-num">40</span>, <span class="t-num">0xc792ea</span>);</code></pre>
+    </div>
+
+    <div class="api" data-api="drawPoint">
+      <div class="api-head"><span class="api-name">Lument.drawPoint</span><span class="api-sig">drawPoint(x,y,color,size=1): void</span></div>
+      <p>绘制带尺寸的点（区别于单像素 drawPixel）。</p>
+      <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+        <tr><td><code>x,y</code></td><td>number</td><td>坐标</td></tr>
+        <tr><td><code>color</code></td><td>number</td><td>0xRRGGBB</td></tr>
+        <tr><td><code>size</code></td><td>number</td><td>点直径，默认 1</td></tr>
+      </tbody></table>
+      <p><span class="return">返回值：</span><code>void</code></p>
+      <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">drawPoint</span>(<span class="t-num">100</span>, <span class="t-num">100</span>, <span class="t-num">0xff0000</span>, <span class="t-num">3</span>);</code></pre>
+    </div>
+    </section>
+
+    <!-- ===== 5. 手动批处理 ===== -->
+    <section id="batch">
+    <h2>5. 手动批处理 <span class="new-tag">v1.3 新增</span></h2>
+    <p>当需要精确控制绘制顺序与状态切换时，可使用手动批处理通道，将多个图元合并为一次绘制调用。</p>
+
+    <div class="api" data-api="beginBatch">
+      <div class="api-head"><span class="api-name">Lument.beginBatch</span><span class="api-sig">beginBatch(maxVerts=4096): void</span></div>
+      <p>开启一个批处理上下文，<code>maxVerts</code> 为顶点缓冲上限。</p>
+      <p><span class="return">返回值：</span><code>void</code></p>
+    </div>
+
+    <div class="api" data-api="batchQuad">
+      <div class="api-head"><span class="api-name">Lument.batchQuad</span><span class="api-sig">batchQuad(x,y,w,h,color): void</span></div>
+      <p>向当前批次追加一个四边形。</p>
+      <p><span class="return">返回值：</span><code>void</code></p>
+    </div>
+
+    <div class="api" data-api="batchTriangle">
+      <div class="api-head"><span class="api-name">Lument.batchTriangle</span><span class="api-sig">batchTriangle(x1,y1,x2,y2,x3,y3,color): void</span></div>
+      <p>向当前批次追加一个三角形。</p>
+      <p><span class="return">返回值：</span><code>void</code></p>
+    </div>
+
+    <div class="api" data-api="endBatch">
+      <div class="api-head"><span class="api-name">Lument.endBatch</span><span class="api-sig">endBatch(): void</span></div>
+      <p>提交并清空当前批次。一次绘制调用渲染所有累积的图元。</p>
+      <p><span class="return">返回值：</span><code>void</code></p>
+    </div>
+
+    <h3>使用示例</h3>
+    <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">beginBatch</span>(<span class="t-num">8192</span>);
+<span class="t-kw">for</span> (<span class="t-kw">let</span> i = <span class="t-num">0</span>; i &lt; <span class="t-num">500</span>; i++) {
+  <span class="t-obj">Lument</span>.<span class="t-fn">batchQuad</span>(i*<span class="t-num">2</span>, <span class="t-num">100</span>, <span class="t-num">2</span>, <span class="t-num">20</span>, <span class="t-num">0xe94560</span>);
+}
+<span class="t-obj">Lument</span>.<span class="t-fn">endBatch</span>(); <span class="t-com">// 1 次 drawCall 渲染 500 个矩形</span></code></pre>
+    <div class="note">批处理必须在 beginFrame/endFrame 之间调用；同一批次内图元共享渲染状态，切换纹理会强制提交。</div>
+    </section>
+
+    <!-- ===== 6. 2D 场景渲染 ===== -->
+    <section id="scene2d">
+    <h2>6. 2D 场景渲染</h2>
+    <p>场景级视觉效果：色彩后处理、清晰度、暗角、雾、灯光与渲染目标。</p>
+
+    <h3>SceneColor 后处理</h3>
+    <p>对整个画面应用色调/亮度/对比度等参数。所有方法返回 self 以便链式调用。</p>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>SceneColor.tint(color)</code></td><td>color:number 0xRRGGBB</td><td>SceneColor</td><td>整体染色</td></tr>
+      <tr><td><code>SceneColor.brightness(v)</code></td><td>v:number 0~2</td><td>SceneColor</td><td>亮度</td></tr>
+      <tr><td><code>SceneColor.contrast(v)</code></td><td>v:number 0~2</td><td>SceneColor</td><td>对比度</td></tr>
+      <tr><td><code>SceneColor.saturation(v)</code></td><td>v:number 0~2</td><td>SceneColor</td><td>饱和度</td></tr>
+      <tr><td><code>SceneColor.hueShift(deg)</code></td><td>deg:number 0~360</td><td>SceneColor</td><td>色相旋转</td></tr>
+      <tr><td><code>SceneColor.grayscale(enable)</code></td><td>enable:boolean</td><td>SceneColor</td><td>灰度</td></tr>
+      <tr><td><code>SceneColor.sepia(enable)</code></td><td>enable:boolean</td><td>SceneColor</td><td>复古棕褐色</td></tr>
+      <tr><td><code>SceneColor.invert(enable)</code></td><td>enable:boolean</td><td>SceneColor</td><td>颜色反转</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.scene.color
+  .<span class="t-fn">brightness</span>(<span class="t-num">1.2</span>)
+  .<span class="t-fn">saturation</span>(<span class="t-num">0.8</span>)
+  .<span class="t-fn">tint</span>(<span class="t-num">0x0f3460</span>);</code></pre>
+
+    <h3>清晰度 clarity</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>clarity.sharpness(v)</code></td><td>v:number 0~1</td><td>clarity</td><td>锐化强度</td></tr>
+      <tr><td><code>clarity.blur(radius)</code></td><td>radius:number</td><td>clarity</td><td>高斯模糊半径</td></tr>
+      <tr><td><code>clarity.bloom(threshold,intensity)</code></td><td>threshold:number,intensity:number</td><td>clarity</td><td>泛光阈值与强度</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.scene.clarity.<span class="t-fn">bloom</span>(<span class="t-num">0.8</span>, <span class="t-num">1.5</span>);</code></pre>
+
+    <h3>暗角 vignette</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>vignette.intensity(v)</code></td><td>v:number 0~1</td><td>vignette</td><td>暗角强度</td></tr>
+      <tr><td><code>vignette.radius(r)</code></td><td>r:number 0~1</td><td>vignette</td><td>暗角半径</td></tr>
+      <tr><td><code>vignette.color(c)</code></td><td>c:number 0xRRGGBB</td><td>vignette</td><td>暗角颜色</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.scene.vignette.<span class="t-fn">intensity</span>(<span class="t-num">0.6</span>).<span class="t-fn">color</span>(<span class="t-num">0x000000</span>);</code></pre>
+
+    <h3>雾 fog</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>fog.color(c)</code></td><td>c:number</td><td>fog</td><td>雾色</td></tr>
+      <tr><td><code>fog.near(n)</code></td><td>n:number</td><td>fog</td><td>雾起始距离</td></tr>
+      <tr><td><code>fog.far(f)</code></td><td>f:number</td><td>fog</td><td>雾结束距离</td></tr>
+      <tr><td><code>fog.density(d)</code></td><td>d:number</td><td>fog</td><td>雾密度</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.scene.fog.<span class="t-fn">color</span>(<span class="t-num">0x16213e</span>).<span class="t-fn">near</span>(<span class="t-num">100</span>).<span class="t-fn">far</span>(<span class="t-num">600</span>);</code></pre>
+
+    <h3>灯光 lights</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>addLight(x,y,color,intensity,radius)</code></td><td>位置/颜色/强度/半径</td><td>LightID</td><td>添加点光源</td></tr>
+      <tr><td><code>setLightDirection(x,y)</code></td><td>方向向量</td><td>void</td><td>设置全局光照方向</td></tr>
+      <tr><td><code>setAmbient(color)</code></td><td>color:number</td><td>void</td><td>环境光颜色</td></tr>
+      <tr><td><code>removeLight(id)</code></td><td>id:LightID</td><td>void</td><td>移除指定光源</td></tr>
+      <tr><td><code>clearLights()</code></td><td>—</td><td>void</td><td>清除所有光源</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-kw">const</span> lid = <span class="t-obj">Lument</span>.scene.<span class="t-fn">addLight</span>(<span class="t-num">200</span>,<span class="t-num">200</span>, <span class="t-num">0xffaa55</span>, <span class="t-num">1.2</span>, <span class="t-num">150</span>);
+<span class="t-obj">Lument</span>.scene.<span class="t-fn">setAmbient</span>(<span class="t-num">0x223355</span>);</code></pre>
+
+    <h3>渲染目标 renderTargets</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>createRenderTarget(w,h)</code></td><td>w,h:number</td><td>RenderTarget</td><td>创建离屏渲染目标</td></tr>
+      <tr><td><code>setRenderTarget(rt)</code></td><td>rt:RenderTarget</td><td>void</td><td>切换渲染目标</td></tr>
+      <tr><td><code>drawRenderTarget(rt,x,y,w,h)</code></td><td>rt,位置,尺寸</td><td>void</td><td>把目标当作纹理绘制</td></tr>
+      <tr><td><code>destroyRenderTarget(rt)</code></td><td>rt:RenderTarget</td><td>void</td><td>销毁渲染目标</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-kw">const</span> rt = <span class="t-obj">Lument</span>.scene.<span class="t-fn">createRenderTarget</span>(<span class="t-num">512</span>, <span class="t-num">512</span>);
+<span class="t-obj">Lument</span>.scene.<span class="t-fn">setRenderTarget</span>(rt);
+<span class="t-com">// ... 绘制到 rt</span>
+<span class="t-obj">Lument</span>.scene.<span class="t-fn">setRenderTarget</span>(<span class="t-kw">null</span>);
+<span class="t-obj">Lument</span>.scene.<span class="t-fn">drawRenderTarget</span>(rt, <span class="t-num">0</span>, <span class="t-num">0</span>, <span class="t-num">512</span>, <span class="t-num">512</span>);</code></pre>
+    </section>
+
+    <!-- ===== 7. UI 系统 ===== -->
+    <section id="ui">
+    <h2>7. UI 系统</h2>
+    <p>即时模式风格的 UI 框架，所有控件以 ID 标识，可树形组合。</p>
+
+    <h3>控件创建</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>UI.create(type,opts?)</code></td><td>type:WIDGET,opts:object</td><td>Widget</td><td>通用控件创建</td></tr>
+      <tr><td><code>UI.createButton(text,x,y,w,h)</code></td><td>文本/位置/尺寸</td><td>Widget</td><td>按钮</td></tr>
+      <tr><td><code>UI.createLabel(text,x,y,w,h)</code></td><td>文本/位置/尺寸</td><td>Widget</td><td>标签</td></tr>
+      <tr><td><code>UI.createInput(x,y,w,h)</code></td><td>位置/尺寸</td><td>Widget</td><td>输入框</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-kw">const</span> btn = <span class="t-obj">Lument</span>.UI.<span class="t-fn">createButton</span>(<span class="t-str">'Start'</span>, <span class="t-num">20</span>, <span class="t-num">20</span>, <span class="t-num">120</span>, <span class="t-num">40</span>);
+btn.<span class="t-fn">onEvent</span>(<span class="t-obj">Lument</span>.EVENT.CLICK, () => <span class="t-obj">console</span>.<span class="t-fn">log</span>(<span class="t-str">'clicked'</span>));</code></pre>
+
+    <h3>属性方法</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>setText(text)</code></td><td>text:string</td><td>Widget</td><td>设置文本</td></tr>
+      <tr><td><code>getText()</code></td><td>—</td><td>string</td><td>获取文本</td></tr>
+      <tr><td><code>setPosition(x,y)</code></td><td>x,y:number</td><td>Widget</td><td>设置位置</td></tr>
+      <tr><td><code>setSize(w,h)</code></td><td>w,h:number</td><td>Widget</td><td>设置尺寸</td></tr>
+      <tr><td><code>setColor(color)</code></td><td>color:number</td><td>Widget</td><td>设置颜色</td></tr>
+      <tr><td><code>getColor()</code></td><td>—</td><td>number</td><td>获取颜色</td></tr>
+      <tr><td><code>setAlpha(a)</code></td><td>a:number 0~1</td><td>Widget</td><td>透明度</td></tr>
+      <tr><td><code>setVisible(v)</code></td><td>v:boolean</td><td>Widget</td><td>显示/隐藏</td></tr>
+      <tr><td><code>setEnabled(e)</code></td><td>e:boolean</td><td>Widget</td><td>启用/禁用</td></tr>
+    </tbody></table>
+    <pre><code>label.<span class="t-fn">setText</span>(<span class="t-str">'Score: 100'</span>).<span class="t-fn">setColor</span>(<span class="t-num">0xffcb6b</span>);</code></pre>
+
+    <h3>层级关系</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>addChild(child)</code></td><td>child:Widget</td><td>Widget</td><td>添加子控件</td></tr>
+      <tr><td><code>removeChild(child)</code></td><td>child:Widget</td><td>Widget</td><td>移除子控件</td></tr>
+      <tr><td><code>getParent()</code></td><td>—</td><td>Widget|null</td><td>获取父控件</td></tr>
+      <tr><td><code>getChildren()</code></td><td>—</td><td>Widget[]</td><td>获取子控件列表</td></tr>
+    </tbody></table>
+    <pre><code>panel.<span class="t-fn">addChild</span>(btn);
+btn.<span class="t-fn">getParent</span>(); <span class="t-com">// panel</span></code></pre>
+
+    <h3>布局</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>setLayout(layout)</code></td><td>layout:LAYOUT</td><td>Widget</td><td>设置布局类型</td></tr>
+      <tr><td><code>setPadding(t,r,b,l)</code></td><td>四边边距</td><td>Widget</td><td>内边距</td></tr>
+      <tr><td><code>setSpacing(s)</code></td><td>s:number</td><td>Widget</td><td>子项间距</td></tr>
+      <tr><td><code>setGrid(cols,rows)</code></td><td>cols,rows:number</td><td>Widget</td><td>网格行列数</td></tr>
+      <tr><td><code>setAlignment(h,v)</code></td><td>水平/垂直对齐</td><td>Widget</td><td>内容对齐</td></tr>
+    </tbody></table>
+    <pre><code>panel.<span class="t-fn">setLayout</span>(<span class="t-obj">Lument</span>.LAYOUT.VERTICAL)
+     .<span class="t-fn">setPadding</span>(<span class="t-num">10</span>,<span class="t-num">10</span>,<span class="t-num">10</span>,<span class="t-num">10</span>)
+     .<span class="t-fn">setSpacing</span>(<span class="t-num">8</span>);</code></pre>
+    </section>
+
+    <!-- ===== 8. UI 新增控件 ===== -->
+    <section id="ui-widgets">
+    <h2>8. UI 新增控件 <span class="new-tag">v1.3</span></h2>
+    <p>v1.3 引入的高阶控件，均通过 <code>UI.create</code> 或专用工厂方法创建。</p>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>createDropdown(x,y,w,h)</code></td><td>位置/尺寸</td><td>Widget</td><td>下拉选择框</td></tr>
+      <tr><td><code>createToggle(x,y,w,h)</code></td><td>位置/尺寸</td><td>Widget</td><td>开关</td></tr>
+      <tr><td><code>createScrollview(x,y,w,h)</code></td><td>位置/尺寸</td><td>Widget</td><td>滚动视图容器</td></tr>
+      <tr><td><code>createTooltip(text,target)</code></td><td>文本/目标控件</td><td>Widget</td><td>悬浮提示</td></tr>
+      <tr><td><code>createProgress(x,y,w,h)</code></td><td>位置/尺寸</td><td>Widget</td><td>进度条</td></tr>
+      <tr><td><code>createSlider(x,y,w,h)</code></td><td>位置/尺寸</td><td>Widget</td><td>滑块</td></tr>
+      <tr><td><code>createCheckbox(x,y,w,h)</code></td><td>位置/尺寸</td><td>Widget</td><td>复选框</td></tr>
+      <tr><td><code>createDivider(x,y,w,h)</code></td><td>位置/尺寸</td><td>Widget</td><td>分割线</td></tr>
+      <tr><td><code>createSpinner(x,y,size)</code></td><td>位置/尺寸</td><td>Widget</td><td>加载旋转图标</td></tr>
+      <tr><td><code>createIcon(name,x,y,size)</code></td><td>图标名/位置/尺寸</td><td>Widget</td><td>内置图标</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-kw">const</span> slider = <span class="t-obj">Lument</span>.UI.<span class="t-fn">createSlider</span>(<span class="t-num">20</span>,<span class="t-num">20</span>,<span class="t-num">200</span>,<span class="t-num">20</span>);
+<span class="t-kw">const</span> prog  = <span class="t-obj">Lument</span>.UI.<span class="t-fn">createProgress</span>(<span class="t-num">20</span>,<span class="t-num">60</span>,<span class="t-num">200</span>,<span class="t-num">16</span>);
+<span class="t-kw">const</span> ico   = <span class="t-obj">Lument</span>.UI.<span class="t-fn">createIcon</span>(<span class="t-str">'heart'</span>, <span class="t-num">240</span>, <span class="t-num">20</span>, <span class="t-num">24</span>);</code></pre>
+    </section>
+
+    <!-- ===== 9. UI 控件状态 ===== -->
+    <section id="ui-state">
+    <h2>9. UI 控件状态 <span class="new-tag">v1.3</span></h2>
+    <p>控件的数值/范围/选项/勾选/滚动等内容状态接口。</p>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>setValue(v)</code></td><td>v:number</td><td>Widget</td><td>设置当前值（slider/progress）</td></tr>
+      <tr><td><code>getValue()</code></td><td>—</td><td>number</td><td>获取当前值</td></tr>
+      <tr><td><code>setMinMax(min,max)</code></td><td>min,max:number</td><td>Widget</td><td>取值范围</td></tr>
+      <tr><td><code>setOptions(arr)</code></td><td>arr:string[]</td><td>Widget</td><td>下拉选项</td></tr>
+      <tr><td><code>getSelected()</code></td><td>—</td><td>number</td><td>选中索引</td></tr>
+      <tr><td><code>setSelected(i)</code></td><td>i:number</td><td>Widget</td><td>设置选中项</td></tr>
+      <tr><td><code>setChecked(b)</code></td><td>b:boolean</td><td>Widget</td><td>勾选状态</td></tr>
+      <tr><td><code>getChecked()</code></td><td>—</td><td>boolean</td><td>获取勾选</td></tr>
+      <tr><td><code>setScroll(x,y)</code></td><td>x,y:number</td><td>Widget</td><td>滚动位置</td></tr>
+      <tr><td><code>getScroll()</code></td><td>—</td><td>{x,y}</td><td>获取滚动位置</td></tr>
+      <tr><td><code>setContentSize(w,h)</code></td><td>w,h:number</td><td>Widget</td><td>内容尺寸（scrollview）</td></tr>
+    </tbody></table>
+    <pre><code>slider.<span class="t-fn">setMinMax</span>(<span class="t-num">0</span>, <span class="t-num">100</span>).<span class="t-fn">setValue</span>(<span class="t-num">50</span>);
+dd.<span class="t-fn">setOptions</span>([<span class="t-str">'Easy'</span>, <span class="t-str">'Normal'</span>, <span class="t-str">'Hard'</span>]).<span class="t-fn">setSelected</span>(<span class="t-num">1</span>);
+chk.<span class="t-fn">setChecked</span>(<span class="t-kw">true</span>);</code></pre>
+    </section>
+
+    <!-- ===== 10. UI 自动化 ===== -->
+    <section id="ui-auto">
+    <h2>10. UI 自动化 <span class="new-tag">v1.3</span></h2>
+
+    <h3>主题系统</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>UI.setTheme(theme)</code></td><td>theme:object</td><td>void</td><td>应用主题配色</td></tr>
+      <tr><td><code>UI.getTheme()</code></td><td>—</td><td>object</td><td>获取当前主题</td></tr>
+      <tr><td><code>UI.resetTheme()</code></td><td>—</td><td>void</td><td>恢复默认主题</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.UI.<span class="t-fn">setTheme</span>({
+  bg: <span class="t-num">0x16213e</span>, accent: <span class="t-num">0xe94560</span>, text: <span class="t-num">0xffffff</span>
+});</code></pre>
+
+    <h3>自动尺寸</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>setAutoSize(mode)</code></td><td>mode:AUTOSIZE</td><td>Widget</td><td>设置自动尺寸策略</td></tr>
+      <tr><td><code>measureText(text,size)</code></td><td>text,size</td><td>{w,h}</td><td>测量文本尺寸</td></tr>
+      <tr><td><code>setMargin(t,r,b,l)</code></td><td>四边外边距</td><td>Widget</td><td>外边距</td></tr>
+    </tbody></table>
+    <pre><code>label.<span class="t-fn">setAutoSize</span>(<span class="t-obj">Lument</span>.AUTOSIZE.WIDTH);
+<span class="t-kw">const</span> m = <span class="t-obj">Lument</span>.UI.<span class="t-fn">measureText</span>(<span class="t-str">'Hi'</span>, <span class="t-num">16</span>);</code></pre>
+
+    <h3>声明式 UI</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>UI.buildFromJson(json)</code></td><td>json:object|string</td><td>Widget</td><td>从 JSON 构建控件树</td></tr>
+      <tr><td><code>UI.dumpTree(root)</code></td><td>root:Widget</td><td>string</td><td>导出控件树为字符串</td></tr>
+      <tr><td><code>UI.findById(id)</code></td><td>id:string</td><td>Widget|null</td><td>按 id 查找控件</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-kw">const</span> root = <span class="t-obj">Lument</span>.UI.<span class="t-fn">buildFromJson</span>({
+  type: <span class="t-str">'panel'</span>, id: <span class="t-str">'main'</span>,
+  layout: <span class="t-str">'vertical'</span>, padding: <span class="t-num">12</span>,
+  children: [
+    { type: <span class="t-str">'label'</span>, id: <span class="t-str">'title'</span>, text: <span class="t-str">'Menu'</span> },
+    { type: <span class="t-str">'button'</span>, id: <span class="t-str">'start'</span>, text: <span class="t-str">'Start'</span> }
+  ]
+});
+<span class="t-obj">Lument</span>.UI.<span class="t-fn">findById</span>(<span class="t-str">'start'</span>).<span class="t-fn">onEvent</span>(<span class="t-obj">Lument</span>.EVENT.CLICK, startGame);</code></pre>
+
+    <h3>FLOW 布局</h3>
+    <p>设置 <code>Lument.LAYOUT.FLOW</code> 后，子控件按行排列并在空间不足时自动换行。</p>
+    <pre><code>panel.<span class="t-fn">setLayout</span>(<span class="t-obj">Lument</span>.LAYOUT.FLOW).<span class="t-fn">setSpacing</span>(<span class="t-num">6</span>);</code></pre>
+    </section>
+
+    <!-- ===== 11. UI 事件与导航 ===== -->
+    <section id="ui-events">
+    <h2>11. UI 事件与导航</h2>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>onEvent(type,cb)</code></td><td>type:EVENT,cb:Function</td><td>Widget</td><td>注册事件回调</td></tr>
+      <tr><td><code>setFocused(b)</code></td><td>b:boolean</td><td>Widget</td><td>设置焦点</td></tr>
+      <tr><td><code>render(g)</code></td><td>g:Graphics</td><td>void</td><td>手动渲染控件</td></tr>
+      <tr><td><code>handleTouch(x,y,phase)</code></td><td>坐标/阶段</td><td>boolean</td><td>处理触摸事件</td></tr>
+      <tr><td><code>handleKey(code,down)</code></td><td>键码/按下</td><td>boolean</td><td>处理按键</td></tr>
+      <tr><td><code>UI.navigateTo(screen)</code></td><td>screen:Widget</td><td>void</td><td>导航到新界面</td></tr>
+      <tr><td><code>UI.navigateBack()</code></td><td>—</td><td>Widget|null</td><td>返回上一界面</td></tr>
+      <tr><td><code>UI.getCurrentScreen()</code></td><td>—</td><td>Widget|null</td><td>当前活动界面</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.UI.<span class="t-fn">navigateTo</span>(settingsScreen);
+<span class="t-com">// 用户按返回键</span>
+<span class="t-kw">if</span> (<span class="t-obj">Lument</span>.<span class="t-fn">keyPressed</span>(<span class="t-obj">Lument</span>.KEY.ESCAPE)) {
+  <span class="t-obj">Lument</span>.UI.<span class="t-fn">navigateBack</span>();
+}</code></pre>
+    </section>
+
+    <!-- ===== 12. 物理引擎 ===== -->
+    <section id="physics">
+    <h2>12. 物理引擎</h2>
+    <p>内置 2D 刚体物理引擎，支持碰撞、力、射线查询。</p>
+
+    <div class="api" data-api="setGravity"><div class="api-head"><span class="api-name">Physics.setGravity</span><span class="api-sig">setGravity(x,y): void</span></div>
+    <p>设置全局重力向量（单位 px/s²）。</p>
+    <p><span class="return">返回值：</span><code>void</code></p>
+    <pre><code><span class="t-obj">Lument</span>.Physics.<span class="t-fn">setGravity</span>(<span class="t-num">0</span>, <span class="t-num">980</span>);</code></pre></div>
+
+    <div class="api" data-api="setIterations"><div class="api-head"><span class="api-name">Physics.setIterations</span><span class="api-sig">setIterations(n): void</span></div>
+    <p>设置约束求解迭代次数，值越大越精确但越慢，默认 8。</p>
+    <p><span class="return">返回值：</span><code>void</code></p></div>
+
+    <div class="api" data-api="step"><div class="api-head"><span class="api-name">Physics.step</span><span class="api-sig">step(dt): void</span></div>
+    <p>推进物理模拟一个时间步长。</p>
+    <pre><code><span class="t-obj">Lument</span>.Physics.<span class="t-fn">step</span>(<span class="t-obj">Lument</span>.<span class="t-fn">getDeltaTime</span>());</code></pre></div>
+
+    <div class="api" data-api="reset"><div class="api-head"><span class="api-name">Physics.reset</span><span class="api-sig">reset(): void</span></div>
+    <p>清除所有刚体与约束。</p></div>
+
+    <div class="api" data-api="createBody"><div class="api-head"><span class="api-name">Physics.createBody</span><span class="api-sig">createBody(opts): BodyID</span></div>
+    <p>创建刚体。<code>opts</code> 含 x,y,type(DYNAMIC/STATIC/KINEMATIC)。</p>
+    <pre><code><span class="t-kw">const</span> b = <span class="t-obj">Lument</span>.Physics.<span class="t-fn">createBody</span>({ x:<span class="t-num">100</span>, y:<span class="t-num">100</span>, type:<span class="t-obj">Lument</span>.BODY.DYNAMIC });</code></pre></div>
+
+    <div class="api" data-api="destroyBody"><div class="api-head"><span class="api-name">Physics.destroyBody</span><span class="api-sig">destroyBody(id): void</span></div><p>销毁刚体。</p></div>
+
+    <div class="api" data-api="setShape"><div class="api-head"><span class="api-name">Physics.setShape</span><span class="api-sig">setShape(id,shape,opts): void</span></div>
+    <p>为刚体设置碰撞形状（CIRCLE/BOX/POLYGON）。</p></div>
+
+    <div class="api" data-api="setMass"><div class="api-head"><span class="api-name">Physics.setMass</span><span class="api-sig">setMass(id,m): void</span></div><p>设置质量。</p></div>
+    <div class="api" data-api="setRestitution"><div class="api-head"><span class="api-name">Physics.setRestitution</span><span class="api-sig">setRestitution(id,r): void</span></div><p>弹性系数 0~1。</p></div>
+    <div class="api" data-api="setFriction"><div class="api-head"><span class="api-name">Physics.setFriction</span><span class="api-sig">setFriction(id,f): void</span></div><p>摩擦系数 0~1。</p></div>
+
+    <div class="api" data-api="applyForce"><div class="api-head"><span class="api-name">Physics.applyForce</span><span class="api-sig">applyForce(id,fx,fy): void</span></div><p>施加力（中心）。</p></div>
+    <div class="api" data-api="applyImpulse"><div class="api-head"><span class="api-name">Physics.applyImpulse</span><span class="api-sig">applyImpulse(id,ix,iy): void</span></div><p>施加冲量。</p></div>
+
+    <div class="api" data-api="checkCollision"><div class="api-head"><span class="api-name">Physics.checkCollision</span><span class="api-sig">checkCollision(idA,idB): boolean</span></div><p>检测两刚体是否碰撞。</p></div>
+    <div class="api" data-api="getCollisions"><div class="api-head"><span class="api-name">Physics.getCollisions</span><span class="api-sig">getCollisions(id): Collision[]</span></div>
+    <p>返回该刚体当前帧的所有碰撞信息（含法线、穿透、对方 ID）。</p></div>
+
+    <div class="api" data-api="raycast"><div class="api-head"><span class="api-name">Physics.raycast</span><span class="api-sig">raycast(x1,y1,x2,y2): RayHit|null</span></div>
+    <p>射线检测，返回最近命中（含 body、点、法线、距离）。</p>
+    <pre><code><span class="t-kw">const</span> hit = <span class="t-obj">Lument</span>.Physics.<span class="t-fn">raycast</span>(<span class="t-num">0</span>,<span class="t-num">0</span>, <span class="t-num">500</span>,<span class="t-num">0</span>);
+<span class="t-kw">if</span> (hit) <span class="t-obj">console</span>.<span class="t-fn">log</span>(hit.body, hit.point);</code></pre></div>
+
+    <div class="api" data-api="pointQuery"><div class="api-head"><span class="api-name">Physics.pointQuery</span><span class="api-sig">pointQuery(x,y): BodyID|null</span></div><p>查询点所在的刚体。</p></div>
+
+    <div class="api" data-api="onCollision"><div class="api-head"><span class="api-name">Physics.onCollision</span><span class="api-sig">onCollision(cb): void</span></div>
+    <p>注册全局碰撞回调，参数为 <code>(a:BodyID, b:BodyID, info:Collision)</code>。</p>
+    <pre><code><span class="t-obj">Lument</span>.Physics.<span class="t-fn">onCollision</span>((a,b,info) => {
+  <span class="t-obj">console</span>.<span class="t-fn">log</span>(<span class="t-str">'碰撞'</span>, a, b, info.normal);
+});</code></pre></div>
+    </section>
+
+    <!-- ===== 13. 物理空间分区与调试 ===== -->
+    <section id="physics-debug">
+    <h2>13. 物理空间分区与调试 <span class="new-tag">v1.3</span></h2>
+
+    <div class="api" data-api="setBroadphase"><div class="api-head"><span class="api-name">Physics.setBroadphase</span><span class="api-sig">setBroadphase(mode): void</span></div>
+    <p>设置宽相位算法。</p>
+    <table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>mode</code></td><td>BROADPHASE</td><td>GRID / QUADTREE / BRUTE</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.Physics.<span class="t-fn">setBroadphase</span>(<span class="t-obj">Lument</span>.BROADPHASE.QUADTREE);</code></pre></div>
+
+    <div class="api" data-api="setGridCellSize"><div class="api-head"><span class="api-name">Physics.setGridCellSize</span><span class="api-sig">setGridCellSize(size): void</span></div>
+    <p>设置 GRID 宽相位的格子尺寸（像素）。</p></div>
+
+    <div class="api" data-api="debugDraw"><div class="api-head"><span class="api-name">Physics.debugDraw</span><span class="api-sig">debugDraw(opts?): void</span></div>
+    <p>绘制物理调试覆盖层。</p>
+    <table><thead><tr><th>参数 (opts)</th><th>类型</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>bodies</code></td><td>boolean</td><td>绘制刚体形状，默认 true</td></tr>
+      <tr><td><code>contacts</code></td><td>boolean</td><td>绘制接触点，默认 false</td></tr>
+      <tr><td><code>broadphase</code></td><td>boolean</td><td>绘制宽相位分区，默认 false</td></tr>
+      <tr><td><code>color</code></td><td>number</td><td>线条颜色，默认 0x00ff00</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.Physics.<span class="t-fn">debugDraw</span>({ bodies:<span class="t-kw">true</span>, contacts:<span class="t-kw">true</span>, broadphase:<span class="t-kw">true</span> });</code></pre></div>
+
+    <div class="api" data-api="getPairCount"><div class="api-head"><span class="api-name">Physics.getPairCount</span><span class="api-sig">getPairCount(): number</span></div>
+    <p>返回当前帧宽相位生成的碰撞对数量，用于性能评估。</p>
+    <p><span class="return">返回值：</span><code>number</code></p></div>
+    </section>
+
+    <!-- ===== 14. 音频系统 ===== -->
+    <section id="audio">
+    <h2>14. 音频系统</h2>
+    <p>基于 WebAudio 的音效与音乐播放，支持分组音量、3D 空间化。</p>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>loadSound(src,cb?)</code></td><td>url,回调</td><td>SoundID</td><td>加载短音效</td></tr>
+      <tr><td><code>loadMusic(src,cb?)</code></td><td>url,回调</td><td>MusicID</td><td>加载背景音乐</td></tr>
+      <tr><td><code>playSound(id,loop=false)</code></td><td>id,循环</td><td>ChannelID</td><td>播放音效</td></tr>
+      <tr><td><code>stopSound(ch)</code></td><td>ch:ChannelID</td><td>void</td><td>停止</td></tr>
+      <tr><td><code>pauseSound(ch)</code></td><td>ch</td><td>void</td><td>暂停</td></tr>
+      <tr><td><code>resumeSound(ch)</code></td><td>ch</td><td>void</td><td>恢复</td></tr>
+      <tr><td><code>setPitch(ch,p)</code></td><td>ch,倍速</td><td>void</td><td>音调/播放速率</td></tr>
+      <tr><td><code>setPan(ch,pan)</code></td><td>ch,-1~1</td><td>void</td><td>立体声平衡</td></tr>
+      <tr><td><code>fadeIn(ch,ms)</code></td><td>ch,毫秒</td><td>void</td><td>淡入</td></tr>
+      <tr><td><code>fadeOut(ch,ms)</code></td><td>ch,毫秒</td><td>void</td><td>淡出</td></tr>
+      <tr><td><code>setMasterVolume(v)</code></td><td>v:0~1</td><td>void</td><td>主音量</td></tr>
+      <tr><td><code>setGroupVolume(group,v)</code></td><td>组名,音量</td><td>void</td><td>分组音量</td></tr>
+      <tr><td><code>playSound3d(id,x,y,z)</code></td><td>id,空间坐标</td><td>ChannelID</td><td>3D 空间音效</td></tr>
+      <tr><td><code>setAudioListener(x,y,z,fwdX,fwdY,fwdZ)</code></td><td>位置+朝向</td><td>void</td><td>设置听者</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-kw">const</span> snd = <span class="t-obj">Lument</span>.Audio.<span class="t-fn">loadSound</span>(<span class="t-str">'jump.wav'</span>);
+<span class="t-obj">Lument</span>.Audio.<span class="t-fn">playSound</span>(snd);
+<span class="t-obj">Lument</span>.Audio.<span class="t-fn">setMasterVolume</span>(<span class="t-num">0.8</span>);</code></pre>
+    </section>
+
+    <!-- ===== 15. 网络模块 ===== -->
+    <section id="network">
+    <h2>15. 网络模块</h2>
+    <h3>HTTP</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>httpRequest(opts)</code></td><td>method/url/data/headers</td><td>Promise&lt;Response&gt;</td><td>通用请求</td></tr>
+      <tr><td><code>httpGet(url,opts?)</code></td><td>url</td><td>Promise</td><td>GET</td></tr>
+      <tr><td><code>httpPost(url,data,opts?)</code></td><td>url,数据</td><td>Promise</td><td>POST</td></tr>
+      <tr><td><code>httpPut(url,data,opts?)</code></td><td>url,数据</td><td>Promise</td><td>PUT</td></tr>
+      <tr><td><code>httpDelete(url,opts?)</code></td><td>url</td><td>Promise</td><td>DELETE</td></tr>
+      <tr><td><code>httpCancel(reqId)</code></td><td>reqId</td><td>void</td><td>取消请求</td></tr>
+      <tr><td><code>httpSetHeader(k,v)</code></td><td>键,值</td><td>void</td><td>全局请求头</td></tr>
+      <tr><td><code>httpSetTimeout(ms)</code></td><td>毫秒</td><td>void</td><td>超时</td></tr>
+      <tr><td><code>httpSetAuthToken(token)</code></td><td>token</td><td>void</td><td>Authorization Bearer</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.Net.<span class="t-fn">httpSetAuthToken</span>(<span class="t-str">'abc123'</span>);
+<span class="t-obj">Lument</span>.Net.<span class="t-fn">httpGet</span>(<span class="t-str">'/api/profile'</span>).<span class="t-fn">then</span>(r => {
+  <span class="t-obj">console</span>.<span class="t-fn">log</span>(r.json);
+});</code></pre>
+
+    <h3>WebSocket</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>wsConnect(url)</code></td><td>url</td><td>Promise&lt;WsID&gt;</td><td>建立连接</td></tr>
+      <tr><td><code>wsSend(id,data)</code></td><td>id,二进制</td><td>void</td><td>发送二进制</td></tr>
+      <tr><td><code>wsSendText(id,text)</code></td><td>id,文本</td><td>void</td><td>发送文本</td></tr>
+      <tr><td><code>wsClose(id)</code></td><td>id</td><td>void</td><td>关闭连接</td></tr>
+      <tr><td><code>wsIsConnected(id)</code></td><td>id</td><td>boolean</td><td>是否连接中</td></tr>
+    </tbody></table>
+
+    <h3>JSON 与数据</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>jsonParse(str)</code></td><td>字符串</td><td>object</td><td>解析 JSON</td></tr>
+      <tr><td><code>jsonBuild(obj)</code></td><td>对象</td><td>string</td><td>序列化</td></tr>
+      <tr><td><code>uploadData(url,file,onProgress?)</code></td><td>url,File,进度</td><td>Promise</td><td>上传文件</td></tr>
+      <tr><td><code>downloadData(url,onProgress?)</code></td><td>url,进度</td><td>Promise&lt;Blob&gt;</td><td>下载数据</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.Net.<span class="t-fn">downloadData</span>(<span class="t-str">'/assets/level.dat'</span>).<span class="t-fn">then</span>(blob => {
+  <span class="t-com">// 处理 blob</span>
+});</code></pre>
+    </section>
+
+    <!-- ===== 16. AI 模块 ===== -->
+    <section id="ai">
+    <h2>16. AI 模块</h2>
+
+    <h3>行为树 Behavior Trees</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>AI.createTree(root?)</code></td><td>根节点</td><td>TreeID</td><td>创建行为树</td></tr>
+      <tr><td><code>AI.createNode(type,opts?)</code></td><td>SELECTOR/SEQUENCE/ACTION/CONDITION</td><td>NodeID</td><td>创建节点</td></tr>
+      <tr><td><code>AI.addChild(parent,child)</code></td><td>父,子</td><td>void</td><td>挂载子节点</td></tr>
+      <tr><td><code>AI.tick(tree,ctx)</code></td><td>tree,黑板上下文</td><td>STATUS</td><td>执行一帧</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-kw">const</span> seq = <span class="t-obj">Lument</span>.AI.<span class="t-fn">createNode</span>(<span class="t-str">'SEQUENCE'</span>);
+<span class="t-obj">Lument</span>.AI.<span class="t-fn">addChild</span>(seq, <span class="t-obj">Lument</span>.AI.<span class="t-fn">createNode</span>(<span class="t-str">'ACTION'</span>, { fn: Patrol }));
+<span class="t-kw">const</span> tree = <span class="t-obj">Lument</span>.AI.<span class="t-fn">createTree</span>(seq);
+<span class="t-obj">Lument</span>.AI.<span class="t-fn">tick</span>(tree, blackboard);</code></pre>
+
+    <h3>有限状态机 FSM</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>AI.createFsm()</code></td><td>—</td><td>FsmID</td><td>创建 FSM</td></tr>
+      <tr><td><code>AI.addState(fsm,name,onEnter?,onUpdate?,onExit?)</code></td><td>名称与回调</td><td>void</td><td>添加状态</td></tr>
+      <tr><td><code>AI.addTransition(fsm,from,to,event)</code></td><td>源/目标/事件</td><td>void</td><td>添加转换</td></tr>
+      <tr><td><code>AI.setState(fsm,name)</code></td><td>状态名</td><td>void</td><td>强制切换</td></tr>
+      <tr><td><code>AI.tick(fsm,ctx)</code></td><td>上下文</td><td>void</td><td>更新当前状态</td></tr>
+    </tbody></table>
+
+    <h3>寻路 Pathfinding</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>AI.createGrid(cols,rows,cellSize)</code></td><td>列/行/格子</td><td>GridID</td><td>创建网格</td></tr>
+      <tr><td><code>AI.setBlocked(grid,x,y,b)</code></td><td>坐标/阻挡</td><td>void</td><td>设置阻挡</td></tr>
+      <tr><td><code>AI.findPath(grid,sx,sy,tx,ty)</code></td><td>起止点</td><td>number[]|null</td><td>A* 寻路 [x1,y1,x2,y2,...]</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-kw">const</span> g = <span class="t-obj">Lument</span>.AI.<span class="t-fn">createGrid</span>(<span class="t-num">50</span>,<span class="t-num">50</span>,<span class="t-num">16</span>);
+<span class="t-obj">Lument</span>.AI.<span class="t-fn">setBlocked</span>(g,<span class="t-num">5</span>,<span class="t-num">5</span>,<span class="t-kw">true</span>);
+<span class="t-kw">const</span> path = <span class="t-obj">Lument</span>.AI.<span class="t-fn">findPath</span>(g,<span class="t-num">0</span>,<span class="t-num">0</span>,<span class="t-num">20</span>,<span class="t-num">20</span>);</code></pre>
+
+    <h3>黑板 Blackboard</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>AI.createBlackboard()</code></td><td>—</td><td>BbID</td><td>创建黑板</td></tr>
+      <tr><td><code>AI.setInt(bb,k,v)</code> / <code>getInt</code></td><td>键/值</td><td>void/number</td><td>整型</td></tr>
+      <tr><td><code>AI.setFloat(bb,k,v)</code> / <code>getFloat</code></td><td>键/值</td><td>void/number</td><td>浮点</td></tr>
+      <tr><td><code>AI.setBool(bb,k,v)</code> / <code>getBool</code></td><td>键/值</td><td>void/boolean</td><td>布尔</td></tr>
+      <tr><td><code>AI.setStr(bb,k,v)</code> / <code>getStr</code></td><td>键/值</td><td>void/string</td><td>字符串</td></tr>
+    </tbody></table>
+
+    <h3>Agents</h3>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>AI.registerAgent(id,tree,bb)</code></td><td>id/树/黑板</td><td>void</td><td>注册智能体</td></tr>
+      <tr><td><code>AI.setTarget(id,x,y)</code></td><td>坐标</td><td>void</td><td>设置目标点</td></tr>
+      <tr><td><code>AI.tick(id)</code></td><td>id</td><td>STATUS</td><td>更新单个智能体</td></tr>
+    </tbody></table>
+    </section>
+
+    <!-- ===== 17. ECS 实体系统 ===== -->
+    <section id="ecs">
+    <h2>17. ECS 实体系统</h2>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>ECS.createEntity()</code></td><td>—</td><td>EntityID</td><td>创建实体</td></tr>
+      <tr><td><code>ECS.destroyEntity(id)</code></td><td>id</td><td>void</td><td>销毁实体</td></tr>
+      <tr><td><code>ECS.setPosition(id,x,y)</code></td><td>id,坐标</td><td>void</td><td>位置</td></tr>
+      <tr><td><code>ECS.getPosition(id)</code></td><td>id</td><td>{x,y}</td><td>获取位置</td></tr>
+      <tr><td><code>ECS.setScale(id,sx,sy?)</code></td><td>缩放</td><td>void</td><td>缩放</td></tr>
+      <tr><td><code>ECS.setSprite(id,tex)</code></td><td>纹理</td><td>void</td><td>精灵</td></tr>
+      <tr><td><code>ECS.setSpriteColor(id,color)</code></td><td>0xRRGGBB</td><td>void</td><td>精灵染色</td></tr>
+      <tr><td><code>ECS.setVisible(id,b)</code></td><td>bool</td><td>void</td><td>可见性</td></tr>
+      <tr><td><code>ECS.setCollider(id,shape,opts)</code></td><td>形状/参数</td><td>void</td><td>碰撞体</td></tr>
+      <tr><td><code>ECS.checkCollision(idA,idB)</code></td><td>两个 id</td><td>boolean</td><td>碰撞检测</td></tr>
+      <tr><td><code>ECS.setScript(id,fn)</code></td><td>更新函数</td><td>void</td><td>挂载脚本 (id,dt)=&gt;{}</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-kw">const</span> e = <span class="t-obj">Lument</span>.ECS.<span class="t-fn">createEntity</span>();
+<span class="t-obj">Lument</span>.ECS.<span class="t-fn">setSprite</span>(e, tex);
+<span class="t-obj">Lument</span>.ECS.<span class="t-fn">setScript</span>(e, (id, dt) => {
+  <span class="t-kw">const</span> p = <span class="t-obj">Lument</span>.ECS.<span class="t-fn">getPosition</span>(id);
+  <span class="t-obj">Lument</span>.ECS.<span class="t-fn">setPosition</span>(id, p.x + <span class="t-num">50</span>*dt, p.y);
+});</code></pre>
+    </section>
+
+    <!-- ===== 18. 场景管理 ===== -->
+    <section id="scene-mgmt">
+    <h2>18. 场景管理</h2>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>SceneManager.loadScene(name)</code></td><td>场景名</td><td>Promise&lt;Scene&gt;</td><td>异步加载场景</td></tr>
+      <tr><td><code>SceneManager.setActiveScene(scene)</code></td><td>Scene</td><td>void</td><td>切换激活场景</td></tr>
+      <tr><td><code>SceneManager.getActiveScene()</code></td><td>—</td><td>Scene</td><td>当前激活场景</td></tr>
+      <tr><td><code>SceneManager.sceneSetBackground(color)</code></td><td>0xRRGGBB</td><td>void</td><td>场景背景色</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.SceneManager.<span class="t-fn">loadScene</span>(<span class="t-str">'level1'</span>).<span class="t-fn">then</span>(s => {
+  s.<span class="t-fn">sceneSetBackground</span>(<span class="t-num">0x16213e</span>);
+});</code></pre>
+    </section>
+
+    <!-- ===== 19. 输入系统 ===== -->
+    <section id="input">
+    <h2>19. 输入系统</h2>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>keyDown(code)</code></td><td>KEY 常量</td><td>boolean</td><td>当前是否按住</td></tr>
+      <tr><td><code>keyPressed(code)</code></td><td>KEY 常量</td><td>boolean</td><td>本帧是否按下（边沿）</td></tr>
+      <tr><td><code>getTouchCount()</code></td><td>—</td><td>number</td><td>触摸点数量</td></tr>
+      <tr><td><code>getTouch(index)</code></td><td>索引</td><td>{x,y,id}</td><td>获取触摸点</td></tr>
+      <tr><td><code>getJoystickX()</code></td><td>—</td><td>number</td><td>摇杆 X (-1~1)</td></tr>
+      <tr><td><code>getJoystickY()</code></td><td>—</td><td>number</td><td>摇杆 Y (-1~1)</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-kw">if</span> (<span class="t-obj">Lument</span>.<span class="t-fn">keyDown</span>(<span class="t-obj">Lument</span>.KEY.LEFT)) x -= speed*dt;
+<span class="t-kw">if</span> (<span class="t-obj">Lument</span>.<span class="t-fn">getTouchCount</span>() &gt; <span class="t-num">0</span>) {
+  <span class="t-kw">const</span> t = <span class="t-obj">Lument</span>.<span class="t-fn">getTouch</span>(<span class="t-num">0</span>);
+}</code></pre>
+    </section>
+
+    <!-- ===== 20. 存储系统 ===== -->
+    <section id="storage">
+    <h2>20. 存储系统</h2>
+    <p>基于 localStorage 的本地持久化，自动 JSON 序列化。</p>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>saveData(key,value)</code></td><td>键,任意值</td><td>boolean</td><td>保存数据</td></tr>
+      <tr><td><code>loadData(key,def?)</code></td><td>键,默认值</td><td>any</td><td>读取数据</td></tr>
+      <tr><td><code>clearData(key?)</code></td><td>键(可选)</td><td>void</td><td>清除指定/全部</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">saveData</span>(<span class="t-str">'score'</span>, <span class="t-num">100</span>);
+<span class="t-kw">const</span> s = <span class="t-obj">Lument</span>.<span class="t-fn">loadData</span>(<span class="t-str">'score'</span>, <span class="t-num">0</span>);</code></pre>
+    </section>
+
+    <!-- ===== 21. 工具 API ===== -->
+    <section id="util">
+    <h2>21. 工具 API</h2>
+    <table><thead><tr><th>函数签名</th><th>参数</th><th>返回值</th><th>说明</th></tr></thead><tbody>
+      <tr><td><code>getTimeMs()</code></td><td>—</td><td>number</td><td>毫秒时间戳</td></tr>
+      <tr><td><code>random(max?)</code></td><td>上限</td><td>number</td><td>[0,max) 浮点</td></tr>
+      <tr><td><code>randomRange(min,max)</code></td><td>下限/上限</td><td>number</td><td>[min,max)</td></tr>
+      <tr><td><code>log(...args)</code></td><td>任意</td><td>void</td><td>引擎日志（带时间戳）</td></tr>
+    </tbody></table>
+    <pre><code><span class="t-obj">Lument</span>.<span class="t-fn">log</span>(<span class="t-str">'spawn at'</span>, <span class="t-obj">Lument</span>.<span class="t-fn">randomRange</span>(<span class="t-num">0</span>, <span class="t-num">800</span>));</code></pre>
+    </section>
+
+    <!-- ===== 22. 常量参考 ===== -->
+    <section id="constants">
+    <h2>22. 常量参考</h2>
+
+    <h3>VERSION / PLATFORM / RENDERER</h3>
+    <div class="const-grid">
+      <div class="const-card"><span class="cn">VERSION</span><span class="cv">"1.3.0"</span></div>
+      <div class="const-card"><span class="cn">PLATFORM.WEB</span><span class="cv">"WEB"</span></div>
+      <div class="const-card"><span class="cn">PLATFORM.MOBILE</span><span class="cv">"MOBILE"</span></div>
+      <div class="const-card"><span class="cn">PLATFORM.DESKTOP</span><span class="cv">"DESKTOP"</span></div>
+      <div class="const-card"><span class="cn">RENDERER.WEBGL</span><span class="cv">"WEBGL"</span></div>
+      <div class="const-card"><span class="cn">RENDERER.CANVAS2D</span><span class="cv">"CANVAS2D"</span></div>
+      <div class="const-card"><span class="cn">RENDERER.WEBGPU</span><span class="cv">"WEBGPU"</span></div>
+    </div>
+
+    <h3>KEY (节选)</h3>
+    <div class="const-grid">
+      <div class="const-card"><span class="cn">KEY.LEFT</span><span class="cv">ArrowLeft</span></div>
+      <div class="const-card"><span class="cn">KEY.RIGHT</span><span class="cv">ArrowRight</span></div>
+      <div class="const-card"><span class="cn">KEY.UP</span><span class="cv">ArrowUp</span></div>
+      <div class="const-card"><span class="cn">KEY.DOWN</span><span class="cv">ArrowDown</span></div>
+      <div class="const-card"><span class="cn">KEY.SPACE</span><span class="cv">Space</span></div>
+      <div class="const-card"><span class="cn">KEY.ENTER</span><span class="cv">Enter</span></div>
+      <div class="const-card"><span class="cn">KEY.ESCAPE</span><span class="cv">Escape</span></div>
+      <div class="const-card"><span class="cn">KEY.A ~ Z</span><span class="cv">KeyA ~ KeyZ</span></div>
+    </div>
+
+    <h3>WIDGET / LAYOUT / AUTOSIZE</h3>
+    <div class="const-grid">
+      <div class="const-card"><span class="cn">WIDGET.BUTTON</span><span class="cv">"button"</span></div>
+      <div class="const-card"><span class="cn">WIDGET.LABEL</span><span class="cv">"label"</span></div>
+      <div class="const-card"><span class="cn">WIDGET.INPUT</span><span class="cv">"input"</span></div>
+      <div class="const-card"><span class="cn">WIDGET.PANEL</span><span class="cv">"panel"</span></div>
+      <div class="const-card"><span class="cn">LAYOUT.VERTICAL</span><span class="cv">"vertical"</span></div>
+      <div class="const-card"><span class="cn">LAYOUT.HORIZONTAL</span><span class="cv">"horizontal"</span></div>
+      <div class="const-card"><span class="cn">LAYOUT.GRID</span><span class="cv">"grid"</span></div>
+      <div class="const-card"><span class="cn">LAYOUT.FLOW</span><span class="cv">"flow"</span></div>
+      <div class="const-card"><span class="cn">LAYOUT.ABSOLUTE</span><span class="cv">"absolute"</span></div>
+      <div class="const-card"><span class="cn">AUTOSIZE.NONE</span><span class="cv">0</span></div>
+      <div class="const-card"><span class="cn">AUTOSIZE.WIDTH</span><span class="cv">1</span></div>
+      <div class="const-card"><span class="cn">AUTOSIZE.HEIGHT</span><span class="cv">2</span></div>
+      <div class="const-card"><span class="cn">AUTOSIZE.BOTH</span><span class="cv">3</span></div>
+    </div>
+
+    <h3>BROADPHASE / EVENT / LIGHT / BODY / SHAPE</h3>
+    <div class="const-grid">
+      <div class="const-card"><span class="cn">BROADPHASE.GRID</span><span class="cv">"GRID"</span></div>
+      <div class="const-card"><span class="cn">BROADPHASE.QUADTREE</span><span class="cv">"QUADTREE"</span></div>
+      <div class="const-card"><span class="cn">BROADPHASE.BRUTE</span><span class="cv">"BRUTE"</span></div>
+      <div class="const-card"><span class="cn">EVENT.CLICK</span><span class="cv">"click"</span></div>
+      <div class="const-card"><span class="cn">EVENT.CHANGE</span><span class="cv">"change"</span></div>
+      <div class="const-card"><span class="cn">EVENT.FOCUS</span><span class="cv">"focus"</span></div>
+      <div class="const-card"><span class="cn">EVENT.BLUR</span><span class="cv">"blur"</span></div>
+      <div class="const-card"><span class="cn">EVENT.HOVER</span><span class="cv">"hover"</span></div>
+      <div class="const-card"><span class="cn">LIGHT.POINT</span><span class="cv">0</span></div>
+      <div class="const-card"><span class="cn">LIGHT.SPOT</span><span class="cv">1</span></div>
+      <div class="const-card"><span class="cn">LIGHT.DIRECTIONAL</span><span class="cv">2</span></div>
+      <div class="const-card"><span class="cn">BODY.STATIC</span><span class="cv">0</span></div>
+      <div class="const-card"><span class="cn">BODY.DYNAMIC</span><span class="cv">1</span></div>
+      <div class="const-card"><span class="cn">BODY.KINEMATIC</span><span class="cv">2</span></div>
+      <div class="const-card"><span class="cn">SHAPE.CIRCLE</span><span class="cv">"circle"</span></div>
+      <div class="const-card"><span class="cn">SHAPE.BOX</span><span class="cv">"box"</span></div>
+      <div class="const-card"><span class="cn">SHAPE.POLYGON</span><span class="cv">"polygon"</span></div>
+    </div>
+    </section>
+
+    <div class="footer">
+      Lument Engine v1.3.0 · 文档生成于 2026-08-28 · © Lument Project
+    </div>
+  </main>
+</div>
+
+<script>
+/* ============= 侧边栏导航构建 ============= */
+var NAV_DATA = [
+  { id:"quickstart",       title:"1. 快速开始" },
+  { id:"core",             title:"2. 核心 API", items:["init","shutdown","isRunning","beginFrame","endFrame","getDeltaTime","getStats","getPlatform","getRendererType","run"] },
+  { id:"render",           title:"3. 渲染 API", items:["clear","setCamera","drawRect","drawSprite","drawText","drawPixel","flush","loadTexture","createTextureFromData","destroyTexture","getCanvas","getContext"] },
+  { id:"primitives",       title:"4. 渲染图元 (v1.3)", items:["drawCircle","drawLine","drawTriangle","drawPolygon","drawEllipse","drawPoint"] },
+  { id:"batch",            title:"5. 手动批处理 (v1.3)", items:["beginBatch","batchQuad","batchTriangle","endBatch"] },
+  { id:"scene2d",          title:"6. 2D 场景渲染", items:["SceneColor","clarity","vignette","fog","lights","renderTargets"] },
+  { id:"ui",               title:"7. UI 系统", items:["create","createButton","createLabel","createInput","setText","getText","setPosition","setSize","setColor","addChild","removeChild","getParent","setLayout","setPadding","setSpacing","setGrid","setAlignment"] },
+  { id:"ui-widgets",       title:"8. UI 新增控件 (v1.3)", items:["createDropdown","createToggle","createScrollview","createTooltip","createProgress","createSlider","createCheckbox","createDivider","createSpinner","createIcon"] },
+  { id:"ui-state",         title:"9. UI 控件状态 (v1.3)", items:["setValue","getValue","setMinMax","setOptions","getSelected","setSelected","setChecked","getChecked","setScroll","getScroll","setContentSize"] },
+  { id:"ui-auto",          title:"10. UI 自动化 (v1.3)", items:["setTheme","getTheme","resetTheme","setAutoSize","measureText","setMargin","buildFromJson","dumpTree","findById","FLOW"] },
+  { id:"ui-events",        title:"11. UI 事件与导航", items:["onEvent","setFocused","render","handleTouch","handleKey","navigateTo","navigateBack","getCurrentScreen"] },
+  { id:"physics",          title:"12. 物理引擎", items:["setGravity","setIterations","step","reset","createBody","destroyBody","setShape","setMass","setRestitution","setFriction","applyForce","applyImpulse","checkCollision","getCollisions","raycast","pointQuery","onCollision"] },
+  { id:"physics-debug",    title:"13. 物理分区与调试 (v1.3)", items:["setBroadphase","setGridCellSize","debugDraw","getPairCount"] },
+  { id:"audio",            title:"14. 音频系统", items:["loadSound","loadMusic","playSound","stopSound","pauseSound","resumeSound","setPitch","setPan","fadeIn","fadeOut","setMasterVolume","setGroupVolume","playSound3d","setAudioListener"] },
+  { id:"network",          title:"15. 网络模块", items:["httpRequest","httpGet","httpPost","httpPut","httpDelete","httpCancel","httpSetHeader","httpSetTimeout","httpSetAuthToken","wsConnect","wsSend","wsSendText","wsClose","wsIsConnected","jsonParse","jsonBuild","uploadData","downloadData"] },
+  { id:"ai",               title:"16. AI 模块", items:["createTree","createNode","addChild","tick","createFsm","addState","addTransition","setState","createGrid","setBlocked","findPath","createBlackboard","setInt","getInt","registerAgent","setTarget"] },
+  { id:"ecs",              title:"17. ECS 实体系统", items:["createEntity","destroyEntity","setPosition","getPosition","setScale","setSprite","setSpriteColor","setVisible","setCollider","checkCollision","setScript"] },
+  { id:"scene-mgmt",       title:"18. 场景管理", items:["loadScene","setActiveScene","getActiveScene","sceneSetBackground"] },
+  { id:"input",            title:"19. 输入系统", items:["keyDown","keyPressed","getTouchCount","getTouch","getJoystickX","getJoystickY"] },
+  { id:"storage",          title:"20. 存储系统", items:["saveData","loadData","clearData"] },
+  { id:"util",             title:"21. 工具 API", items:["getTimeMs","random","randomRange","log"] },
+  { id:"constants",        title:"22. 常量参考", items:["VERSION","PLATFORM","RENDERER","KEY","WIDGET","LAYOUT","AUTOSIZE","BROADPHASE","EVENT","LIGHT","BODY","SHAPE"] }
+];
+
+var navEl = document.getElementById('nav');
+var itemIndex = {};  // api-name -> {sectionId, li}
+
+NAV_DATA.forEach(function(sec){
+  var section = document.createElement('div');
+  section.className = 'nav-section';
+  section.dataset.section = sec.id;
+
+  var title = document.createElement('div');
+  title.className = 'nav-title';
+  title.innerHTML = '<span>'+sec.title+'</span><span class="arrow">▼</span>';
+  title.addEventListener('click', function(){
+    section.classList.toggle('collapsed');
+  });
+  section.appendChild(title);
+
+  if (sec.items) {
+    var ul = document.createElement('ul');
+    ul.className = 'nav-list';
+    sec.items.forEach(function(name){
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + sec.id;
+      a.textContent = name;
+      a.dataset.api = name.toLowerCase();
+      li.appendChild(a);
+      ul.appendChild(li);
+      itemIndex[name.toLowerCase()] = { sectionId: sec.id, li: li, a: a };
+    });
+    section.appendChild(ul);
+  }
+  navEl.appendChild(section);
+});
+
+/* ============= 搜索过滤 ============= */
+var search = document.getElementById('search');
+search.addEventListener('input', function(){
+  var q = search.value.trim().toLowerCase();
+  Object.keys(itemIndex).forEach(function(key){
+    var entry = itemIndex[key];
+    var match = !q || key.indexOf(q) !== -1;
+    entry.li.style.display = match ? '' : 'none';
+    if (match && q) {
+      entry.li.parentElement.parentElement.classList.remove('collapsed');
+    }
+  });
+  // 没有匹配项的 section 标题也可隐藏（可选）
+  if (q) {
+    document.querySelectorAll('.nav-section').forEach(function(s){
+      var anyVisible = s.querySelectorAll('.nav-list li:not([style*="display: none"])').length > 0;
+      s.querySelector('.nav-title').style.display = anyVisible ? '' : 'none';
+    });
+  } else {
+    document.querySelectorAll('.nav-title').forEach(function(t){ t.style.display=''; });
+  }
+});
+
+/* ============= 平滑滚动 + 高亮 ============= */
+var allLinks = document.querySelectorAll('#nav a');
+allLinks.forEach(function(a){
+  a.addEventListener('click', function(e){
+    var target = document.getElementById(a.getAttribute('href').slice(1));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior:'smooth', block:'start' });
+      history.replaceState(null,'', '#'+target.id);
+      // 关闭移动端菜单
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('overlay').classList.remove('open');
+    }
+  });
+});
+
+// 滚动监听高亮
+var sections = document.querySelectorAll('#main section');
+window.addEventListener('scroll', function(){
+  var pos = window.scrollY + 80;
+  var current = null;
+  sections.forEach(function(s){
+    if (s.offsetTop <= pos) current = s.id;
+  });
+  if (current) {
+    allLinks.forEach(function(a){
+      if (a.getAttribute('href') === '#'+current) a.classList.add('active');
+      else a.classList.remove('active');
+    });
+  }
+});
+
+/* ============= 移动端菜单 ============= */
+document.getElementById('menuBtn').addEventListener('click', function(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('open');
+});
+document.getElementById('overlay').addEventListener('click', function(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+});
+
+/* ============= 轻量代码高亮（已用 span 标注，此处仅作占位扩展） ============= */
+// 代码示例已在内联 HTML 中通过 .t-kw/.t-str/.t-num/.t-com/.t-fn/.t-obj span 标注完成高亮。
+</script>
+</body>
+</html>

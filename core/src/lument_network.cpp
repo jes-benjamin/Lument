@@ -25,7 +25,7 @@
 //     作为全局状态保存。
 //   - LumentHttpResponse 的 body/headers 使用 thread_local 静态字符串
 //     存储，避免释放与悬空指针问题。
-//   - 模块目标引擎版本：1.2.0（与 LUMENT_VERSION_STRING 一致）。
+//   - 模块目标引擎版本：1.3.0（与 LUMENT_VERSION_STRING 一致）。
 // ============================================================
 #include "lument_internal.h"
 
@@ -37,9 +37,9 @@
 
 // 校验本模块对应的引擎版本
 static_assert(LUMENT_VERSION_MAJOR == 1 &&
-              LUMENT_VERSION_MINOR == 2 &&
+              LUMENT_VERSION_MINOR == 3 &&
               LUMENT_VERSION_PATCH == 0,
-              "lument_network.cpp 对应引擎版本 1.2.0");
+              "lument_network.cpp 对应引擎版本 1.3.0");
 
 namespace {
 

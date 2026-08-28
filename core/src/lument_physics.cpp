@@ -35,11 +35,13 @@
 #include <algorithm>
 #include <string>
 #include <cstring>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace {
 
 // ---------- 常量 ----------
-constexpr int   MAX_BODIES = 512;            // 物理体池容量
+constexpr int   MAX_BODIES = 2048;           // 物理体池容量（空间分区后可承载更多）
 constexpr float DEFAULT_GRAVITY_X = 0.0f;   // 默认重力 X
 constexpr float DEFAULT_GRAVITY_Y = 9.8f;   // 默认重力 Y（m/s^2，dt 以秒计）
 constexpr int   DEFAULT_VELOCITY_ITER = 8;  // 默认速度求解迭代
@@ -112,6 +114,16 @@ struct PhysicsWorld {
     std::vector<LumentCollision> frameCollisions; // 本帧发生的碰撞
     LumentCollisionCallback callback = nullptr;
     void* callbackUserData = nullptr;
+
+    // 空间分区（v1.3）
+    int   broadphase = LUMENT_BROADPHASE_GRID;  // 默认均匀网格
+    float gridCellSize = 0.0f;                    // 0 = 自动（按最大体尺寸）
+    int   lastPairCount = 0;                     // 上一步生成的候选对数
+
+    // 调试绘制配色（v1.3）
+    LumentColor dbgShape   = {  80, 200, 120, 255 };
+    LumentColor dbgContact = { 240,  90,  90, 255 };
+    LumentColor dbgGrid    = {  60,  90, 140, 120 };
 };
 
 PhysicsWorld g_world;
@@ -409,6 +421,210 @@ bool ray_circle(const PhysicsBody& b, float x1, float y1, float x2, float y2,
 // 延迟初始化：保证物理子系统可独立使用（即使 lument_init 未调用）
 void ensure_init() {
     if (!g_world.initialized) ue::init_physics();
+}
+
+// ============================================================
+// 空间分区（v1.3）
+// ----------------------------------------------------------------
+// 宽相（broadphase）生成候选碰撞对，再交窄相 compute_manifold 精确判定。
+// 三种实现：
+//   - BRUTE   : O(n²) 全配对（体数极少时开销可忽略，且无额外分配）
+//   - GRID    : 均匀网格，体跨多格插入，格内两两组对并去重（默认）
+//   - QUADTREE: 自适应四叉树，稀疏场景优于均匀网格
+// ============================================================
+
+// 计算物理体的世界 AABB（中心 x/y，AABB 用 w/h，Circle 用 radius）
+inline void compute_body_aabb(const PhysicsBody& b, LumentRect& out) {
+    if (b.shape.type == LUMENT_SHAPE_CIRCLE) {
+        float r = b.shape.radius;
+        out.x = b.x - r; out.y = b.y - r;
+        out.w = r * 2.0f; out.h = r * 2.0f;
+    } else {
+        out.x = b.x - b.shape.w * 0.5f;
+        out.y = b.y - b.shape.h * 0.5f;
+        out.w = b.shape.w;
+        out.h = b.shape.h;
+    }
+}
+
+// 自动网格尺寸：取所有存活体的最大包围尺寸（保证绝大多数体落入单格）
+inline float auto_grid_cell_size() {
+    float m = 1.0f;
+    for (int i = 0; i < MAX_BODIES; ++i) {
+        if (!g_world.pool[i].alive) continue;
+        const auto& s = g_world.pool[i].shape;
+        float e = (s.type == LUMENT_SHAPE_CIRCLE) ? s.radius * 2.0f
+                                                   : std::max(s.w, s.h);
+        if (e > m) m = e;
+    }
+    return m;
+}
+
+inline int64_t cell_key(int cx, int cy) {
+    return (int64_t(uint32_t(cx)) << 32) | uint64_t(uint32_t(cy));
+}
+
+// 均匀网格宽相：生成候选对（i<j），跨格去重。
+void broadphase_grid(std::vector<std::pair<int, int>>& out) {
+    float cs = g_world.gridCellSize > 0.0f ? g_world.gridCellSize
+                                            : auto_grid_cell_size();
+    if (cs < 1e-3f) cs = 1.0f;
+
+    std::unordered_map<int64_t, std::vector<int>> cells;
+    // 预估容量：按存活体数 ×2（跨格系数）
+    cells.reserve(256);
+
+    for (int i = 0; i < MAX_BODIES; ++i) {
+        if (!g_world.pool[i].alive) continue;
+        LumentRect a;
+        compute_body_aabb(g_world.pool[i], a);
+        int x0 = int(std::floor(a.x / cs));
+        int y0 = int(std::floor(a.y / cs));
+        int x1 = int(std::floor((a.x + a.w) / cs));
+        int y1 = int(std::floor((a.y + a.h) / cs));
+        for (int gx = x0; gx <= x1; ++gx)
+            for (int gy = y0; gy <= y1; ++gy)
+                cells[cell_key(gx, gy)].push_back(i);
+    }
+
+    // 去重集合：i*MAX_BODIES+j 编码
+    std::unordered_set<int64_t> seen;
+    seen.reserve(cells.size() * 4);
+    for (auto& kv : cells) {
+        const std::vector<int>& v = kv.second;
+        for (size_t a = 0; a < v.size(); ++a) {
+            for (size_t b = a + 1; b < v.size(); ++b) {
+                int i = std::min(v[a], v[b]);
+                int j = std::max(v[a], v[b]);
+                int64_t key = int64_t(i) * MAX_BODIES + j;
+                if (seen.insert(key).second) {
+                    out.push_back({i, j});
+                }
+            }
+        }
+    }
+}
+
+// ---- 四叉树宽相 ----
+struct QuadNode {
+    LumentRect bounds;
+    int       depth = 0;
+    std::vector<int> items;     // 体索引（仅在叶子节点存放）
+    QuadNode* children[4] = {nullptr, nullptr, nullptr, nullptr};
+
+    bool is_leaf() const { return children[0] == nullptr; }
+    void free() {
+        for (int k = 0; k < 4; ++k) { if (children[k]) { children[k]->free(); delete children[k]; children[k] = nullptr; } }
+        items.clear();
+    }
+};
+
+// 世界包围盒：扫描所有存活体
+inline LumentRect world_bounds() {
+    LumentRect r{1e30f, 1e30f, -1e30f, -1e30f};
+    bool any = false;
+    for (int i = 0; i < MAX_BODIES; ++i) {
+        if (!g_world.pool[i].alive) continue;
+        any = true;
+        LumentRect a; compute_body_aabb(g_world.pool[i], a);
+        if (a.x < r.x) r.x = a.x;
+        if (a.y < r.y) r.y = a.y;
+        if (a.x + a.w > r.w) r.w = a.x + a.w;
+        if (a.y + a.h > r.h) r.h = a.y + a.h;
+    }
+    if (!any) { r = {0, 0, 0, 0}; return r; }
+    float w = r.w - r.x, h = r.h - r.y;
+    // 扩展一点边距，避免边界体落在根外
+    r.x -= 1.0f; r.y -= 1.0f; w += 2.0f; h += 2.0f;
+    r.w = w; r.h = h;
+    return r;
+}
+
+// 插入体索引到四叉树
+void quad_insert(QuadNode* node, int idx, int maxDepth, int capacity) {
+    LumentRect a; compute_body_aabb(g_world.pool[idx], a);
+    // 完全在节点外则不插
+    if (a.x + a.w < node->bounds.x || a.x > node->bounds.x + node->bounds.w ||
+        a.y + a.h < node->bounds.y || a.y > node->bounds.y + node->bounds.h)
+        return;
+
+    if (node->is_leaf()) {
+        node->items.push_back(idx);
+        // 达到容量且未达最大深度 → 分裂
+        if ((int)node->items.size() > capacity && node->depth < maxDepth) {
+            float x = node->bounds.x, y = node->bounds.y;
+            float w = node->bounds.w * 0.5f, h = node->bounds.h * 0.5f;
+            for (int k = 0; k < 4; ++k) {
+                node->children[k] = new QuadNode();
+                node->children[k]->bounds = { x + (k & 1) * w, y + ((k >> 1) & 1) * h, w, h };
+                node->children[k]->depth = node->depth + 1;
+            }
+            // 将原叶子项重新下分
+            std::vector<int> old;
+            old.swap(node->items);
+            for (int oi : old) quad_insert(node, oi, maxDepth, capacity);
+        }
+    } else {
+        for (int k = 0; k < 4; ++k) quad_insert(node->children[k], idx, maxDepth, capacity);
+    }
+}
+
+// 收集叶子项两两组对，i<j 去重
+void quad_collect(QuadNode* node, std::vector<std::pair<int, int>>& out,
+                  std::unordered_set<int64_t>& seen) {
+    if (!node) return;
+    if (node->is_leaf()) {
+        const std::vector<int>& v = node->items;
+        for (size_t a = 0; a < v.size(); ++a) {
+            for (size_t b = a + 1; b < v.size(); ++b) {
+                int i = std::min(v[a], v[b]);
+                int j = std::max(v[a], v[b]);
+                int64_t key = int64_t(i) * MAX_BODIES + j;
+                if (seen.insert(key).second) out.push_back({i, j});
+            }
+        }
+    } else {
+        for (int k = 0; k < 4; ++k) quad_collect(node->children[k], out, seen);
+    }
+}
+
+void broadphase_quadtree(std::vector<std::pair<int, int>>& out) {
+    LumentRect rootBounds = world_bounds();
+    if (rootBounds.w <= 0.0f || rootBounds.h <= 0.0f) return;
+    QuadNode root;
+    root.bounds = rootBounds;
+    const int maxDepth = 6;
+    const int capacity = 8;
+    for (int i = 0; i < MAX_BODIES; ++i) {
+        if (g_world.pool[i].alive) quad_insert(&root, i, maxDepth, capacity);
+    }
+    std::unordered_set<int64_t> seen;
+    quad_collect(&root, out, seen);
+    // root.children 由 QuadNode 析构释放（递归 free 在 ~QuadNode? 没定义析构）
+    // 显式释放
+    for (int k = 0; k < 4; ++k) if (root.children[k]) { root.children[k]->free(); delete root.children[k]; }
+}
+
+// 统一入口：按当前宽相算法生成候选对
+void broadphase_pairs(std::vector<std::pair<int, int>>& out) {
+    switch (g_world.broadphase) {
+    case LUMENT_BROADPHASE_BRUTE:
+        for (int i = 0; i < MAX_BODIES; ++i) {
+            if (!g_world.pool[i].alive) continue;
+            for (int j = i + 1; j < MAX_BODIES; ++j) {
+                if (!g_world.pool[j].alive) continue;
+                out.push_back({i, j});
+            }
+        }
+        break;
+    case LUMENT_BROADPHASE_QUADTREE:
+        broadphase_quadtree(out);
+        break;
+    case LUMENT_BROADPHASE_GRID:
+    default:
+        broadphase_grid(out);
+        break;
+    }
 }
 
 } // namespace

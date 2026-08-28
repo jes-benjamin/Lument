@@ -16,9 +16,9 @@ extern "C" {
 
 // ========== 引擎版本 ==========
 #define LUMENT_VERSION_MAJOR 1
-#define LUMENT_VERSION_MINOR 2
+#define LUMENT_VERSION_MINOR 3
 #define LUMENT_VERSION_PATCH 0
-#define LUMENT_VERSION_STRING "1.2.0"
+#define LUMENT_VERSION_STRING "1.3.0"
 
 // ========== 平台标识 ==========
 typedef enum {
@@ -194,6 +194,13 @@ typedef enum {
     LUMENT_SHAPE_CIRCLE  = 1,   // 圆形
 } LumentShapeType;
 
+// ========== 宽相空间分区算法 ==========
+typedef enum {
+    LUMENT_BROADPHASE_BRUTE   = 0,  // 暴力 O(n²)
+    LUMENT_BROADPHASE_GRID    = 1,  // 均匀网格
+    LUMENT_BROADPHASE_QUADTREE = 2,  // 四叉树
+} LumentBroadphaseType;
+
 // ========== 碰撞形状 ==========
 typedef struct {
     LumentShapeType type;
@@ -325,6 +332,35 @@ LUMENT_API void lument_draw_sprite(uint32_t textureId, LumentRect dest, LumentRe
 LUMENT_API void lument_draw_text(const char* text, float x, float y, float size, LumentColor color);
 LUMENT_API void lument_draw_pixel(int x, int y, LumentColor color);
 LUMENT_API void lument_flush(void);
+
+// --- 基础图元（全部参与精灵批处理，复用白色纹理，单次提交）---
+// 轮廓（非填充）图元内部以细矩形/扇形分段拼接实现，保持与批次一致。
+LUMENT_API void lument_draw_circle(float cx, float cy, float radius,
+                                   LumentColor color, bool filled);
+LUMENT_API void lument_draw_line(float x1, float y1, float x2, float y2,
+                                 float thickness, LumentColor color);
+LUMENT_API void lument_draw_triangle(float x1, float y1, float x2, float y2,
+                                     float x3, float y3, LumentColor color, bool filled);
+LUMENT_API void lument_draw_polygon(const LumentVec2* points, int count,
+                                     LumentColor color, bool filled);
+LUMENT_API void lument_draw_polyline(const LumentVec2* points, int count,
+                                     float thickness, LumentColor color);
+LUMENT_API void lument_draw_ellipse(float cx, float cy, float rx, float ry,
+                                    LumentColor color, bool filled);
+LUMENT_API void lument_draw_arc(float cx, float cy, float radius,
+                                float startDeg, float endDeg, float thickness,
+                                LumentColor color);
+LUMENT_API void lument_draw_point(float x, float y, float size, LumentColor color);
+
+// --- 批处理控制（手动批次，更细粒度的状态管理）---
+// 手动批次允许调用者显式声明批次边界，避免自动按纹理排序的开销。
+LUMENT_API void lument_begin_batch(uint32_t textureId);     // textureId=0 用白色
+LUMENT_API void lument_batch_quad(LumentRect dest, LumentColor color);
+LUMENT_API void lument_batch_quad_uv(LumentRect dest, LumentRect src, LumentColor color);
+LUMENT_API void lument_end_batch(void);                      // 提交当前手动批次
+LUMENT_API uint32_t lument_get_batch_count(void);            // 当前挂起的图元数
+LUMENT_API void lument_set_blend_mode(int mode);              // 0=normal 1=additive 2=multiply
+LUMENT_API int  lument_get_blend_mode(void);
 
 // --- 纹理管理 ---
 LUMENT_API uint32_t lument_load_texture(const char* path);
@@ -458,18 +494,25 @@ LUMENT_API void lument_scene_set_background(LumentColor color);
 
 // --- Widget 类型 ---
 typedef enum {
-    LUMENT_WIDGET_NONE      = 0,
-    LUMENT_WIDGET_CONTAINER = 1,   // 容器（可嵌套）
-    LUMENT_WIDGET_BUTTON    = 2,   // 按钮
-    LUMENT_WIDGET_LABEL     = 3,   // 文本标签
-    LUMENT_WIDGET_INPUT     = 4,   // 文本输入框
-    LUMENT_WIDGET_IMAGE     = 5,   // 图片
-    LUMENT_WIDGET_LIST      = 6,   // 列表/滚动视图
-    LUMENT_WIDGET_PROGRESS  = 7,   // 进度条
-    LUMENT_WIDGET_CHECKBOX  = 8,   // 复选框
-    LUMENT_WIDGET_SLIDER    = 9,   // 滑块
-    LUMENT_WIDGET_TABBAR    = 10,  // 标签栏
-    LUMENT_WIDGET_NAVBAR    = 11,  // 导航栏
+    LUMENT_WIDGET_NONE       = 0,
+    LUMENT_WIDGET_CONTAINER  = 1,   // 容器（可嵌套）
+    LUMENT_WIDGET_BUTTON     = 2,   // 按钮
+    LUMENT_WIDGET_LABEL      = 3,   // 文本标签
+    LUMENT_WIDGET_INPUT      = 4,   // 文本输入框
+    LUMENT_WIDGET_IMAGE      = 5,   // 图片
+    LUMENT_WIDGET_LIST       = 6,   // 列表/滚动视图
+    LUMENT_WIDGET_PROGRESS   = 7,   // 进度条
+    LUMENT_WIDGET_CHECKBOX   = 8,   // 复选框
+    LUMENT_WIDGET_SLIDER     = 9,   // 滑块
+    LUMENT_WIDGET_TABBAR     = 10,  // 标签栏
+    LUMENT_WIDGET_NAVBAR     = 11,  // 导航栏
+    LUMENT_WIDGET_DROPDOWN   = 12,  // 下拉选择框
+    LUMENT_WIDGET_TOGGLE     = 13,  // 开关
+    LUMENT_WIDGET_SCROLLVIEW = 14,  // 滚动视图
+    LUMENT_WIDGET_TOOLTIP    = 15,  // 提示气泡
+    LUMENT_WIDGET_DIVIDER    = 16,  // 分隔线
+    LUMENT_WIDGET_SPINNER    = 17,  // 加载指示器
+    LUMENT_WIDGET_ICON       = 18,  // 图标
 } LumentWidgetType;
 
 // --- 布局类型 ---
@@ -479,7 +522,30 @@ typedef enum {
     LUMENT_LAYOUT_HORIZONTAL= 2,   // 水平排列
     LUMENT_LAYOUT_GRID      = 3,   // 网格布局
     LUMENT_LAYOUT_STACK     = 4,   // 堆叠（Z轴）
+    LUMENT_LAYOUT_FLOW      = 5,   // 自动换行流式布局
 } LumentLayoutType;
+
+// --- 自动尺寸模式 ---
+typedef enum {
+    LUMENT_AUTOSIZE_OFF    = 0,    // 关闭自动尺寸
+    LUMENT_AUTOSIZE_WIDTH  = 1,    // 按内容自适应宽度
+    LUMENT_AUTOSIZE_HEIGHT = 2,    // 按内容自适应高度
+    LUMENT_AUTOSIZE_BOTH   = 3,    // 同时自适应宽高
+} LumentAutoSize;
+
+// --- 主题（统一外观配色）---
+typedef struct {
+    LumentColor background;  // 全局背景
+    LumentColor surface;     // 控件表面
+    LumentColor primary;     // 主色（按钮/高亮）
+    LumentColor secondary;   // 次色
+    LumentColor text;        // 主文本
+    LumentColor textMuted;   // 次要文本/占位符
+    LumentColor border;      // 边框
+    LumentColor accent;      // 强调色（焦点环/滑块）
+    LumentColor danger;      // 危险色
+    LumentColor success;     // 成功色
+} LumentTheme;
 
 // --- 事件类型 ---
 typedef enum {
@@ -546,6 +612,49 @@ LUMENT_API LumentWidget lument_ui_create_button(const char* text, float x, float
 LUMENT_API LumentWidget lument_ui_create_label(const char* text, float x, float y, float w, float h);
 LUMENT_API LumentWidget lument_ui_create_input(const char* placeholder, float x, float y, float w, float h);
 
+// --- 新增控件便捷创建（v1.3）---
+LUMENT_API LumentWidget lument_ui_create_dropdown(float x, float y, float w, float h);
+LUMENT_API LumentWidget lument_ui_create_toggle(bool initial, float x, float y, float w, float h);
+LUMENT_API LumentWidget lument_ui_create_scrollview(float x, float y, float w, float h);
+LUMENT_API LumentWidget lument_ui_create_tooltip(const char* text, float x, float y);
+LUMENT_API LumentWidget lument_ui_create_progress(float x, float y, float w, float h);
+LUMENT_API LumentWidget lument_ui_create_slider(float min, float max, float value,
+                                                float x, float y, float w, float h);
+LUMENT_API LumentWidget lument_ui_create_checkbox(bool initial, float x, float y, float w, float h);
+LUMENT_API LumentWidget lument_ui_create_divider(float x, float y, float w, float h);
+LUMENT_API LumentWidget lument_ui_create_spinner(float x, float y, float size);
+LUMENT_API LumentWidget lument_ui_create_icon(uint32_t textureId, float x, float y, float size);
+
+// --- 控件状态查询与设置（v1.3，统一数值接口）---
+LUMENT_API void  lument_ui_set_value(LumentWidget widget, float value);  // slider/progress/toggle
+LUMENT_API float lument_ui_get_value(LumentWidget widget);
+LUMENT_API void  lument_ui_set_min_max(LumentWidget widget, float min, float max);
+LUMENT_API void  lument_ui_set_options(LumentWidget widget, const char* const* options, int count);
+LUMENT_API int   lument_ui_get_selected(LumentWidget widget);
+LUMENT_API void  lument_ui_set_selected(LumentWidget widget, int index);
+LUMENT_API void  lument_ui_set_checked(LumentWidget widget, bool checked);
+LUMENT_API bool  lument_ui_get_checked(LumentWidget widget);
+LUMENT_API void  lument_ui_set_scroll(LumentWidget widget, float offsetX, float offsetY);
+LUMENT_API void  lument_ui_get_scroll(LumentWidget widget, float* offsetX, float* offsetY);
+
+// --- 自动化系统（v1.3）---
+// 主题：统一外观配色，新建控件自动套用主题色
+LUMENT_API void lument_ui_set_theme(const LumentTheme* theme);
+LUMENT_API void lument_ui_get_theme(LumentTheme* outTheme);
+LUMENT_API void lument_ui_reset_theme(void);
+// 自动尺寸：按内容/子控件自动计算尺寸
+LUMENT_API void lument_ui_set_auto_size(LumentWidget widget, int mode);  // LumentAutoSize
+LUMENT_API void lument_ui_measure_text(const char* text, float fontSize, float* outW, float* outH);
+LUMENT_API void lument_ui_set_margin(LumentWidget widget, float top, float right, float bottom, float left);
+// 声明式 UI 构建：从 JSON 描述构建控件树，返回根容器
+//   JSON 示例: {"type":"container","layout":1,"children":[{"type":"button","text":"OK","x":0,"y":0,"w":80,"h":32}]}
+LUMENT_API LumentWidget lument_ui_build_from_json(const char* json);
+LUMENT_API const char* lument_ui_dump_tree(LumentWidget root);   // 调试：输出控件树为 JSON
+LUMENT_API LumentWidget lument_ui_find_by_id(const char* name);  // 按自定义名查找（设置于 text）
+
+// --- 滚动视图内容管理 ---
+LUMENT_API void lument_ui_set_content_size(LumentWidget scrollview, float w, float h);
+
 // ============================================================
 // 存储 API
 // ============================================================
@@ -609,6 +718,32 @@ LUMENT_API bool lument_physics_point_query(float x, float y, int* outBodyId);
 // --- 碰撞回调 ---
 typedef void (*LumentCollisionCallback)(const LumentCollision* collision, void* userData);
 LUMENT_API void lument_physics_on_collision(LumentCollisionCallback callback, void* userData);
+
+// --- 空间分区（v1.3）---
+// 宽相算法切换：暴力 / 均匀网格 / 四叉树。默认均匀网格（MAX_BODIES 较大时显著优于 O(n²)）。
+LUMENT_API void lument_physics_set_broadphase(int type);   // LumentBroadphaseType
+LUMENT_API int  lument_physics_get_broadphase(void);
+LUMENT_API void lument_physics_set_grid_cell_size(float size);  // 0 = 自动（按最大体尺寸）
+LUMENT_API float lument_physics_get_grid_cell_size(void);
+LUMENT_API int  lument_physics_get_broadphase_pairs(void);     // 上一步生成的候选对数
+LUMENT_API int  lument_physics_get_body_count(void);
+LUMENT_API void lument_physics_get_body_aabb(int bodyId, LumentRect* outAabb);
+LUMENT_API int  lument_physics_query_region(float x, float y, float w, float h,
+                                            int* outBodies, int maxCount);
+
+// --- 物理调试绘制（v1.3）---
+// 全部通过引擎渲染图元 API 提交，可叠加在游戏画面之上用于调参。
+LUMENT_API void lument_physics_debug_draw_bodies(void);     // 所有物理体轮廓
+LUMENT_API void lument_physics_debug_draw_contacts(void);   // 本帧碰撞接触点
+LUMENT_API void lument_physics_debug_draw_grid(void);       // 空间分区网格
+LUMENT_API void lument_physics_debug_draw_aabb(int bodyId); // 单个体 AABB
+LUMENT_API void lument_physics_debug_draw_ray(float x1, float y1, float x2, float y2);
+LUMENT_API void lument_physics_set_debug_colors(LumentColor shape,
+                                                 LumentColor contact,
+                                                 LumentColor grid);
+LUMENT_API void lument_physics_get_debug_colors(LumentColor* shape,
+                                                LumentColor* contact,
+                                                LumentColor* grid);
 
 // ============================================================
 // 增强音频 API

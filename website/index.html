@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Lument Engine - 轻量级跨平台 2D 游戏引擎。支持 C++/Python/Java/JS 多语言，覆盖 Linux/Windows/macOS/Android/Web 全平台。v1.3.0 新增 UI 自动化、渲染图元批处理、物理空间分区调试。">
+<title>Lument Engine · 轻量级跨平台 2D 游戏引擎</title>
+<style>
+/* ============================================================
+   Lument Engine Landing Page - Self-contained
+   ============================================================ */
+:root{
+  --bg-0:#070a1f;
+  --bg-1:#0d1330;
+  --bg-2:#1a1140;
+  --panel:rgba(22,33,62,0.55);
+  --panel-solid:#16213e;
+  --border:rgba(120,160,255,0.16);
+  --border-strong:rgba(120,160,255,0.35);
+  --text:#e8ecff;
+  --text-dim:#9aa6c8;
+  --text-mute:#6b7699;
+  --accent:#5dade2;
+  --accent-2:#7c5cff;
+  --accent-3:#e94560;
+  --accent-cyan:#38e8ff;
+  --grad:linear-gradient(135deg,#5dade2 0%,#7c5cff 55%,#e94560 100%);
+  --grad-soft:linear-gradient(135deg,rgba(93,173,226,.15),rgba(124,92,255,.15));
+  --shadow:0 24px 60px -20px rgba(0,0,0,.7);
+  --radius:18px;
+  --maxw:1200px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+body{
+  font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:var(--bg-0);
+  color:var(--text);
+  line-height:1.65;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+img{max-width:100%}
+.wrap{width:100%;max-width:var(--maxw);margin:0 auto;padding:0 24px}
+
+/* ---------- animated background ---------- */
+.bg-fx{position:fixed;inset:0;z-index:-2;overflow:hidden;background:
+  radial-gradient(1200px 800px at 15% -10%,rgba(93,173,226,.18),transparent 55%),
+  radial-gradient(1000px 700px at 100% 10%,rgba(124,92,255,.20),transparent 55%),
+  radial-gradient(900px 700px at 50% 120%,rgba(233,69,96,.12),transparent 55%),
+  linear-gradient(180deg,#070a1f 0%,#0d1330 40%,#1a1140 100%);}
+.orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.45;animation:float 18s ease-in-out infinite}
+.orb.a{width:480px;height:480px;background:#1c4a8a;top:-120px;left:-80px}
+.orb.b{width:520px;height:520px;background:#5b2a9e;top:30%;right:-160px;animation-delay:-6s}
+.orb.c{width:420px;height:420px;background:#7a1f3a;bottom:-140px;left:30%;animation-delay:-11s}
+.grid-overlay{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background-image:linear-gradient(rgba(120,160,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(120,160,255,.05) 1px,transparent 1px);
+  background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 30%,transparent 80%)}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.08)}66%{transform:translate(-30px,40px) scale(.95)}}
+
+/* ---------- navbar ---------- */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;transition:.3s}
+nav .bar{display:flex;align-items:center;justify-content:space-between;height:70px;
+  backdrop-filter:blur(14px);background:rgba(7,10,31,.55);border-bottom:1px solid transparent;transition:.3s}
+nav.scrolled .bar{background:rgba(7,10,31,.82);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:20px;letter-spacing:.5px}
+.brand .logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
+  background:var(--grad);box-shadow:0 0 22px rgba(93,173,226,.5);color:#06122a;font-size:20px;font-weight:900}
+.brand span.g{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{display:flex;align-items:center;gap:30px}
+.nav-links a{color:var(--text-dim);font-size:15px;font-weight:500;transition:.2s;position:relative}
+.nav-links a:hover{color:var(--text)}
+.nav-links a::after{content:"";position:absolute;left:0;bottom:-6px;height:2px;width:0;background:var(--grad);transition:.25s}
+.nav-links a:hover::after{width:100%}
+.nav-cta{display:flex;align-items:center;gap:14px}
+.badge-mini{font-size:12px;font-weight:700;color:#cfe3ff;background:rgba(93,173,226,.14);
+  border:1px solid var(--border-strong);padding:4px 10px;border-radius:999px}
+.btn-ghost{color:var(--text-dim);font-size:14px;font-weight:600}
+.btn-ghost:hover{color:var(--text)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;font-size:15px;
+  padding:11px 22px;border-radius:11px;cursor:pointer;border:none;transition:.25s;white-space:nowrap}
+.btn-primary{background:var(--grad);color:#06122a;box-shadow:0 10px 30px -8px rgba(93,173,226,.55)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 38px -8px rgba(124,92,255,.65)}
+.btn-outline{background:rgba(120,160,255,.06);color:var(--text);border:1px solid var(--border-strong)}
+.btn-outline:hover{border-color:var(--accent);background:rgba(93,173,226,.12);transform:translateY(-2px)}
+.burger{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:6px}
+.burger span{width:24px;height:2px;background:var(--text);transition:.3s}
+
+/* ---------- section helpers ---------- */
+section{padding:96px 0;position:relative}
+.section-head{text-align:center;max-width:720px;margin:0 auto 56px}
+.eyebrow{display:inline-block;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  color:var(--accent);background:rgba(93,173,226,.1);border:1px solid var(--border-strong);
+  padding:6px 14px;border-radius:999px;margin-bottom:18px}
+.section-head h2{font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-1px;margin-bottom:16px;line-height:1.2}
+.section-head p{color:var(--text-dim);font-size:17px}
+.text-grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+/* reveal animation */
+.reveal{opacity:0;transform:translateY(36px);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1;transform:none}
+.reveal.d1{transition-delay:.08s}.reveal.d2{transition-delay:.16s}.reveal.d3{transition-delay:.24s}.reveal.d4{transition-delay:.32s}
+
+/* ---------- hero ---------- */
+.hero{padding:170px 0 90px;text-align:center;position:relative}
+.hero .pill{display:inline-flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:#cfe3ff;
+  background:rgba(93,173,226,.1);border:1px solid var(--border-strong);padding:7px 16px;border-radius:999px;margin-bottom:26px}
+.hero .pill .dot{width:8px;height:8px;border-radius:50%;background:#39ff88;box-shadow:0 0 12px #39ff88;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.hero h1{font-size:clamp(52px,9vw,104px);font-weight:900;letter-spacing:-3px;line-height:1;margin-bottom:8px;
+  background:linear-gradient(135deg,#ffffff 0%,#9cc8ff 45%,#b89cff 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  text-shadow:0 0 80px rgba(93,173,226,.25)}
+.hero .ver{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:#fff;
+  background:var(--grad);padding:5px 16px;border-radius:999px;margin-bottom:24px;box-shadow:0 8px 24px -6px rgba(124,92,255,.6)}
+.hero .tagline{font-size:clamp(20px,3vw,28px);font-weight:700;color:var(--text);margin-bottom:20px;letter-spacing:1px}
+.hero .desc{max-width:640px;margin:0 auto 40px;color:var(--text-dim);font-size:18px}
+.hero-actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:60px}
+.hero-stats{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;max-width:760px;margin:0 auto}
+.stat{flex:1;min-width:140px;padding:18px 14px;background:var(--panel);border:1px solid var(--border);
+  border-radius:14px;backdrop-filter:blur(8px)}
+.stat .num{font-size:26px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.stat .lab{font-size:13px;color:var(--text-mute);margin-top:2px}
+.scroll-hint{margin-top:54px;color:var(--text-mute);font-size:13px;letter-spacing:2px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.mouse{width:26px;height:42px;border:2px solid var(--border-strong);border-radius:14px;position:relative}
+.mouse::before{content:"";position:absolute;top:7px;left:50%;transform:translateX(-50%);width:4px;height:8px;border-radius:3px;background:var(--accent);animation:wheel 1.8s infinite}
+@keyframes wheel{0%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,14px)}}
+
+/* ---------- feature cards ---------- */
+.cards{display:grid;gap:24px}
+.cards.new{grid-template-columns:repeat(2,1fr)}
+.cards.core{grid-template-columns:repeat(3,1fr)}
+.card{position:relative;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:32px;overflow:hidden;transition:transform .3s,border-color .3s,box-shadow .3s;backdrop-filter:blur(10px)}
+.card::before{content:"";position:absolute;inset:0;background:var(--grad-soft);opacity:0;transition:opacity .3s;pointer-events:none}
+.card:hover{transform:translateY(-6px);border-color:var(--border-strong);box-shadow:var(--shadow)}
+.card:hover::before{opacity:1}
+.card .ic{width:56px;height:56px;border-radius:14px;display:grid;place-items:center;font-size:28px;margin-bottom:20px;
+  background:rgba(93,173,226,.12);border:1px solid var(--border-strong);position:relative;z-index:1}
+.card h3{font-size:21px;font-weight:700;margin-bottom:10px;position:relative;z-index:1}
+.card .sub{font-size:13px;color:var(--accent);font-weight:600;margin-bottom:14px;position:relative;z-index:1;letter-spacing:.5px}
+.card p{color:var(--text-dim);font-size:14.5px;position:relative;z-index:1;margin-bottom:16px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;position:relative;z-index:1}
+.chip{font-size:12px;font-weight:600;color:#cfe3ff;background:rgba(120,160,255,.08);
+  border:1px solid var(--border);padding:5px 11px;border-radius:8px;transition:.2s}
+.chip:hover{border-color:var(--accent);background:rgba(93,173,226,.14)}
+.card .newflag{position:absolute;top:18px;right:18px;font-size:11px;font-weight:700;color:#06122a;
+  background:var(--accent-cyan);padding:3px 9px;border-radius:6px;letter-spacing:.5px;z-index:2}
+.card.core .ic{font-size:30px}
+.card.core h3{font-size:18px}
+.card.core p{font-size:13.5px;margin-bottom:0}
+
+/* ---------- platforms ---------- */
+.platforms{display:grid;grid-template-columns:repeat(5,1fr);gap:18px}
+.plat{padding:30px 16px;text-align:center;background:var(--panel);border:1px solid var(--border);
+  border-radius:14px;transition:.3s;backdrop-filter:blur(8px)}
+.plat:hover{transform:translateY(-5px);border-color:var(--accent);box-shadow:0 14px 36px -14px rgba(93,173,226,.5)}
+.plat .ic{font-size:38px;margin-bottom:12px;display:block}
+.plat .nm{font-weight:700;font-size:15px}
+.plat .sub{font-size:12px;color:var(--text-mute);margin-top:3px}
+
+/* ---------- quick start ---------- */
+.qs{display:grid;grid-template-columns:1fr 1.15fr;gap:48px;align-items:center}
+.qs-text h2{font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-1px;margin-bottom:18px}
+.qs-text p{color:var(--text-dim);font-size:16px;margin-bottom:24px}
+.qs-list{list-style:none;display:flex;flex-direction:column;gap:12px}
+.qs-list li{display:flex;align-items:center;gap:12px;color:var(--text);font-size:15px}
+.qs-list .ok{width:22px;height:22px;border-radius:50%;background:rgba(57,255,136,.15);border:1px solid rgba(57,255,136,.4);
+  color:#39ff88;display:grid;place-items:center;font-size:13px;flex-shrink:0}
+.code-card{background:#0a1024;border:1px solid var(--border-strong);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.code-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(13,19,48,.6)}
+.code-head .dots{display:flex;gap:7px}
+.code-head .dots i{width:12px;height:12px;border-radius:50%;display:block}
+.code-head .dots i:nth-child(1){background:#ff5f56}.code-head .dots i:nth-child(2){background:#ffbd2e}.code-head .dots i:nth-child(3){background:#27c93f}
+.code-head .file{font-size:13px;color:var(--text-mute);margin-left:8px;font-family:monospace}
+.code-head .copy{margin-left:auto;font-size:12px;color:var(--text-dim);background:rgba(120,160,255,.08);
+  border:1px solid var(--border);padding:5px 11px;border-radius:7px;cursor:pointer;transition:.2s}
+.code-head .copy:hover{color:var(--text);border-color:var(--accent)}
+.code-body{padding:20px 22px;overflow-x:auto;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13.5px;line-height:1.7}
+.code-body .k{color:#c792ea}.code-body .s{color:#c3e88d}.code-body .n{color:#f78c6c}
+.code-body .f{color:#82aaff}.code-body .c{color:#5b6b8c;font-style:italic}
+.code-body .p{color:#89ddff}.code-body .o{color:#ffcb6b}
+.code-body .v{color:#f07178}
+.code-body .obj{color:#f78c6c;font-weight:600}
+
+/* ---------- version history ---------- */
+.timeline{position:relative;max-width:840px;margin:0 auto;padding-left:38px}
+.timeline::before{content:"";position:absolute;left:13px;top:8px;bottom:8px;width:2px;background:linear-gradient(180deg,var(--accent),var(--accent-2),var(--accent-3))}
+.tl-item{position:relative;padding:0 0 36px 28px}
+.tl-item:last-child{padding-bottom:0}
+.tl-item::before{content:"";position:absolute;left:-32px;top:4px;width:20px;height:20px;border-radius:50%;
+  background:var(--bg-0);border:3px solid var(--accent);box-shadow:0 0 0 4px rgba(93,173,226,.15)}
+.tl-item.cur::before{border-color:var(--accent-cyan);background:var(--accent-cyan);box-shadow:0 0 0 4px rgba(56,232,255,.2),0 0 18px rgba(56,232,255,.5)}
+.tl-ver{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.tl-ver .v{font-size:22px;font-weight:800}
+.tl-ver .v.cur{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.tl-ver .tag{font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px}
+.tl-ver .tag.latest{background:var(--accent-cyan);color:#06122a}
+.tl-ver .tag.prev{background:rgba(120,160,255,.12);color:#cfe3ff;border:1px solid var(--border)}
+.tl-item ul{list-style:none;margin-top:10px;display:grid;gap:7px}
+.tl-item ul li{color:var(--text-dim);font-size:14.5px;padding-left:18px;position:relative}
+.tl-item ul li::before{content:"▸";position:absolute;left:0;color:var(--accent)}
+.tl-item.cur ul li::before{color:var(--accent-cyan)}
+
+/* ---------- CTA band ---------- */
+.cta-band{margin:40px 0 0;padding:56px 40px;text-align:center;border-radius:24px;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,rgba(93,173,226,.16),rgba(124,92,255,.16),rgba(233,69,96,.16));
+  border:1px solid var(--border-strong)}
+.cta-band h2{font-size:clamp(26px,4vw,36px);font-weight:800;margin-bottom:12px}
+.cta-band p{color:var(--text-dim);margin-bottom:26px;font-size:16px}
+
+/* ---------- footer ---------- */
+footer{border-top:1px solid var(--border);background:rgba(7,10,31,.6);padding:60px 0 30px;margin-top:40px}
+.foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px;margin-bottom:40px}
+.foot-brand .brand{margin-bottom:14px}
+.foot-brand p{color:var(--text-mute);font-size:14px;max-width:320px}
+.foot-col h4{font-size:14px;font-weight:700;margin-bottom:16px;color:var(--text)}
+.foot-col a{display:block;color:var(--text-mute);font-size:14px;margin-bottom:10px;transition:.2s}
+.foot-col a:hover{color:var(--accent)}
+.foot-bottom{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;
+  padding-top:24px;border-top:1px solid var(--border);color:var(--text-mute);font-size:13px}
+.foot-bottom .vinfo{display:flex;align-items:center;gap:10px}
+
+/* ---------- responsive ---------- */
+@media(max-width:980px){
+  .cards.new{grid-template-columns:1fr}
+  .cards.core{grid-template-columns:repeat(2,1fr)}
+  .platforms{grid-template-columns:repeat(3,1fr)}
+  .qs{grid-template-columns:1fr;gap:32px}
+  .foot-grid{grid-template-columns:1fr 1fr;gap:30px}
+}
+@media(max-width:720px){
+  section{padding:72px 0}
+  .nav-links{display:none}
+  .burger{display:flex}
+  .nav-links.open{display:flex;flex-direction:column;position:absolute;top:70px;left:0;right:0;
+    background:rgba(7,10,31,.96);padding:20px 24px;gap:18px;border-bottom:1px solid var(--border);backdrop-filter:blur(14px)}
+  .nav-cta .btn-ghost{display:none}
+  .hero{padding:130px 0 70px}
+  .cards.core{grid-template-columns:1fr}
+  .platforms{grid-template-columns:repeat(2,1fr)}
+  .foot-grid{grid-template-columns:1fr}
+  .hero-stats{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<!-- background -->
+<div class="bg-fx">
+  <div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>
+</div>
+<div class="grid-overlay"></div>
+
+<!-- navbar -->
+<nav id="nav">
+  <div class="wrap bar">
+    <a class="brand" href="#top">
+      <span class="logo">L</span>
+      <span><span class="g">Lument</span> Engine</span>
+    </a>
+    <div class="nav-links" id="navLinks">
+      <a href="#features">新功能</a>
+      <a href="#core">核心功能</a>
+      <a href="#platforms">平台支持</a>
+      <a href="#start">快速开始</a>
+      <a href="#changelog">版本</a>
+    </div>
+    <div class="nav-cta">
+      <span class="badge-mini">v1.3.0</span>
+      <a class="btn-ghost" href="https://github.com/lument/lument" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn btn-primary" href="#start">开始使用</a>
+    </div>
+    <button class="burger" id="burger" aria-label="菜单"><span></span><span></span><span></span></button>
+  </div>
+</nav>
+
+<!-- hero -->
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="pill reveal"><span class="dot"></span> v1.3.0 现已发布 · UI 自动化 · 渲染图元批处理 · 物理空间分区</div>
+    <h1 class="reveal d1">Lument</h1>
+    <div class="ver reveal d1">v1.3.0</div>
+    <div class="tagline reveal d2">轻量级跨平台 2D 游戏引擎</div>
+    <p class="desc reveal d3">一套 C ABI 核心，C++ / Python / Java / JS 四种语言共用。覆盖渲染、物理、音频、AI、UI、网络全栈能力，Linux / Windows / macOS / Android / Web 一套代码全平台运行。低占用、零热路径分配，专为 2D 像素风与剧情 RPG 而生。</p>
+    <div class="hero-actions reveal d3">
+      <a class="btn btn-primary" href="#start">开始使用</a>
+      <a class="btn btn-outline" href="#features">查看新功能</a>
+    </div>
+    <div class="hero-stats reveal d4">
+      <div class="stat"><div class="num">132+</div><div class="lab">统一 C ABI 接口</div></div>
+      <div class="stat"><div class="num">4</div><div class="lab">开发语言</div></div>
+      <div class="stat"><div class="num">5</div><div class="lab">目标平台</div></div>
+      <div class="stat"><div class="num">62</div><div class="lab">测试用例</div></div>
+      <div class="stat"><div class="num">O(1)</div><div class="lab">ECS 查找</div></div>
+    </div>
+    <div class="scroll-hint reveal d4"><span>向下滚动探索</span><span class="mouse"></span></div>
+  </div>
+</header>
+
+<!-- 新功能 v1.3.0 -->
+<section id="features">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">v1.3.0 新增</span>
+      <h2>四大方向全面 <span class="text-grad">进化</span></h2>
+      <p>从 UI 控件自动化到渲染批处理、物理空间分区与工程化交付，v1.3.0 让引擎在易用性与性能两端同时更进一步。</p>
+    </div>
+    <div class="cards new">
+      <article class="card reveal">
+        <span class="newflag">NEW</span>
+        <div class="ic">🧩</div>
+        <h3>UI 系统自动化与控件补全</h3>
+        <div class="sub">声明式 JSON · 主题系统 · FLOW 布局</div>
+        <p>补全下拉框、开关、滚动视图、提示、分割线、加载指示、图标、滑块、复选框等控件，配合自动尺寸与声明式 UI 构建，界面开发效率倍增。</p>
+        <div class="chips">
+          <span class="chip">dropdown</span><span class="chip">toggle</span><span class="chip">scrollview</span>
+          <span class="chip">tooltip</span><span class="chip">divider</span><span class="chip">spinner</span>
+          <span class="chip">icon</span><span class="chip">slider</span><span class="chip">checkbox</span>
+          <span class="chip">主题系统</span><span class="chip">auto-sizing</span><span class="chip">JSON UI</span><span class="chip">FLOW 布局</span>
+        </div>
+      </article>
+      <article class="card reveal d1">
+        <span class="newflag">NEW</span>
+        <div class="ic">🎨</div>
+        <h3>基础渲染图元与批处理</h3>
+        <div class="sub">手动批处理 · 单次 drawCall</div>
+        <p>新增圆形、直线、三角形、多边形、椭圆、点等基础图元，并提供手动批处理 API，将成百上千个图元合并为一次绘制调用。</p>
+        <div class="chips">
+          <span class="chip">circle</span><span class="chip">line</span><span class="chip">triangle</span>
+          <span class="chip">polygon</span><span class="chip">ellipse</span><span class="chip">point</span>
+          <span class="chip">beginBatch</span><span class="chip">batchQuad</span><span class="chip">endBatch</span>
+        </div>
+      </article>
+      <article class="card reveal d2">
+        <span class="newflag">NEW</span>
+        <div class="ic">⚡</div>
+        <h3>物理引擎空间分区与调试</h3>
+        <div class="sub">宽相位加速 · 可视化调试</div>
+        <p>引入均匀网格与四叉树宽相位，大幅削减碰撞对数量；提供物理调试渲染（刚体 / 接触 / 分区网格）与碰撞对计数，性能可观测。</p>
+        <div class="chips">
+          <span class="chip">Uniform Grid</span><span class="chip">Quadtree</span><span class="chip">Broadphase</span>
+          <span class="chip">debugDraw</span><span class="chip">bodies</span><span class="chip">contacts</span>
+          <span class="chip">grid</span><span class="chip">pair count</span>
+        </div>
+      </article>
+      <article class="card reveal d3">
+        <span class="newflag">NEW</span>
+        <div class="ic">📦</div>
+        <h3>工程化与生态交付</h3>
+        <div class="sub">npm · 类型定义 · 测试套件</div>
+        <p>正式发布为 npm 包，附带完整 TypeScript 类型定义与示例代码，并以 62 项测试构成的测试套件保障回归质量，开箱即用。</p>
+        <div class="chips">
+          <span class="chip">npm package</span><span class="chip">TypeScript 类型</span>
+          <span class="chip">examples</span><span class="chip">62-test suite</span><span class="chip">CI</span>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- 核心功能 -->
+<section id="core">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">核心功能</span>
+      <h2>一套引擎，<span class="text-grad">全栈能力</span></h2>
+      <p>从底层渲染到上层 AI，Lument 以统一的 C ABI 将各模块贯穿，多语言共享同一套核心实现。</p>
+    </div>
+    <div class="cards core">
+      <article class="card core reveal"><div class="ic">🔗</div><h3>C ABI 跨语言</h3><p>C++ / Python / Java / JS 共用 132+ C 接口，一套核心四种语言调用。</p></article>
+      <article class="card core reveal d1"><div class="ic">🧱</div><h3>ECS 实体组件系统</h3><p>稀疏集合实现 O(1) 实体查找，组件化架构，热路径零动态分配。</p></article>
+      <article class="card core reveal d2"><div class="ic">🌐</div><h3>2D 物理引擎</h3><p>刚体动力学、自定义阻尼、碰撞检测与响应、射线投射。</p></article>
+      <article class="card core reveal"><div class="ic">🎨</div><h3>多后端渲染</h3><p>Canvas2D / WebGL / OpenGL ES 2.0，多后端统一抽象。</p></article>
+      <article class="card core reveal d1"><div class="ic">🪟</div><h3>UI 应用开发</h3><p>控件 / 布局 / 事件 / 导航，可构建完整应用界面而非仅 HUD。</p></article>
+      <article class="card core reveal d2"><div class="ic">🔊</div><h3>3D 空间音频</h3><p>支持 MP3/WAV/OGG，空间音频定位、音量与音调控制。</p></article>
+      <article class="card core reveal"><div class="ic">📡</div><h3>网络模块</h3><p>HTTP/HTTPS 请求、WebSocket 长连接、下载与上传。</p></article>
+      <article class="card core reveal d1"><div class="ic">🤖</div><h3>AI 系统</h3><p>行为树、有限状态机、A* 寻路、黑板系统。</p></article>
+      <article class="card core reveal d2"><div class="ic">💾</div><h3>场景管理与存储</h3><p>场景加载 / 切换 / 背景，存档读写与清除。</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- 平台支持 -->
+<section id="platforms">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">平台支持</span>
+      <h2>一套代码，<span class="text-grad">全平台运行</span></h2>
+      <p>从桌面到移动再到 Web，Lument 的跨平台抽象层让同一份代码直达五大平台。</p>
+    </div>
+    <div class="platforms">
+      <div class="plat reveal"><span class="ic">🐧</span><div class="nm">Linux</div><div class="sub">桌面 / OpenGL ES</div></div>
+      <div class="plat reveal d1"><span class="ic">🪟</span><div class="nm">Windows</div><div class="sub">桌面 / OpenGL</div></div>
+      <div class="plat reveal d2"><span class="ic">🍎</span><div class="nm">macOS</div><div class="sub">桌面 / OpenGL</div></div>
+      <div class="plat reveal d3"><span class="ic">🤖</span><div class="nm">Android</div><div class="sub">移动 / GLES 2.0</div></div>
+      <div class="plat reveal d4"><span class="ic">🌐</span><div class="nm">Web</div><div class="sub">浏览器 / WebGL</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 快速开始 -->
+<section id="start">
+  <div class="wrap qs">
+    <div class="qs-text reveal">
+      <span class="eyebrow">快速开始</span>
+      <h2>几行代码，<span class="text-grad">跑起来</span></h2>
+      <p>引入运行时，初始化引擎，在每帧回调中清屏并绘制——无需复杂配置，浏览器中即可体验 Lument。</p>
+      <ul class="qs-list">
+        <li><span class="ok">✓</span> 零配置初始化，开箱即用</li>
+        <li><span class="ok">✓</span> 统一 update / render 回调</li>
+        <li><span class="ok">✓</span> 与 C++ / Python / Java 接口一致</li>
+        <li><span class="ok">✓</span> 完整 TypeScript 类型支持</li>
+      </ul>
+      <div style="margin-top:28px;display:flex;gap:14px;flex-wrap:wrap">
+        <a class="btn btn-primary" href="https://github.com/lument/lument" target="_blank" rel="noopener">获取源码</a>
+        <a class="btn btn-outline" href="#changelog">更新日志</a>
+      </div>
+    </div>
+    <div class="code-card reveal d2">
+      <div class="code-head">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <span class="file">game.js</span>
+        <button class="copy" id="copyBtn">复制</button>
+      </div>
+<pre class="code-body" id="codeBlock"><code><span class="k">const</span> <span class="obj">engine</span> <span class="o">=</span> <span class="obj">Lument</span><span class="p">;</span>
+<span class="obj">engine</span><span class="p">.</span><span class="f">init</span><span class="p">({</span> <span class="v">width</span><span class="p">:</span> <span class="n">800</span><span class="p">,</span> <span class="v">height</span><span class="p">:</span> <span class="n">600</span><span class="p">,</span> <span class="v">title</span><span class="p">:</span> <span class="s">'My Game'</span> <span class="p">});</span>
+<span class="obj">engine</span><span class="p">.</span><span class="f">run</span><span class="p">(()</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="obj">engine</span><span class="p">.</span><span class="f">clear</span><span class="p">({</span> <span class="v">r</span><span class="p">:</span> <span class="n">30</span><span class="p">,</span> <span class="v">g</span><span class="p">:</span> <span class="n">30</span><span class="p">,</span> <span class="v">b</span><span class="p">:</span> <span class="n">40</span><span class="p">,</span> <span class="v">a</span><span class="p">:</span> <span class="n">255</span> <span class="p">});</span>
+    <span class="obj">engine</span><span class="p">.</span><span class="f">drawCircle</span><span class="p">(</span><span class="n">400</span><span class="p">,</span> <span class="n">300</span><span class="p">,</span> <span class="n">50</span><span class="p">,</span> <span class="p">{</span> <span class="v">r</span><span class="p">:</span> <span class="n">100</span><span class="p">,</span> <span class="v">g</span><span class="p">:</span> <span class="n">200</span><span class="p">,</span> <span class="v">b</span><span class="p">:</span> <span class="n">255</span><span class="p">,</span> <span class="v">a</span><span class="p">:</span> <span class="n">255</span> <span class="p">},</span> <span class="k">true</span><span class="p">);</span>
+<span class="p">});</span>
+<span class="c">// 在 800×600 画布上每帧清屏并绘制一个青色圆</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- 版本历史 -->
+<section id="changelog">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">版本历史</span>
+      <h2>持续 <span class="text-grad">演进</span></h2>
+      <p>从 v1.2.0 的全栈能力铺陈，到 v1.3.0 的易用性与性能深耕，Lument 稳步向前。</p>
+    </div>
+    <div class="timeline">
+      <div class="tl-item reveal">
+        <div class="tl-ver"><span class="v">v1.2.0</span><span class="tag prev">上一稳定版</span></div>
+        <p style="color:var(--text-mute);font-size:14px">全栈能力成型：物理 / 音频 / 网络 / AI / ECS 齐备</p>
+        <ul>
+          <li>2D 物理模拟：刚体动力学、自定义阻尼、重力、碰撞检测与响应</li>
+          <li>3D 空间音频：MP3/WAV/OGG、空间定位、音量与音调控制</li>
+          <li>网络模块：HTTP/HTTPS 请求、WebSocket 长连接、数据同步</li>
+          <li>AI 模块：行为树、有限状态机、A* 寻路、黑板系统</li>
+          <li>图形渲染增强：后处理、粒子系统、精灵动画、纹理图集</li>
+          <li>ECS 系统：稀疏集合 O(1) 查找</li>
+        </ul>
+      </div>
+      <div class="tl-item cur reveal d1">
+        <div class="tl-ver"><span class="v cur">v1.3.0</span><span class="tag latest">最新版本</span></div>
+        <p style="color:var(--text-mute);font-size:14px">易用性与性能深耕：UI 自动化 · 渲染批处理 · 物理空间分区 · 工程化</p>
+        <ul>
+          <li>UI 系统自动化：9 类新控件、主题系统、auto-sizing、声明式 JSON 构建、FLOW 布局</li>
+          <li>基础渲染图元：circle / line / triangle / polygon / ellipse / point</li>
+          <li>手动批处理 API：beginBatch / batchQuad / endBatch，单次 drawCall</li>
+          <li>物理空间分区：Uniform Grid 与 Quadtree 宽相位、调试渲染、碰撞对计数</li>
+          <li>工程化：npm 包、TypeScript 类型定义、示例、62 项测试套件</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="cta-band reveal">
+      <h2>准备好用 <span class="text-grad">Lument</span> 构建你的下一款游戏了吗？</h2>
+      <p>免费、开源（MIT），一行命令引入，全平台运行。</p>
+      <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+        <a class="btn btn-primary" href="https://github.com/lument/lument" target="_blank" rel="noopener">前往 GitHub</a>
+        <a class="btn btn-outline" href="https://lument.uzens.cc.cd/" target="_blank" rel="noopener">访问文档</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- footer -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="#top"><span class="logo">L</span><span><span class="g">Lument</span> Engine</span></a>
+        <p>轻量级跨平台 2D 游戏引擎。一套 C ABI 核心，多语言、多平台、全栈能力。MIT 开源协议。</p>
+      </div>
+      <div class="foot-col">
+        <h4>产品</h4>
+        <a href="#features">新功能 v1.3.0</a>
+        <a href="#core">核心功能</a>
+        <a href="#platforms">平台支持</a>
+        <a href="#changelog">更新日志</a>
+      </div>
+      <div class="foot-col">
+        <h4>资源</h4>
+        <a href="https://github.com/lument/lument" target="_blank" rel="noopener">GitHub 仓库</a>
+        <a href="https://lument.uzens.cc.cd/" target="_blank" rel="noopener">开发文档</a>
+        <a href="#start">快速开始</a>
+        <a href="https://github.com/lument/lument/tree/main/examples" target="_blank" rel="noopener">示例代码</a>
+      </div>
+      <div class="foot-col">
+        <h4>社区</h4>
+        <a href="https://github.com/lument/lument/issues" target="_blank" rel="noopener">问题反馈</a>
+        <a href="https://github.com/lument/lument" target="_blank" rel="noopener">源代码</a>
+        <a href="https://lument.uzens.cc.cd/" target="_blank" rel="noopener">官网主页</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <div>© 2026 Lument Project · MIT License</div>
+      <div class="vinfo"><span class="badge-mini">v1.3.0</span><span>构建于 2026-08-28</span></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  /* sticky nav shadow */
+  var nav=document.getElementById('nav');
+  function onScroll(){ if(window.scrollY>20){nav.classList.add('scrolled')}else{nav.classList.remove('scrolled')} }
+  window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
+
+  /* mobile menu */
+  var burger=document.getElementById('burger');
+  var links=document.getElementById('navLinks');
+  burger.addEventListener('click',function(){ links.classList.toggle('open'); });
+  links.addEventListener('click',function(e){ if(e.target.tagName==='A'){ links.classList.remove('open'); } });
+
+  /* reveal on scroll */
+  var reveals=document.querySelectorAll('.reveal');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } });
+    },{threshold:0.12,rootMargin:'0px 0px -40px 0px'});
+    reveals.forEach(function(el){ io.observe(el); });
+  }else{
+    reveals.forEach(function(el){ el.classList.add('in'); });
+  }
+
+  /* copy code */
+  var copyBtn=document.getElementById('copyBtn');
+  var codeBlock=document.getElementById('codeBlock');
+  copyBtn.addEventListener('click',function(){
+    var text=codeBlock.innerText;
+    var done=function(){ copyBtn.textContent='已复制 ✓'; setTimeout(function(){ copyBtn.textContent='复制'; },1600); };
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done).catch(fallback); }
+    else{ fallback(); }
+    function fallback(){
+      var ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select();
+      try{ document.execCommand('copy'); done(); }catch(e){} document.body.removeChild(ta);
+    }
+  });
+
+  /* subtle parallax on hero orbs */
+  var orbs=document.querySelectorAll('.orb');
+  window.addEventListener('mousemove',function(e){
+    var x=(e.clientX/window.innerWidth-0.5), y=(e.clientY/window.innerHeight-0.5);
+    orbs.forEach(function(o,i){ var f=(i+1)*8; o.style.transform='translate('+(x*f)+'px,'+(y*f)+'px)'; });
+  },{passive:true});
+})();
+</script>
+</body>
+</html>
