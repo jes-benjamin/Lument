@@ -36,6 +36,15 @@ int main(){
     CHECK(lument_cube_get_mesh_index_count(sph)==384, "sphere(8) 索引数=384");
     LumentMesh pl=lument_cube_create_plane(4,4);
     CHECK(lument_cube_get_mesh_index_count(pl)==6, "plane 索引数=6");
+    LumentMesh cyl=lument_cube_create_cylinder(1.0f,1.0f,2.0f,12);
+    CHECK(lument_cube_get_mesh_vertex_count(cyl)==54, "cylinder(12) 顶点数=54 (侧壁26+顶盖14+底盖14)");
+    CHECK(lument_cube_get_mesh_index_count(cyl)==144, "cylinder(12) 索引数=144");
+    LumentMesh cone=lument_cube_create_cone(1.0f,2.0f,12);
+    CHECK(lument_cube_get_mesh_vertex_count(cone)==40, "cone(12) 顶点数=40 (无顶盖)");
+    CHECK(lument_cube_get_mesh_index_count(cone)==108, "cone(12) 索引数=108");
+    LumentMesh tor=lument_cube_create_torus(1.0f,0.3f,8,16);
+    CHECK(lument_cube_get_mesh_vertex_count(tor)==153, "torus(8,16) 顶点数=153");
+    CHECK(lument_cube_get_mesh_index_count(tor)==768, "torus(8,16) 索引数=768");
 
     // 2. OBJ（内存）
     printf("[OBJ]\n");
@@ -106,6 +115,25 @@ int main(){
     CHECK(V.m[14]<0,"look_at 摄像机后退 z"); // -dot(z,eye) <0
     LumentQuat q; lument_cube_quat_from_euler(&q,0,90,0); lument_cube_quat_normalize(&q);
     CHECK(q.w>0.7f&&q.y>0.7f,"四元数 绕Y 90° ≈ (0,0.707,0,0.707)");
+    LumentMat4 O; lument_cube_mat4_ortho(&O,-2.0f,2.0f,-1.0f,1.0f,0.1f,100.0f);
+    CHECK(O.m[0]>0.49f&&O.m[0]<0.51f,"正交矩阵 m[0]=2/(r-l)=0.5");
+    CHECK(O.m[5]>0.99f&&O.m[5]<1.01f,"正交矩阵 m[5]=2/(t-b)=1");
+    CHECK(O.m[11]==0.0f,"正交矩阵 m[11]=0（区别于透视的 -1）");
+
+    // 7. 相机投影与渲染状态
+    printf("[相机/渲染状态]\n");
+    LumentCamera3DHandle cam=lument_cube_create_camera();
+    CHECK(cam!=0,"创建相机成功");
+    LumentCamera3D cd; lument_cube_get_camera(cam,&cd);
+    CHECK(cd.projection==LUMENT_CUBE_PROJECTION_PERSPECTIVE,"相机默认透视投影");
+    lument_cube_set_camera_projection(cam,LUMENT_CUBE_PROJECTION_ORTHO);
+    lument_cube_get_camera(cam,&cd);
+    CHECK(cd.projection==LUMENT_CUBE_PROJECTION_ORTHO,"切换为正交投影成功");
+    CHECK(lument_cube_get_wireframe()==false,"默认关闭线框");
+    lument_cube_set_wireframe(true);
+    CHECK(lument_cube_get_wireframe()==true,"开启线框成功");
+    lument_cube_set_wireframe(false);
+    CHECK(lument_cube_get_wireframe()==false,"关闭线框成功");
 
     // 7. 格式枚举
     printf("[格式]\n");

@@ -5570,6 +5570,12 @@ const Lument = (function() {
                 m[8]=r[6]*scl[2];m[9]=r[7]*scl[2];m[10]=r[8]*scl[2];
                 m[12]=pos[0];m[13]=pos[1];m[14]=pos[2];m[15]=1; return m;
             },
+            ortho(left,right,bottom,top,near,far){
+                const m=new Float32Array(16);
+                m[0]=2/(right-left); m[5]=2/(top-bottom); m[10]=-2/(far-near);
+                m[12]=-(right+left)/(right-left); m[13]=-(top+bottom)/(top-bottom); m[14]=-(far+near)/(far-near); m[15]=1;
+                return m;
+            },
         };
 
         // ---------- 图元 ----------
@@ -5586,12 +5592,12 @@ const Lument = (function() {
                      1,0,0,1,0,0,1,0,0,1,0,0, -1,0,0,-1,0,0,-1,0,0,-1,0,0];
             const uv=new Array(24*2).fill(0);
             const idx=[]; for(let i=0;i<6;i++){ const b=i*4; idx.push(b,b+1,b+2,b,b+2,b+3); }
-            return { positions:v, normals:n, uvs:uv, indices:idx };
+            const r={ positions:v, normals:n, uvs:uv, indices:idx }; r.bounds=computeBounds(r); return r;
         }
         function makePlane(w,h){ const hw=w/2,hh=h/2;
             const v=[-hw,-hh,0, hw,-hh,0, hw,hh,0, -hw,hh,0]; const n=[0,0,1,0,0,1,0,0,1,0,0,1];
             const uv=[0,0,1,0,1,1,0,1]; const idx=[0,1,2,0,2,3];
-            return { positions:v, normals:n, uvs:uv, indices:idx };
+            const rp={ positions:v, normals:n, uvs:uv, indices:idx }; rp.bounds=computeBounds(rp); return rp;
         }
         function makeSphere(radius,seg){ if(seg<3)seg=3;
             const positions=[],normals=[],uvs=[],indices=[];
@@ -5602,7 +5608,43 @@ const Lument = (function() {
             const stride=seg+1;
             for(let y=0;y<seg;y++) for(let x=0;x<seg;x++){ const a=y*stride+x,b=a+1,c=a+stride,d=c+1;
                 indices.push(a,c,b,b,c,d); }
-            return { positions, normals, uvs, indices };
+            const rs={ positions, normals, uvs, indices }; rs.bounds=computeBounds(rs); return rs;
+        }
+        // 旋转体：圆柱 / 圆锥（rTop=0 即圆锥），带上下盖
+        function makeCylinder(rTop,rBottom,h,seg){ if(seg<3)seg=3;
+            const positions=[],normals=[],uvs=[],indices=[];
+            const hh=h/2, dr=rBottom-rTop, len=Math.sqrt(h*h+dr*dr)||1;
+            for(let y=0;y<=1;y++){ const r=(y===0)?rTop:rBottom;
+                for(let x=0;x<=seg;x++){ const u=x/seg, th=u*2*Math.PI, ct=Math.cos(th), st=Math.sin(th);
+                    positions.push(ct*r, hh-y*h, st*r);
+                    // 侧面法线：((h*ct, dr, h*st) 归一化) —— 兼容斜面（圆锥）
+                    normals.push(h*ct/len, dr/len, h*st/len); uvs.push(u, 1-y); } }
+            for(let x=0;x<seg;x++){ const a=x,b=a+1,c=a+seg+1,d=c+1; indices.push(a,c,b,b,c,d); }
+            // 顶盖（法线 +Y）
+            if(rTop>0){ const baseT=positions.length/3; positions.push(0,hh,0); normals.push(0,1,0); uvs.push(0.5,0.5);
+                for(let x=0;x<=seg;x++){ const th=x/seg*2*Math.PI; positions.push(Math.cos(th)*rTop,hh,Math.sin(th)*rTop);
+                    normals.push(0,1,0); uvs.push(Math.cos(th)*0.5+0.5,Math.sin(th)*0.5+0.5); }
+                for(let x=0;x<seg;x++) indices.push(baseT, baseT+1+x+1, baseT+1+x); }   // CCW → +Y
+            // 底盖（法线 -Y）
+            if(rBottom>0){ const baseB=positions.length/3; positions.push(0,-hh,0); normals.push(0,-1,0); uvs.push(0.5,0.5);
+                for(let x=0;x<=seg;x++){ const th=x/seg*2*Math.PI; positions.push(Math.cos(th)*rBottom,-hh,Math.sin(th)*rBottom);
+                    normals.push(0,-1,0); uvs.push(Math.cos(th)*0.5+0.5,Math.sin(th)*0.5+0.5); }
+                for(let x=0;x<seg;x++) indices.push(baseB, baseB+1+x, baseB+1+x+1); }  // CW → -Y
+            const rc={ positions, normals, uvs, indices }; rc.bounds=computeBounds(rc); return rc;
+        }
+        function makeCone(radius,h,seg){ return makeCylinder(0,radius,h,seg); }
+        // 环面（甜甜圈）
+        function makeTorus(radius,tube,radialSeg,tubularSeg){
+            if(radialSeg<3)radialSeg=3; if(tubularSeg<3)tubularSeg=3;
+            const positions=[],normals=[],uvs=[],indices=[];
+            for(let j=0;j<=tubularSeg;j++){ const u=j/tubularSeg*Math.PI*2, cu=Math.cos(u), su=Math.sin(u);
+                for(let i=0;i<=radialSeg;i++){ const v=i/radialSeg*Math.PI*2, cv=Math.cos(v), sv=Math.sin(v);
+                    positions.push((radius+tube*cv)*cu, tube*sv, (radius+tube*cv)*su);
+                    normals.push(cv*cu, sv, cv*su); uvs.push(j/tubularSeg, i/radialSeg); } }
+            for(let j=0;j<tubularSeg;j++) for(let i=0;i<radialSeg;i++){
+                const a=j*(radialSeg+1)+i, b=a+1, c=a+radialSeg+1, d=c+1;
+                indices.push(a,c,b, b,c,d); }
+            const rt={ positions, normals, uvs, indices }; rt.bounds=computeBounds(rt); return rt;
         }
 
         // ---------- 加载器 ----------
@@ -5799,7 +5841,21 @@ const Lument = (function() {
             m._pos=mk(m.positions,3); m._nrm=mk(m.normals&&m.normals.length?m.normals:m.positions.map(()=>0),3);
             m._uv=mk(m.uvs&&m.uvs.length?m.uvs:new Array(m.positions.length/3*2).fill(0),2);
             const ib=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint32Array(m.indices),gl.STATIC_DRAW);
-            m._ib=ib; m._count=m.indices.length; m._gl=true; m._vao=vao; gl.bindVertexArray(null);
+            m._ib=ib; m._count=m.indices.length; m._gl=true; m._vao=vao;
+            // 线框：由三角形索引提取唯一边（每条边只保留一次，避免重复绘制）
+            if(!m.isLines){
+                const seen=new Set(), edges=[];
+                for(let i=0;i+2<m.indices.length;i+=3){
+                    const t=[m.indices[i],m.indices[i+1],m.indices[i+2]];
+                    for(let e=0;e<3;e++){ const a=t[e], b=t[(e+1)%3];
+                        const key=(a<b)?(a+'_'+b):(b+'_'+a);
+                        if(!seen.has(key)){ seen.add(key); edges.push(a,b); } }
+                }
+                const wib=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,wib);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint32Array(edges),gl.STATIC_DRAW);
+                m._wireIb=wib; m._wireCount=edges.length;
+            }
+            gl.bindVertexArray(null);
         }
         function loadTexture(url){
             return new Promise((resolve)=>{ const img=new Image(); img.crossOrigin='anonymous'; img.onload=()=>{
@@ -5808,7 +5864,11 @@ const Lument = (function() {
                 img.onerror=()=>resolve(null); img.src=url; });
         }
         function drawMesh(m, mvp, model, mat){
-            uploadMesh(m); gl.bindVertexArray(m._vao);
+            uploadMesh(m);
+            // 线框/线段模式：禁用光照与贴图，使用统一线条颜色，保证线条清晰
+            const lineMode = (wireframe && m._wireIb) || m.isLines;
+            const col = (lineMode && mat.wireColor) ? mat.wireColor : (mat.baseColor||[1,1,1]);
+            gl.bindVertexArray(m._vao);
             gl.useProgram(prog);
             const aPos=gl.getAttribLocation(prog,'aPos'), aN=gl.getAttribLocation(prog,'aNormal'), aUV=gl.getAttribLocation(prog,'aUV');
             gl.bindBuffer(gl.ARRAY_BUFFER,m._pos.b); gl.enableVertexAttribArray(aPos); gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,0,0);
@@ -5817,11 +5877,11 @@ const Lument = (function() {
             gl.uniformMatrix4fv(gl.getUniformLocation(prog,'uMVP'),false,mvp);
             gl.uniformMatrix4fv(gl.getUniformLocation(prog,'uModel'),false,model);
             gl.uniform3f(gl.getUniformLocation(prog,'uCamPos'), 0,0,5);
-            gl.uniform3f(gl.getUniformLocation(prog,'uBaseColor'), (mat.baseColor?mat.baseColor[0]:1),(mat.baseColor?mat.baseColor[1]:1),(mat.baseColor?mat.baseColor[2]:1));
-            gl.uniform1f(gl.getUniformLocation(prog,'uMetallic'), mat.metallic||0);
-            gl.uniform1f(gl.getUniformLocation(prog,'uRoughness'), mat.roughness==null?1:mat.roughness);
-            gl.uniform3fv(gl.getUniformLocation(prog,'uAmbient'), ambient);
-            const nl=Math.min(lights.length,4); gl.uniform1i(gl.getUniformLocation(prog,'uNumLights'), nl);
+            gl.uniform3f(gl.getUniformLocation(prog,'uBaseColor'), col[0],col[1],col[2]);
+            gl.uniform1f(gl.getUniformLocation(prog,'uMetallic'), lineMode?0:(mat.metallic||0));
+            gl.uniform1f(gl.getUniformLocation(prog,'uRoughness'), lineMode?1:(mat.roughness==null?1:mat.roughness));
+            gl.uniform3fv(gl.getUniformLocation(prog,'uAmbient'), lineMode?[1,1,1]:ambient);
+            const nl=Math.min(lights.length,4); gl.uniform1i(gl.getUniformLocation(prog,'uNumLights'), lineMode?0:nl);
             const lp=[],lc=[],li=[],lt=[]; for(let i=0;i<4;i++){ const L=lights[i]||{pos:[0,5,0],color:[1,1,1],intensity:1,type:0};
                 lp.push(...(L.pos||[0,5,0])); lc.push(...(L.color||[1,1,1])); li.push(L.intensity==null?1:L.intensity); lt.push(L.type||0); }
             gl.uniform3fv(gl.getUniformLocation(prog,'uLightPos'), lp);
@@ -5829,13 +5889,64 @@ const Lument = (function() {
             gl.uniform1fv(gl.getUniformLocation(prog,'uLightIntensity'), li);
             gl.uniform1iv(gl.getUniformLocation(prog,'uLightType'), lt);
             // 纹理
-            let hasTex=(mat.albedoMap)?1:0;
+            let hasTex=(mat.albedoMap)?1:0; if(lineMode) hasTex=0;
             gl.activeTexture(gl.TEXTURE0);
-            if(mat.albedoMap) gl.bindTexture(gl.TEXTURE_2D,mat.albedoMap); else gl.bindTexture(gl.TEXTURE_2D,null);
+            if(mat.albedoMap&&!lineMode) gl.bindTexture(gl.TEXTURE_2D,mat.albedoMap); else gl.bindTexture(gl.TEXTURE_2D,null);
             gl.uniform1i(gl.getUniformLocation(prog,'uHasAlbedo'), hasTex);
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,m._ib);
-            gl.drawElements(gl.TRIANGLES, m._count, gl.UNSIGNED_INT, 0);
+            if(lineMode && !m.isLines){ gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,m._wireIb); gl.drawElements(gl.LINES, m._wireCount, gl.UNSIGNED_INT, 0); }
+            else if(m.isLines){ gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,m._ib); gl.drawElements(gl.LINES, m._count, gl.UNSIGNED_INT, 0); }
+            else { gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,m._ib); gl.drawElements(gl.TRIANGLES, m._count, gl.UNSIGNED_INT, 0); }
             gl.bindVertexArray(null);
+        }
+
+        // ---------- 渲染状态 ----------
+        let wireframe=false, cullEnabled=true, bgColor=[0.06,0.06,0.12,1];
+        const cullStats={ nodes:0, visible:0, culled:0, drawCalls:0, triangles:0 };
+
+        // ---------- 网格地面（线框辅助） ----------
+        function makeGrid(size,divisions){
+            const half=size/2, step=size/divisions, positions=[],normals=[],uvs=[],indices=[];
+            for(let i=0,v=0;i<=divisions;i++,v+=step){
+                const p=-half+v;
+                positions.push(p,0,-half, p,0,half); normals.push(0,1,0,0,1,0); uvs.push(0,0,1,1);
+                positions.push(-half,0,p, half,0,p); normals.push(0,1,0,0,1,0); uvs.push(0,0,1,1);
+                indices.push(i*4,i*4+1, i*4+2,i*4+3);
+            }
+            const g={ positions, normals, uvs, indices, isLines:true }; g.bounds=computeBounds(g); return g;
+        }
+        const gridMesh=makeGrid(20,20);
+        const gridMaterial={ wireColor:[0.18,0.22,0.32], roughness:1 };
+        let gridEnabled=true;
+
+        // ---------- 视锥剔除 ----------
+        // Gribb-Hartmann：由 viewProj 提取 6 个裁剪平面（列主序取行）
+        function extractFrustum(vp){
+            const row=(i)=>[vp[i],vp[4+i],vp[8+i],vp[12+i]];
+            const r0=row(0),r1=row(1),r2=row(2),r3=row(3);
+            const comb=(a,b,s)=>{ const p=[a[0]+s*b[0],a[1]+s*b[1],a[2]+s*b[2],a[3]+s*b[3]];
+                const l=Math.sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])||1; return [p[0]/l,p[1]/l,p[2]/l,p[3]/l]; };
+            return [ comb(r3,r0,1), comb(r3,r0,-1), comb(r3,r1,1), comb(r3,r1,-1), comb(r3,r2,1), comb(r3,r2,-1) ];
+        }
+        // 局部包围盒经世界矩阵变换后的 AABB（8 角）
+        function worldAABB(b,m){
+            const mn=[1e30,1e30,1e30], mx=[-1e30,-1e30,-1e30];
+            for(let i=0;i<8;i++){
+                const x=(i&1)?b.max[0]:b.min[0], y=(i&2)?b.max[1]:b.min[1], z=(i&4)?b.max[2]:b.min[2];
+                const wx=m[0]*x+m[4]*y+m[8]*z+m[12];
+                const wy=m[1]*x+m[5]*y+m[9]*z+m[13];
+                const wz=m[2]*x+m[6]*y+m[10]*z+m[14];
+                if(wx<mn[0])mn[0]=wx; if(wy<mn[1])mn[1]=wy; if(wz<mn[2])mn[2]=wz;
+                if(wx>mx[0])mx[0]=wx; if(wy>mx[1])mx[1]=wy; if(wz>mx[2])mx[2]=wz;
+            }
+            return {min:mn,max:mx};
+        }
+        // AABB 与 6 平面相交测试（positive-vertex 法）
+        function visibleFrustum(b,planes){
+            for(const p of planes){
+                const px=p[0]>0?b.max[0]:b.min[0], py=p[1]>0?b.max[1]:b.min[1], pz=p[2]>0?b.max[2]:b.min[2];
+                if(p[0]*px+p[1]*py+p[2]*pz+p[3] < 0) return false;
+            }
+            return true;
         }
 
         // ---------- 场景图 ----------
@@ -5844,14 +5955,23 @@ const Lument = (function() {
         function nodeSetModel(n,model){ n.model=model; }
         function nodeAddChild(n,c){ c.parent=n; n.children.push(c); }
 
-        // 递归绘制节点
-        function renderNode(n, viewProj, parentM){
+        // 递归绘制节点（含视锥剔除）
+        function renderNode(n, viewProj, parentM, planes){
             if(!n.visible) return;
             const localM=M4.fromTRS(n.position,n.euler,n.scale);
             const worldM=(parentM)?M4.mul(parentM,localM):localM;
-            if(n.mesh){ const mvp=M4.mul(viewProj,worldM); drawMesh(n.mesh, mvp, worldM, n.material||{}); }
-            if(n.model){ for(let i=0;i<n.model.meshes.length;i++){ const mvp=M4.mul(viewProj,worldM); drawMesh(n.model.meshes[i], mvp, worldM, n.model.materials[i]||{}); } }
-            for(const c of n.children) renderNode(c, viewProj, worldM);
+            if(planes){
+                cullStats.nodes++;
+                const b = n.mesh ? n.mesh.bounds : (n.model ? n.model.bounds : null);
+                if(b && !visibleFrustum(worldAABB(b,worldM), planes)){ cullStats.culled++; return; } // 子树整体剔除
+                cullStats.visible++;
+            }
+            if(n.mesh){ const mvp=M4.mul(viewProj,worldM); drawMesh(n.mesh, mvp, worldM, n.material||{});
+                cullStats.drawCalls++; cullStats.triangles += (wireframe?0:Math.floor(n.mesh.indices.length/3)); }
+            if(n.model){ for(let i=0;i<n.model.meshes.length;i++){ const mvp=M4.mul(viewProj,worldM);
+                drawMesh(n.model.meshes[i], mvp, worldM, n.model.materials[i]||{});
+                cullStats.drawCalls++; cullStats.triangles += (wireframe?0:Math.floor(n.model.meshes[i].indices.length/3)); } }
+            for(const c of n.children) renderNode(c, viewProj, worldM, planes);
         }
 
         // ---------- 公开 API ----------
@@ -5888,6 +6008,10 @@ const Lument = (function() {
             createBox:(sx,sy,sz)=>makeBox(sx,sy,sz),
             createPlane:(w,h)=>makePlane(w,h),
             createSphere:(r,s)=>makeSphere(r,s),
+            createCylinder:(rt,rb,h,s)=>makeCylinder(rt,rb,h,s),
+            createCone:(r,h,s)=>makeCone(r,h,s),
+            createTorus:(r,t,rs,ts)=>makeTorus(r,t,rs,ts),
+            createGrid:(size,div)=>makeGrid(size,div),
             // 模型加载
             loadModel, parseGLTF, parseGLB, parseOBJ, parseSTL, parsePLY, parsePLYBinary,
             // 场景图
@@ -5898,12 +6022,29 @@ const Lument = (function() {
             clearLights:()=>{ lights.length=0; },
             render:(camera, rootNode)=>{
                 if(!gl) return; gl.viewport(0,0,canvas.width,canvas.height);
-                gl.clearColor(0.06,0.06,0.12,1); gl.enable(gl.DEPTH_TEST); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+                gl.clearColor(bgColor[0],bgColor[1],bgColor[2],bgColor[3]);
+                gl.enable(gl.DEPTH_TEST); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
                 const eye=camera.position, ctr=camera.target, up=camera.up||[0,1,0];
-                const proj=M4.perspective(camera.fovY||60, canvas.width/canvas.height, camera.near||0.1, camera.far||100);
+                const aspect=canvas.width/canvas.height;
+                // 0=透视 1=正交
+                const proj = (camera.projection===1)
+                    ? (()=>{ const h=(camera.orthoHeight||4)/2, w=h*aspect; return M4.ortho(-w,w,-h,h,camera.near||0.1,camera.far||100); })()
+                    : M4.perspective(camera.fovY||60, aspect, camera.near||0.1, camera.far||100);
                 const view=M4.lookAt(eye,ctr,up); const vp=M4.mul(proj,view);
-                renderNode(rootNode, vp, null);
+                cullStats.nodes=0; cullStats.visible=0; cullStats.culled=0; cullStats.drawCalls=0; cullStats.triangles=0;
+                const planes = cullEnabled ? extractFrustum(vp) : null;
+                if(gridEnabled){ drawMesh(gridMesh, vp, M4.identity(), gridMaterial); cullStats.drawCalls++; }
+                renderNode(rootNode, vp, null, planes);
             },
+            // 渲染状态
+            setWireframe:(v)=>{ wireframe=!!v; },
+            getWireframe:()=>wireframe,
+            setBackground:(c)=>{ bgColor=c||[0.06,0.06,0.12,1]; },
+            setGrid:(v)=>{ gridEnabled=!!v; },
+            getGrid:()=>gridEnabled,
+            setCulling:(v)=>{ cullEnabled=!!v; },
+            getCullStats:()=>({ nodes:cullStats.nodes, visible:cullStats.visible, culled:cullStats.culled, drawCalls:cullStats.drawCalls, triangles:cullStats.triangles }),
+            PROJECTION:{ perspective:0, ortho:1 },
             supportedFormats,
         };
     })();

@@ -190,6 +190,11 @@ void mat4_invert(float* m){
     float id=1.0f/det;
     for(int i=0;i<16;++i) m[i]=inv[i]*id;
 }
+void mat4_ortho(float* m,float l,float r,float b,float t,float n,float f){
+    std::memset(m,0,16*sizeof(float));
+    m[0]=2.0f/(r-l); m[5]=2.0f/(t-b); m[10]=-2.0f/(f-n);
+    m[12]=-(r+l)/(r-l); m[13]=-(t+b)/(t-b); m[14]=-(f+n)/(f-n); m[15]=1.0f;
+}
 void quat_from_euler(float* q,float pitchDeg,float yawDeg,float rollDeg){
     float p=pitchDeg*3.14159265f/180.0f, y=yawDeg*3.14159265f/180.0f, r=rollDeg*3.14159265f/180.0f;
     float sp=std::sin(p*0.5f),cp=std::cos(p*0.5f);
@@ -234,6 +239,8 @@ struct MeshData {
     bool                hasUVs=false;
     // GL 资源（仅 GLES2 后端使用）
     unsigned int vboPos=0, vboNrm=0, vboUV=0, ibo=0;
+    unsigned int wireIbo=0;            // 线框边索引缓冲
+    unsigned int wireCount=0;          // 线框边数量
     bool         gpuUploaded=false;
 };
 
@@ -252,6 +259,7 @@ struct NodeData {
     float scl[3]={1,1,1};
     float worldPos[3]={0,0,0};
     float worldMat[16];
+    LumentAABB worldBounds = { {1e30f,1e30f,1e30f},{-1e30f,-1e30f,-1e30f} };
     LumentMesh mesh=0;
     LumentMaterial material=0;
     LumentModel model=0;
@@ -286,6 +294,8 @@ std::vector<LightData> g_lights;
 float g_ambientColor[3]={0.15f,0.15f,0.15f}; float g_ambientI=1.0f;
 
 bool g_cubeInit=false;
+bool g_wireframe=false;          // 线框渲染全局开关
+int  g_cullTotal=0, g_cullVisible=0;  // 上一帧视锥剔除统计
 
 // ---------- 工具 ----------
 bool read_file(const std::string& path,std::vector<uint8_t>& out){
@@ -883,6 +893,85 @@ void make_sphere(float radius,int seg, MeshData* m){
         m->indices.push_back(b);m->indices.push_back(c);m->indices.push_back(d);
     }
 }
+
+void make_cylinder(float rTop, float rBot, float h, int seg, MeshData* m){
+    const float PI=3.14159265f;
+    if(seg<3) seg=3;
+    float halfH=h*0.5f;
+    int ring=seg+1;
+    for(int i=0;i<=seg;++i){
+        float a=(float)i/(float)seg*2.0f*PI;
+        float cx=std::cos(a), cz=std::sin(a);
+        float nl=std::sqrt(cx*cx+cz*cz); nl=(nl>1e-5f)?nl:1.0f;
+        // 顶圈
+        m->positions.push_back(rTop*cx); m->positions.push_back(halfH); m->positions.push_back(rTop*cz);
+        m->normals.push_back(cx/nl); m->normals.push_back(0); m->normals.push_back(cz/nl);
+        m->uvs.push_back((float)i/(float)seg); m->uvs.push_back(1);
+        // 底圈
+        m->positions.push_back(rBot*cx); m->positions.push_back(-halfH); m->positions.push_back(rBot*cz);
+        m->normals.push_back(cx/nl); m->normals.push_back(0); m->normals.push_back(cz/nl);
+        m->uvs.push_back((float)i/(float)seg); m->uvs.push_back(0);
+    }
+    for(int i=0;i<seg;++i){
+        int t0=2*i, b0=2*i+1, t1=2*i+2, b1=2*i+3;
+        m->indices.push_back(t0); m->indices.push_back(b0); m->indices.push_back(b1);
+        m->indices.push_back(t0); m->indices.push_back(b1); m->indices.push_back(t1);
+    }
+    // 顶盖（rTop>0）
+    if(rTop>1e-5f){
+        int center=(int)(m->positions.size()/3);
+        m->positions.push_back(0); m->positions.push_back(halfH); m->positions.push_back(0);
+        m->normals.push_back(0); m->normals.push_back(1); m->normals.push_back(0);
+        m->uvs.push_back(0.5f); m->uvs.push_back(0.5f);
+        int base=(int)(m->positions.size()/3);
+        for(int i=0;i<=seg;++i){
+            float a=(float)i/(float)seg*2.0f*PI;
+            m->positions.push_back(rTop*std::cos(a)); m->positions.push_back(halfH); m->positions.push_back(rTop*std::sin(a));
+            m->normals.push_back(0); m->normals.push_back(1); m->normals.push_back(0);
+            m->uvs.push_back(std::cos(a)*0.5f+0.5f); m->uvs.push_back(std::sin(a)*0.5f+0.5f);
+        }
+        for(int i=0;i<seg;++i){ m->indices.push_back(center); m->indices.push_back(base+i); m->indices.push_back(base+i+1); }
+    }
+    // 底盖（rBot>0）
+    if(rBot>1e-5f){
+        int center=(int)(m->positions.size()/3);
+        m->positions.push_back(0); m->positions.push_back(-halfH); m->positions.push_back(0);
+        m->normals.push_back(0); m->normals.push_back(-1); m->normals.push_back(0);
+        m->uvs.push_back(0.5f); m->uvs.push_back(0.5f);
+        int base=(int)(m->positions.size()/3);
+        for(int i=0;i<=seg;++i){
+            float a=(float)i/(float)seg*2.0f*PI;
+            m->positions.push_back(rBot*std::cos(a)); m->positions.push_back(-halfH); m->positions.push_back(rBot*std::sin(a));
+            m->normals.push_back(0); m->normals.push_back(-1); m->normals.push_back(0);
+            m->uvs.push_back(std::cos(a)*0.5f+0.5f); m->uvs.push_back(std::sin(a)*0.5f+0.5f);
+        }
+        for(int i=0;i<seg;++i){ m->indices.push_back(center); m->indices.push_back(base+i+1); m->indices.push_back(base+i); }
+    }
+}
+
+void make_torus(float R, float r, int radialSeg, int tubularSeg, MeshData* m){
+    const float PI=3.14159265f;
+    if(radialSeg<3) radialSeg=3;
+    if(tubularSeg<3) tubularSeg=3;
+    int ring=radialSeg+1;
+    for(int i=0;i<=tubularSeg;++i){
+        float u=(float)i/(float)tubularSeg*2.0f*PI;
+        float cu=std::cos(u), su=std::sin(u);
+        for(int j=0;j<=radialSeg;++j){
+            float v=(float)j/(float)radialSeg*2.0f*PI;
+            float cv=std::cos(v), sv=std::sin(v);
+            float x=(R + r*cv)*cu, y=r*sv, z=(R + r*cv)*su;
+            m->positions.push_back(x); m->positions.push_back(y); m->positions.push_back(z);
+            m->normals.push_back(cv*cu); m->normals.push_back(sv); m->normals.push_back(cv*su);
+            m->uvs.push_back((float)i/(float)tubularSeg); m->uvs.push_back((float)j/(float)radialSeg);
+        }
+    }
+    for(int i=0;i<tubularSeg;++i) for(int j=0;j<radialSeg;++j){
+        int a=i*ring+j, b=a+ring, c=a+1, d=b+1;
+        m->indices.push_back(a); m->indices.push_back(b); m->indices.push_back(d);
+        m->indices.push_back(a); m->indices.push_back(d); m->indices.push_back(c);
+    }
+}
 } // namespace
 
 // ============================================================
@@ -944,6 +1033,17 @@ void upload_mesh_gl(MeshData* m){
     glGenBuffers(1,&m->vboNrm); glBindBuffer(GL_ARRAY_BUFFER,m->vboNrm); glBufferData(GL_ARRAY_BUFFER,m->normals.size()*4,m->normals.data(),GL_STATIC_DRAW);
     glGenBuffers(1,&m->vboUV); glBindBuffer(GL_ARRAY_BUFFER,m->vboUV); glBufferData(GL_ARRAY_BUFFER,m->uvs.size()*4,m->uvs.data(),GL_STATIC_DRAW);
     glGenBuffers(1,&m->ibo); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,m->ibo); glBufferData(GL_ELEMENT_ARRAY_BUFFER,m->indices.size()*4,m->indices.data(),GL_STATIC_DRAW);
+    // 线框边索引（每个三角形 3 条边的端点，绘制时按需切换为 GL_LINES）
+    std::vector<uint32_t> edges; edges.reserve(m->indices.size()*2);
+    for(size_t i=0;i+2<m->indices.size();i+=3){
+        uint32_t a=m->indices[i],b=m->indices[i+1],c=m->indices[i+2];
+        edges.push_back(a);edges.push_back(b);
+        edges.push_back(b);edges.push_back(c);
+        edges.push_back(c);edges.push_back(a);
+    }
+    glGenBuffers(1,&m->wireIbo); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,m->wireIbo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,edges.size()*4,edges.data(),GL_STATIC_DRAW);
+    m->wireCount=(unsigned int)edges.size();
     m->gpuUploaded=true;
 }
 void render_mesh_gl(MeshData* m,const float* mvp,const float* model,const LumentCubeMaterial* mat){
@@ -972,7 +1072,12 @@ void render_mesh_gl(MeshData* m,const float* mvp,const float* model,const Lument
     glBindBuffer(GL_ARRAY_BUFFER,m->vboNrm); glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,0);
     glBindBuffer(GL_ARRAY_BUFFER,m->vboUV); glEnableVertexAttribArray(2); glVertexAttribPointer(2,2,GL_FLOAT,GL_FALSE,0,0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,m->ibo);
-    glDrawElements(GL_TRIANGLES,(GLsizei)m->indices.size(),GL_UNSIGNED_INT,0);
+    if(g_wireframe && m->wireIbo){
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,m->wireIbo);
+        glDrawElements(GL_LINES,(GLsizei)m->wireCount,GL_UNSIGNED_INT,0);
+    } else {
+        glDrawElements(GL_TRIANGLES,(GLsizei)m->indices.size(),GL_UNSIGNED_INT,0);
+    }
     glDisableVertexAttribArray(0);glDisableVertexAttribArray(1);glDisableVertexAttribArray(2);
 }
 } // namespace
@@ -992,8 +1097,65 @@ void compute_world(NodeData* n,const float* parentWorld){
     math3d::mat4_mul(n->worldMat, parentWorld, local);
     n->worldPos[0]=n->worldMat[12]; n->worldPos[1]=n->worldMat[13]; n->worldPos[2]=n->worldMat[14];
 }
-void draw_node(NodeData* n,const float* viewProj){
+
+// 从 viewProj（列主序）提取 6 个视锥平面（Gribb-Hartmann 法），每个平面 (a,b,c,d)。
+void extract_frustum(const float* m, float* planes){
+    auto getRow=[&](int r, float* o){ o[0]=m[r]; o[1]=m[4+r]; o[2]=m[8+r]; o[3]=m[12+r]; };
+    float r0[4],r1[4],r2[4],r3[4]; getRow(0,r0);getRow(1,r1);getRow(2,r2);getRow(3,r3);
+    int idx[6]={0,0,1,1,2,2}; int sign[6]={1,-1,1,-1,1,-1}; // left,right,bottom,top,near,far
+    for(int i=0;i<6;++i){
+        float* P=planes+i*4; const float* rrow=(idx[i]==0?r0:(idx[i]==1?r1:r2)); float s=sign[i];
+        P[0]=r3[0]+s*rrow[0]; P[1]=r3[1]+s*rrow[1]; P[2]=r3[2]+s*rrow[2]; P[3]=r3[3]+s*rrow[3];
+        float len=std::sqrt(P[0]*P[0]+P[1]*P[1]+P[2]*P[2]);
+        if(len>1e-8f){ P[0]/=len; P[1]/=len; P[2]/=len; P[3]/=len; }
+    }
+}
+
+// 计算节点的世界包围盒（基于其 mesh/model 的本地包围盒经 worldMat 仿射变换）。
+// 若节点自身无几何（仅作 group），返回无效包围盒（调用方据此不剔除）。
+LumentAABB compute_node_world_bounds(NodeData* n){
+    LumentAABB local = { {1e30f,1e30f,1e30f},{-1e30f,-1e30f,-1e30f} };
+    bool has=false;
+    if(n->mesh){ MeshData* m=g_meshes.get(n->mesh); if(m){ local=m->bounds; has=true; } }
+    else if(n->model){ ModelData* md=g_models.get(n->model); if(md){ local=md->bounds; has=true; } }
+    LumentAABB out = { {1e30f,1e30f,1e30f},{-1e30f,-1e30f,-1e30f} };
+    if(!has) return out;
+    const float* M=n->worldMat;
+    for(int c=0;c<8;++c){
+        float lx=(c&1)?local.max.x:local.min.x;
+        float ly=(c&2)?local.max.y:local.min.y;
+        float lz=(c&4)?local.max.z:local.min.z;
+        float wx=M[0]*lx+M[4]*ly+M[8]*lz+M[12];
+        float wy=M[1]*lx+M[5]*ly+M[9]*lz+M[13];
+        float wz=M[2]*lx+M[6]*ly+M[10]*lz+M[14];
+        if(wx<out.min.x)out.min.x=wx; if(wx>out.max.x)out.max.x=wx;
+        if(wy<out.min.y)out.min.y=wy; if(wy>out.max.y)out.max.y=wy;
+        if(wz<out.min.z)out.min.z=wz; if(wz>out.max.z)out.max.z=wz;
+    }
+    return out;
+}
+
+// 测试 AABB 是否在视锥内（任一平面外则整体剔除）。
+bool aabb_in_frustum(const LumentAABB& b, const float* planes){
+    if(b.min.x>b.max.x) return true; // 无效包围盒：不剔除（group 节点继续递归）
+    for(int i=0;i<6;++i){
+        const float* p=planes+i*4;
+        float mx = p[0]>=0?b.max.x:b.min.x;
+        float my = p[1]>=0?b.max.y:b.min.y;
+        float mz = p[2]>=0?b.max.z:b.min.z;
+        if(p[0]*mx + p[1]*my + p[2]*mz + p[3] < 0.0f) return false;
+    }
+    return true;
+}
+void draw_node(NodeData* n,const float* viewProj, const float* planes){
     if(!n->visible) return;
+    // 视锥剔除：基于本节点世界包围盒，整体跳过（含子树）；group 节点（无几何）继续递归。
+    if(planes){
+        ++g_cullTotal;
+        n->worldBounds = compute_node_world_bounds(n);
+        if(!aabb_in_frustum(n->worldBounds, planes)){ return; }
+        ++g_cullVisible;
+    }
     // 绘制自身 mesh / model
     if(n->mesh){
         float mvp[16]; math3d::mat4_mul(mvp, viewProj, n->worldMat);
@@ -1022,7 +1184,8 @@ void draw_node(NodeData* n,const float* viewProj){
             }
         }
     }
-    for(int c:n->children){ NodeData* cn=g_nodes.get((uint32_t)(c+1)); if(cn) draw_node(cn,viewProj); }
+    // 递归子节点：先以本节点世界矩阵为父，级联计算子节点世界变换（修复层级变换）。
+    for(int c:n->children){ NodeData* cn=g_nodes.get((uint32_t)(c+1)); if(cn){ compute_world(cn,n->worldMat); draw_node(cn,viewProj,planes); } }
 }
 } // namespace
 
@@ -1064,16 +1227,21 @@ LUMENT_API void lument_cube_mat4_invert(LumentMat4* m){ if(m) math3d::mat4_inver
 LUMENT_API void lument_cube_quat_from_euler(LumentQuat* q,float p,float y,float r){ if(q){ float qv[4]; math3d::quat_from_euler(qv,p,y,r); q->x=qv[0];q->y=qv[1];q->z=qv[2];q->w=qv[3]; } }
 LUMENT_API void lument_cube_quat_normalize(LumentQuat* q){ if(q){ float qv[4]={q->x,q->y,q->z,q->w}; math3d::quat_normalize(qv); q->x=qv[0];q->y=qv[1];q->z=qv[2];q->w=qv[3]; } }
 LUMENT_API void lument_cube_vec3_normalize(LumentVec3* v){ if(v){ float qv[3]={v->x,v->y,v->z}; math3d::v3normalize(qv); v->x=qv[0];v->y=qv[1];v->z=qv[2]; } }
+LUMENT_API void lument_cube_mat4_ortho(LumentMat4* m,float l,float r,float b,float t,float n,float f){ if(m) math3d::mat4_ortho(m->m,l,r,b,t,n,f); }
 
 // --- 摄像机 ---
 LUMENT_API LumentCamera3DHandle lument_cube_create_camera(void){
     uint32_t h=g_cameras.alloc(); CamData* c=g_cameras.get(h);
     c->desc.position={0,0,5}; c->desc.target={0,0,0}; c->desc.up={0,1,0};
     c->desc.fovY=60.0f; c->desc.nearPlane=0.1f; c->desc.farPlane=100.0f; c->desc.aspect=16.0f/9.0f;
+    c->desc.projection=LUMENT_CUBE_PROJECTION_PERSPECTIVE;
     return h;
 }
 LUMENT_API void lument_cube_set_camera(LumentCamera3DHandle cam,const LumentCamera3D* d){
     CamData* c=g_cameras.get(cam); if(!c||!d) return; c->desc=*d;
+}
+LUMENT_API void lument_cube_set_camera_projection(LumentCamera3DHandle cam,int projection){
+    CamData* c=g_cameras.get(cam); if(!c) return; c->desc.projection=projection;
 }
 LUMENT_API void lument_cube_get_camera(LumentCamera3DHandle cam,LumentCamera3D* out){
     CamData* c=g_cameras.get(cam); if(!c||!out) return; *out=c->desc;
@@ -1093,6 +1261,9 @@ LUMENT_API LumentMesh lument_cube_create_mesh(const float* positions,int vertexC
 LUMENT_API LumentMesh lument_cube_create_box(float sx,float sy,float sz){ uint32_t h=g_meshes.alloc(); make_box(sx,sy,sz,g_meshes.get(h)); compute_bounds(g_meshes.get(h)); return h; }
 LUMENT_API LumentMesh lument_cube_create_plane(float w,float h){ uint32_t hh=g_meshes.alloc(); make_plane(w,h,g_meshes.get(hh)); compute_bounds(g_meshes.get(hh)); return hh; }
 LUMENT_API LumentMesh lument_cube_create_sphere(float radius,int seg){ uint32_t h=g_meshes.alloc(); make_sphere(radius,seg,g_meshes.get(h)); compute_bounds(g_meshes.get(h)); return h; }
+LUMENT_API LumentMesh lument_cube_create_cylinder(float rTop,float rBot,float h,int seg){ if(seg<3)seg=3; uint32_t hh=g_meshes.alloc(); make_cylinder(rTop,rBot,h,seg,g_meshes.get(hh)); compute_bounds(g_meshes.get(hh)); return hh; }
+LUMENT_API LumentMesh lument_cube_create_cone(float radius,float h,int seg){ if(seg<3)seg=3; uint32_t hh=g_meshes.alloc(); make_cylinder(0.0f,radius,h,seg,g_meshes.get(hh)); compute_bounds(g_meshes.get(hh)); return hh; }
+LUMENT_API LumentMesh lument_cube_create_torus(float R,float r,int rseg,int tseg){ if(rseg<3)rseg=3; if(tseg<3)tseg=3; uint32_t hh=g_meshes.alloc(); make_torus(R,r,rseg,tseg,g_meshes.get(hh)); compute_bounds(g_meshes.get(hh)); return hh; }
 LUMENT_API void lument_cube_destroy_mesh(LumentMesh mesh){
     MeshData* m=g_meshes.get(mesh);
 #if defined(LUMENT_BACKEND_GLES2)
@@ -1220,28 +1391,51 @@ LUMENT_API void lument_cube_clear_lights(void){ g_lights.clear(); }
 
 // --- 渲染 ---
 LUMENT_API void lument_cube_set_background(LumentColor color){ g_bg=color; }
+LUMENT_API void lument_cube_set_wireframe(bool on){ g_wireframe=on; }
+LUMENT_API bool lument_cube_get_wireframe(void){ return g_wireframe; }
+LUMENT_API void lument_cube_get_cull_stats(int* total,int* visible){
+    if(total)*total=g_cullTotal; if(visible)*visible=g_cullVisible;
+}
 LUMENT_API void lument_cube_clear(LumentColor color){ g_bg=color; (void)color; }
 LUMENT_API void lument_cube_render(LumentCamera3DHandle cam){
     CamData* c=g_cameras.get(cam); if(!c) return;
     float eye[3]={c->desc.position.x,c->desc.position.y,c->desc.position.z};
     float ctr[3]={c->desc.target.x,c->desc.target.y,c->desc.target.z};
     float up[3]={c->desc.up.x,c->desc.up.y,c->desc.up.z};
-    math3d::mat4_perspective(c->proj,c->desc.fovY,c->desc.aspect,c->desc.nearPlane,c->desc.farPlane);
     math3d::mat4_look_at(c->view,eye,ctr,up);
+    float dist=-c->view[14]; if(dist<=0.0f) dist=5.0f;
+    if(c->desc.projection==LUMENT_CUBE_PROJECTION_ORTHO){
+        float halfH=std::tan(c->desc.fovY*3.14159265f/180.0f*0.5f)*dist;
+        float halfW=halfH*c->desc.aspect;
+        math3d::mat4_ortho(c->proj,-halfW,halfW,-halfH,halfH,c->desc.nearPlane,c->desc.farPlane);
+    } else {
+        math3d::mat4_perspective(c->proj,c->desc.fovY,c->desc.aspect,c->desc.nearPlane,c->desc.farPlane);
+    }
     float viewProj[16]; math3d::mat4_mul(viewProj,c->proj,c->view);
+    float planes[24]; extract_frustum(viewProj, planes);
+    g_cullTotal=0; g_cullVisible=0;
     float identity[16]; math3d::mat4_identity(identity);
-    for(int r:g_sceneRoots){ NodeData* n=g_nodes.get((uint32_t)(r+1)); if(!n) continue; compute_world(n,identity); draw_node(n,viewProj); }
+    for(int r:g_sceneRoots){ NodeData* n=g_nodes.get((uint32_t)(r+1)); if(!n) continue; compute_world(n,identity); draw_node(n,viewProj,planes); }
 }
 LUMENT_API void lument_cube_render_node(LumentCamera3DHandle cam,LumentNode3D root){
     CamData* c=g_cameras.get(cam); NodeData* n=g_nodes.get(root); if(!c||!n) return;
     float eye[3]={c->desc.position.x,c->desc.position.y,c->desc.position.z};
     float ctr[3]={c->desc.target.x,c->desc.target.y,c->desc.target.z};
     float up[3]={c->desc.up.x,c->desc.up.y,c->desc.up.z};
-    math3d::mat4_perspective(c->proj,c->desc.fovY,c->desc.aspect,c->desc.nearPlane,c->desc.farPlane);
     math3d::mat4_look_at(c->view,eye,ctr,up);
+    float dist=-c->view[14]; if(dist<=0.0f) dist=5.0f;
+    if(c->desc.projection==LUMENT_CUBE_PROJECTION_ORTHO){
+        float halfH=std::tan(c->desc.fovY*3.14159265f/180.0f*0.5f)*dist;
+        float halfW=halfH*c->desc.aspect;
+        math3d::mat4_ortho(c->proj,-halfW,halfW,-halfH,halfH,c->desc.nearPlane,c->desc.farPlane);
+    } else {
+        math3d::mat4_perspective(c->proj,c->desc.fovY,c->desc.aspect,c->desc.nearPlane,c->desc.farPlane);
+    }
     float viewProj[16]; math3d::mat4_mul(viewProj,c->proj,c->view);
+    float planes[24]; extract_frustum(viewProj, planes);
+    g_cullTotal=0; g_cullVisible=0;
     float identity[16]; math3d::mat4_identity(identity);
-    compute_world(n,identity); draw_node(n,viewProj);
+    compute_world(n,identity); draw_node(n,viewProj,planes);
 }
 LUMENT_API void lument_cube_render_model(LumentCamera3DHandle cam,LumentModel model,const LumentVec3* pos,const LumentQuat* rot,const LumentVec3* scl){
     LumentNode3D n=lument_cube_create_node();

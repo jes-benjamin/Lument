@@ -162,28 +162,37 @@
 
 ### 🧩 3D 子系统组成
 
-- **3D 数学**：`vec3 / quat / mat4`（透视、lookAt、四元数欧拉、TRS 组合）
+- **3D 数学**：`vec3 / quat / mat4`（透视、**正交**、lookAt、四元数欧拉、TRS 组合）
 - **3D 场景图**：节点变换层级（位置/旋转/缩放/父子关系）
 - **网格 / 材质 / 模型**：PBR（金属度/粗糙度）+ 反照率/法线/自发光贴图
+- **程序化图元**：立方体 / 平面 / 球体 / **圆柱 / 圆锥 / 环面**（JS 端另有网格地面 `createGrid`）
+- **3D 相机**：透视 / **正交**投影自由切换（等距视角与工程视图）
+- **渲染模式**：实体着色 / **线框**（边索引去重，LINES 绘制）
+- **性能优化**：**视锥剔除**（6 裁剪平面 + 世界空间 AABB，子树整体跳过）+ 剔除与三角形统计
 - **3D 渲染**：WebGL2（JS Runtime 浏览器真渲染）/ GLES2（C++ 移动端与 Emscripten）；无 GPU 后端下 API 与加载器仍可用（无头测试友好）
-- **约 50+ 个 `lument_cube_*` C ABI 函数**，与 2D ABI 并存
+- **约 75 个 `lument_cube_*` C ABI 函数**，与 2D ABI 并存
 
 ### 🚀 快速体验 Lument Cube 3D
 
 用浏览器打开 [examples/lument_cube_demo.html](examples/lument_cube_demo.html)：
 
-- 程序化立方体 / 球体 / 平面实时旋转预览（WebGL2）
-- 鼠标拖拽轨道相机、滚轮缩放
-- 粘贴 glTF / OBJ / STL / PLY 的 URL 原生加载并渲染
+- 6 种程序化图元（立方体 / 球体 / 平面 / **圆柱 / 圆锥 / 环面**）实时旋转预览（WebGL2）
+- 鼠标拖拽轨道相机、滚轮缩放、右键平移
+- 粘贴 glTF / OBJ / STL / PLY 的 URL 原生加载并渲染，自动按包围盒适配视角
+- **HUD 实时性能**：FPS / 三角形数 / DrawCall / 可见与剔除节点数
+- **控制面板**：线框模式、网格地面、正交/透视切换、自动旋转、视锥剔除开关、背景色
 
 ```javascript
 Lument.Cube.init(document.getElementById('cube-canvas')); // 初始化 WebGL2
-const box = Lument.Cube.createBox(2,2,2);
-const root = Lument.Cube.createNode();
-Lument.Cube.nodeSetMesh(root, box);
+const mesh  = Lument.Cube.createTorus(1.2, 0.4, 20, 32);  // 圆柱/圆锥/环面等图元
+const root  = Lument.Cube.createNode();
+Lument.Cube.nodeSetMesh(root, mesh);
 Lument.Cube.setLight([5,8,5], [1,1,1], 1.2, 1);
-const camera = { position:[0,1.5,6], target:[0,0,0], up:[0,1,0], fovY:55 };
+Lument.Cube.setGrid(true);                                 // 网格地面
+const camera = { position:[0,1.5,6], target:[0,0,0], up:[0,1,0], fovY:55,
+                 projection: Lument.Cube.PROJECTION.perspective };
 Lument.Cube.render(camera, root);
+console.log(Lument.Cube.getCullStats());   // { nodes, visible, culled, drawCalls, triangles }
 ```
 
 ## 目录结构
@@ -222,8 +231,10 @@ Lument.Cube.render(camera, root);
 | UI/应用 | 33 | widget/layout/event/navigation |
 | 存储 | 3 | save/load/clear |
 | 工具 | 4 | time/random/log |
-| **Cube 3D** | **52** | 3D 数学/相机/网格/材质/模型加载/场景图/光照/渲染 |
-| **合计** | **184** | 统一 C ABI（2D + 3D 并存）|
+| **Cube 3D** | **75** | 3D 数学/相机(透视+正交)/网格/图元/材质/模型加载/场景图/光照/线框/视锥剔除 |
+| **合计** | **207** | 统一 C ABI（2D + 3D 并存）|
+
+> 计数口径：按 `core/include/lument.h` 中 `LUMENT_API` 声明数统计，Cube 3D 为 `lument_cube_*` 实测条目数。
 
 ## 快速开始
 

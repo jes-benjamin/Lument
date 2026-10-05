@@ -934,15 +934,22 @@ typedef uint32_t LumentNode3D;      // 场景节点句柄
 typedef uint32_t LumentCamera3DHandle; // 3D 摄像机句柄
 #define LUMENT_CUBE_INVALID 0
 
+// ========== 相机投影方式 ==========
+typedef enum {
+    LUMENT_CUBE_PROJECTION_PERSPECTIVE = 0,  // 透视投影（默认，近大远小）
+    LUMENT_CUBE_PROJECTION_ORTHO      = 1,  // 正交投影（工程/2.5D/等距视角）
+} LumentCubeProjection;
+
 // ========== 3D 摄像机描述 ==========
 typedef struct {
     LumentVec3 position;   // 摄像机位置（世界坐标）
     LumentVec3 target;     // 注视点 (look-at)
     LumentVec3 up;         // 上方向（默认 0,1,0）
-    float      fovY;       // 垂直视场角（度）
+    float      fovY;       // 垂直视场角（度，正交投影下忽略）
     float      nearPlane;  // 近裁剪面
     float      farPlane;   // 远裁剪面
     float      aspect;     // 宽高比（宽/高）
+    int        projection; // LumentCubeProjection：透视 / 正交
 } LumentCamera3D;
 
 // ========== 材质描述 ==========
@@ -968,6 +975,7 @@ typedef enum {
 // --- 3D 数学工具 ---
 LUMENT_API void lument_cube_mat4_identity(LumentMat4* m);
 LUMENT_API void lument_cube_mat4_perspective(LumentMat4* m, float fovYDeg, float aspect, float nearP, float farP);
+LUMENT_API void lument_cube_mat4_ortho(LumentMat4* m, float left, float right, float bottom, float top, float nearP, float farP);
 LUMENT_API void lument_cube_mat4_look_at(LumentMat4* m, const LumentVec3* eye, const LumentVec3* target, const LumentVec3* up);
 LUMENT_API void lument_cube_mat4_multiply(LumentMat4* out, const LumentMat4* a, const LumentMat4* b);
 LUMENT_API void lument_cube_mat4_transpose(LumentMat4* m);
@@ -980,6 +988,7 @@ LUMENT_API void lument_cube_vec3_normalize(LumentVec3* v);
 LUMENT_API LumentCamera3DHandle lument_cube_create_camera(void);
 LUMENT_API void lument_cube_set_camera(LumentCamera3DHandle cam, const LumentCamera3D* desc);
 LUMENT_API void lument_cube_get_camera(LumentCamera3DHandle cam, LumentCamera3D* out);
+LUMENT_API void lument_cube_set_camera_projection(LumentCamera3DHandle cam, int projection); // LumentCubeProjection
 LUMENT_API void lument_cube_destroy_camera(LumentCamera3DHandle cam);
 
 // --- 网格（从原始数据创建，或程序化图元）---
@@ -991,6 +1000,9 @@ LUMENT_API LumentMesh lument_cube_create_mesh(
 LUMENT_API LumentMesh lument_cube_create_box(float sx, float sy, float sz);     // 立方体
 LUMENT_API LumentMesh lument_cube_create_plane(float w, float h);               // XY 平面
 LUMENT_API LumentMesh lument_cube_create_sphere(float radius, int segments);    // UV 球
+LUMENT_API LumentMesh lument_cube_create_cylinder(float radiusTop, float radiusBottom, float height, int radialSegments); // 圆柱（含顶/底盖）
+LUMENT_API LumentMesh lument_cube_create_cone(float radius, float height, int radialSegments);           // 圆锥（=顶半径0的圆柱）
+LUMENT_API LumentMesh lument_cube_create_torus(float radius, float tube, int radialSegments, int tubularSegments); // 环面
 LUMENT_API void     lument_cube_destroy_mesh(LumentMesh mesh);
 LUMENT_API void     lument_cube_get_mesh_bounds(LumentMesh mesh, LumentAABB* out);
 LUMENT_API int      lument_cube_get_mesh_vertex_count(LumentMesh mesh);
@@ -1049,6 +1061,10 @@ LUMENT_API void lument_cube_clear_lights(void);
 
 // --- 3D 渲染 ---
 LUMENT_API void lument_cube_set_background(LumentColor color);
+LUMENT_API void lument_cube_set_wireframe(bool on);          // 线框模式全局开关
+LUMENT_API bool lument_cube_get_wireframe(void);            // 当前线框状态
+// 返回上一帧视锥剔除统计：total=参与剔除节点数，visible=实际绘制节点数。
+LUMENT_API void lument_cube_get_cull_stats(int* total, int* visible);
 LUMENT_API void lument_cube_clear(LumentColor color);              // 清屏（3D 深度缓冲）
 LUMENT_API void lument_cube_render(LumentCamera3DHandle cam);      // 渲染根场景（所有节点）
 LUMENT_API void lument_cube_render_node(LumentCamera3DHandle cam, LumentNode3D root);

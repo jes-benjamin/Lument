@@ -55,5 +55,32 @@ const gltf = { asset:{version:"2.0"}, buffers:[{byteLength:bin.length,uri}],
 const g = C.parseGLTF(gltf, null, null);
 check(g.meshes.length===1 && g.meshes[0].positions.length===9 && g.meshes[0].indices.length===3, 'glTF 顶点=3 索引=3');
 
+// 新增图元：圆柱 / 圆锥 / 环面 / 网格地面
+const cyl = C.createCylinder(1,1,2,12);
+check(cyl.positions.length===(13*2+14+14)*3, 'cylinder(12) 顶点数=54 (侧壁26+顶盖14+底盖14)');
+check(cyl.indices.length===12*6+12*3+12*3, 'cylinder(12) 索引数=144');
+const cone = C.createCone(1,2,12);
+check(cone.positions.length===(13*2+14)*3, 'cone(12) 顶点数=40 (无顶盖)');
+check(cone.indices.length===12*6+12*3, 'cone(12) 索引数=108');
+const tor = C.createTorus(1,0.3,8,16);
+check(tor.positions.length===(8+1)*(16+1)*3, 'torus(8,16) 顶点数=153');
+check(tor.indices.length===8*16*6, 'torus(8,16) 索引数=768');
+const grid = C.createGrid(20,20);
+check(grid.isLines===true, 'grid 标记为线段模式');
+check(grid.positions.length===21*4*3 && grid.indices.length===21*4, 'grid(20,20) 顶点=84 索引=84');
+check(grid.uvs.length===grid.positions.length/3*2, 'grid UV 数量与顶点匹配');
+
+// 包围盒
+const bx = C.createBox(2,2,2);
+check(bx.bounds && bx.bounds.min[0]===-1 && bx.bounds.max[0]===1, 'box 包围盒 [-1,1]');
+check(Math.abs(sph.bounds.min[1]+1)<1e-6 && Math.abs(sph.bounds.max[1]-1)<1e-6, 'sphere(1) 包围盒 y∈[-1,1]');
+
+// 正交投影
+const O = C.math.M4.ortho(-2,2,-1,1,0.1,100);
+check(Math.abs(O[0]-0.5)<1e-6, '正交 m[0]=2/(r-l)=0.5');
+check(Math.abs(O[5]-1)<1e-6, '正交 m[5]=2/(t-b)=1');
+check(O[11]===0, '正交 m[11]=0 (区别于透视的 -1)');
+check(C.PROJECTION && C.PROJECTION.ortho===1 && C.PROJECTION.perspective===0, 'PROJECTION 常量');
+
 console.log('\n=== 结果: '+(fail===0?'全部通过':fail+' 项失败')+' ===');
 process.exit(fail===0?0:1);

@@ -74,14 +74,14 @@ int main() {
 
 | 类别 | 函数 |
 |------|------|
-| 数学 | `lument_cube_mat4_perspective / look_at / multiply / invert`、`lument_cube_quat_from_euler` |
-| 相机 | `lument_cube_create_camera / set_camera / get_camera` |
-| 网格 | `lument_cube_create_mesh / create_box / create_plane / create_sphere / get_mesh_bounds` |
+| 数学 | `lument_cube_mat4_perspective / **mat4_ortho** / look_at / multiply / invert`、`lument_cube_quat_from_euler` |
+| 相机 | `lument_cube_create_camera / set_camera / get_camera / **set_camera_projection**` |
+| 网格 | `lument_cube_create_mesh / create_box / create_plane / create_sphere / **create_cylinder / create_cone / create_torus** / get_mesh_bounds` |
 | 材质 | `lument_cube_create_material / material_set_color / material_set_map / material_set_pbr` |
 | 模型 | `lument_cube_load_model / load_model_format / load_model_memory / model_get_mesh / model_get_bounds` |
 | 场景图 | `lument_cube_create_node / node_set_transform / node_set_mesh / node_set_model / node_set_parent` |
 | 光照 | `lument_cube_add_light / set_ambient / clear_lights` |
-| 渲染 | `lument_cube_render / render_node / render_model / set_background` |
+| 渲染 | `lument_cube_render / render_node / render_model / set_background / **set_wireframe / get_wireframe / get_cull_stats**` |
 | 格式 | `lument_cube_format_name / supported_format_count / get_supported_formats` |
 
 ## 4. JavaScript / Web 用法（Web Runtime）
@@ -123,6 +123,61 @@ Web Runtime（`runtime/js/lument.js`）内置 `Lument.Cube` 命名空间，使�
 
 > **注意**：2D 引擎（`Lument.init` 的 `RENDERER.CANVAS2D`）与 3D（`Lument.Cube.init` 的 WebGL2）使用**不同的 canvas / 上下文**。请为 3D 单独准备一个 `<canvas>`，避免与 2D 的 Canvas2D 上下文冲突。
 
+### 4.1 JS 端 API 速查
+
+| 类别 | API |
+|------|-----|
+| 初始化 | `Cube.init(canvas)` |
+| 图元 | `createBox / createPlane / createSphere / createCylinder / createCone / createTorus / createGrid` |
+| 数学 | `Cube.math.M4.{identity,perspective,ortho,lookAt,mul,fromTRS}`、`Cube.math.V3` |
+| 加载 | `loadModel(url)`、`parseGLTF / parseGLB / parseOBJ / parseSTL / parsePLY / parsePLYBinary` |
+| 场景图 | `createNode / nodeSetMesh / nodeSetModel / nodeAddChild` |
+| 光照 | `setLight / setAmbient / clearLights` |
+| 渲染 | `render(camera, root)`、`setBackground(rgba)` |
+| 渲染状态 | `setWireframe / getWireframe`、`setGrid / getGrid`、`setCulling`、`getCullStats`、`PROJECTION.{perspective,ortho}` |
+
+### 4.2 新增渲染能力：正交相机 / 线框 / 视锥剔除 / 网格地面
+
+**① 正交投影**（等距视角、工程视图、2.5D）
+
+```js
+const camera = { position:[5,5,5], target:[0,0,0], up:[0,1,0],
+                 projection: Cube.PROJECTION.ortho, orthoHeight: 6, near:0.1, far:200 };
+// 切回透视：camera.projection = Cube.PROJECTION.perspective（默认，配合 fovY）
+```
+
+正交模式下可用 `camera.orthoHeight` 控制视野高度，缩放手感与透视一致。
+
+**② 线框模式**（调试拓扑、查看网格密度）
+
+```js
+Cube.setWireframe(true);      // 三角形边按 LINES 绘制，每条边只画一次
+Cube.getWireframe();          // -> true
+```
+
+线框边索引在首次上传网格时自动由三角形索引去重生成，不额外占用 CPU 遍历；线框模式自动关闭光照与贴图，使用统一线条色。
+
+**③ 视锥剔除 + 性能统计**
+
+```js
+Cube.setCulling(true);                 // 默认开启
+const s = Cube.getCullStats();         // { nodes, visible, culled, drawCalls, triangles }
+console.log(`可见 ${s.visible} / 剔除 ${s.culled}，drawCall ${s.drawCalls}，三角形 ${s.triangles}`);
+```
+
+渲染时由 `viewProj` 提取 6 个裁剪平面（Gribb-Hartmann），按节点**世界空间 AABB** 做 positive-vertex 测试；
+不可见节点的**整棵子树**会被跳过，适合大场景剪枝。统计在每帧 `render()` 开始时清零。
+
+**④ 网格地面**（空间参考，默认开启）
+
+```js
+Cube.setGrid(false);                                  // 关闭默认 20×20 网格
+const myGrid = Cube.createGrid(40, 40);               // 自定义网格线段对象（size / divisions）
+```
+
+> C++ 端对应能力完全一致：`lument_cube_mat4_ortho`、`lument_cube_set_camera_projection(cam, LUMENT_CUBE_PROJECTION_ORTHO)`、
+> `lument_cube_set_wireframe(true)`、`lument_cube_get_cull_stats(&total,&visible)`，GLES2 后端同样生效。
+
 ## 5. 编译 / 构建
 
 ```bash
@@ -152,6 +207,14 @@ blender "<模型>.blend" --background \
 
 ## 7. 单元验证
 
-- C++：`tests/cube_loader_test.cpp` —— 验证图元、OBJ/STL/PLY/glTF 加载、3D 数学（`build_test/cube_test`）。
-- JS：`tests/cube_js_loader_test.js` —— 验证 `Lument.Cube` 端的解析器与数学（`node tests/cube_js_loader_test.js`）。
-- 交互演示：`examples/lument_cube_demo.html` —— 浏览器中旋转预览程序化模型，并可粘贴 URL 加载 glTF/OBJ/STL/PLY。
+- C++：`tests/cube_loader_test.cpp` —— 验证图元（含圆柱/圆锥/环面顶点与索引计数）、OBJ/STL/PLY/glTF 内存加载、3D 数学（透视与正交矩阵、四元数）、相机投影切换、线框开关、格式枚举（共 34 项断言）。
+- JS：`tests/cube_js_loader_test.js` —— 验证 `Lument.Cube` 解析器、图元（含圆柱/圆锥/环面/网格）、包围盒与正交投影（共 20 项断言，`node tests/cube_js_loader_test.js`）。
+- 交互演示：`examples/lument_cube_demo.html` —— 浏览器 WebGL2 实时渲染，含 **HUD（FPS / 三角形 / DrawCall / 剔除计数）** 与控制面板（6 种图元、线框、网格地面、正交/透视切换、自动旋转、视锥剔除开关、背景色），并可粘贴 URL 加载 glTF/OBJ/STL/PLY。
+
+手动运行 C++ 测试（需先构建核心库）：
+
+```bash
+mkdir -p build_test && cd build_test && cmake -DCMAKE_BUILD_TYPE=Release .. && make lument && cd ..
+g++ -std=c++17 -Icore/include tests/cube_loader_test.cpp -Lbuild_test -llument -o /tmp/cube_test
+LD_LIBRARY_PATH=build_test /tmp/cube_test
+```
