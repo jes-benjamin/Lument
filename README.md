@@ -1,10 +1,10 @@
-# Lument v2.0.0 · LumentCube 分支（Cube / 3D）
+# Lument v2.1.0 · LumentCube 分支（Cube / 3D）
 
 > **当前分支 `LumentCube`**：在 Lument 引擎之上新增 **3D 能力分支**，代号 **Cube**。在完全兼容原 2D / GAL / Live2D 能力的同时，新增原生 3D 渲染与主流 3D 建模文件加载（glTF 2.0 / OBJ / STL / PLY / DAE，可选 FBX，Blender 桥接）。
 > 其余分支：`main`（通用 2D）、`LumentGAL`（视觉小说 / Live2D）。
 
 轻量级跨平台游戏引擎，支持 C++/Python/Java/HTML 多语言开发，适配桌面、移动、Web 多设备平台。
-**v2.0.0 起同时具备 2D 与 3D 能力**。
+**v2.0.0 起同时具备 2D 与 3D 能力**；**v2.1.0 对引擎本体做了性能与功能增强**。
 
 ## 引擎架构
 
@@ -35,6 +35,76 @@
 └──────────────────────────────────────────────────────┘
 ```
 
+## v2.1.0 新增特性（引擎本体增强）
+
+本轮聚焦**引擎本体**（2D 内核 + 物理 + 帧循环）的性能与功能强化，3D 分支能力不受影响。
+
+### 🔥 关键修复：物理宽相此前完全未生效
+
+`lument_physics.cpp` 中虽然实现了均匀网格（Grid）与四叉树（Quadtree）两种宽相，
+但主步进函数 `physics_step` 实际走的是**硬编码 O(n²) 双循环** —— 优化代码从未被接线。
+以 `MAX_BODIES = 2048` 计，每帧约 **209 万次**无谓迭代，是所有带物理场景的固定开销。
+
+现已改为调用统一宽相入口（默认 Grid），实测收益：
+
+| 场景（200 刚体：20 密集 + 180 散布） | 宽相候选对 | 窄相调用量 |
+|---|---|---|
+| 修复前（O(n²) 全对比） | 19,900 | 19,900 次 |
+| 修复后（Grid 宽相） | **90** | **90 次** |
+
+> 窄相 `compute_manifold` 调用量下降约 **99.5%**，且随物体散布程度提升收益更高。
+
+同时修复：公共 API `lument_physics_get_broadphase_pairs` 此前**只有声明没有实现**，
+导致 `liblument.so` 携带未定义符号（静态绑定成可执行文件时链接失败）；现已补齐并返回真实候选对数。
+
+同样的问题也存在于 **JS Runtime**（`runtime/js/lument.js`）：`physicsWorld.broadphase` 配置项早已有之，
+但 `physicsStep` 实际是 O(n²) 双循环，空间分区从未实现。本版本补齐了 **Grid / Quadtree / Brute** 三模式并接线，
+`physicsGetPairCount()` 现在返回真实候选对数（此前恒为 0 或全量）。
+
+> 宽相正确性已实测：120 刚体稀疏散布下 brute=7140 对，grid=0 对、quadtree=184 对；
+> 常规接触场景下三种模式的**物理结果与 brute 完全一致**（偏差 0），确认无漏检。
+> 注：宽相候选集基于"帧起始位置"构建（业界标准），若物体初始即深度穿透，
+> 解算位移会动态产生新接触，此时 grid 与 brute 会有差异——这是宽相固有特性，非缺陷。
+
+### ⚡ 性能增强清单
+
+- **物理宽相接线**：`physics_step` 走 GRID / QUADTREE / BRUTE 可选宽相，候选对缓冲复用（`static` vector，帧内零分配）
+- **刚体槽位 O(1) 分配**：`alloc_body` 原为线性扫描 2048 槽位，现改为空闲索引栈（LIFO，缓存友好），并在 `reset / destroy / init` 三处回收点同步维护
+- **渲染 2D 视锥剔除**：世界坐标精灵按 `camera(x,y,zoom)` + viewport 做 AABB 相交测试，视野外精灵不再进入批次、不再参与排序与顶点生成
+  - 可见区由后端 NDC 变换严格推导：`x ∈ [cam.x, cam.x + viewW/zoom]`，`y` 同理
+  - **只对 `push_sprite` 生效**，屏幕空间图元 / UI / 调试绘制（`rect/line/text` 等）走 `push_quad_raw` 不受影响，**不存在误剔 UI 的风险**
+  - 可随时关闭：`lument_set_render_culling(false)`
+
+### ✨ 功能新增
+
+- **时间缩放 timeScale**：`lument_set_time_scale / lument_get_time_scale`
+  - 影响物理步进与脚本 DT（不阻塞渲染）：`0` = 暂停、`<1` 慢动作、`>1` 快进
+  - 负值钳制为 0（防止 dt 反向导致物理发散），上限 16
+  - 音频刻意不受缩放影响，避免慢动作时变调
+- **性能剖析字段**（扩展 `LumentStats`）：新增 `culledSprites`、`physicsPairs`、`physicsMs`，配合原有 `cpuTimeMs` 可直接定位 CPU 热点
+
+```c
+LumentStats st; lument_get_stats(&st);
+printf("剔除精灵=%u 宽相对=%d 物理耗时=%.2fms CPU=%.2fms\n",
+       st.culledSprites, st.physicsPairs, st.physicsMs, st.cpuTimeMs);
+```
+
+```c
+lument_set_time_scale(0.25f);   // 四分之一速度，子弹时间
+lument_set_time_scale(1.0f);    // 恢复正常
+```
+
+### 🧪 验证
+
+新增两套验证，均可一键运行：
+
+| 测试 | 覆盖内容 | 运行方式 |
+|---|---|---|
+| `tests/core_perf_test.cpp` | 宽相接线（候选对非零且远小于 O(n²)）、槽位池复用与无泄漏、视锥剔除（含边界部分相交不被误剔）、timeScale 钳制、统计字段 —— **21 项断言** | `ctest` 或手工编译 |
+| `tests/broadphase_js_test.js` | JS 端三种宽相模式无异常、剪枝效果、与 brute 语义一致性（不得漏检） | `node tests/broadphase_js_test.js` |
+
+v2.1.0 起测试纳入 CMake：`cmake -DLUMENT_BUILD_TESTS=ON .. && make && ctest`。通过。
+
 ## v1.3.0 新增特性
 
 - **UI 系统自动化和控件补全**: 新增 7 种控件（Dropdown/Toggle/Scrollview/Tooltip/Divider/Spinner/Icon），主题系统（统一配色），自动尺寸（按内容/子控件自适应），流式布局（FLOW 自动换行），声明式 UI 构建（JSON → 控件树），控件树调试导出，按名查找控件
@@ -54,7 +124,7 @@
 ## 设计特点
 
 - **低占用**: 对象池 + 空闲链表，热路径零动态分配
-- **高性能**: ECS 稀疏集合 O(1) 查找，精灵按纹理批量提交
+- **高性能**: ECS 稀疏集合 O(1) 查找，精灵按纹理批量提交，物理网格宽相，渲染视锥剔除
 - **统一 C ABI**: 100+ C 接口函数，所有语言共用同一套核心
 - **多语言**: C++ 直接调用 / Python ctypes / Java JNI / JS 原生实现
 - **跨平台**: Linux / Windows / macOS / Android / Web 一套代码全平台运行
@@ -219,9 +289,9 @@ console.log(Lument.Cube.getCullStats());   // { nodes, visible, culled, drawCall
 
 | 模块 | API 数量 | 说明 |
 |------|---------|------|
-| 核心 | 8 | init/shutdown/frame/stats/platform |
-| 渲染 | 16 | clear/camera/rect/sprite/text/pixel/texture/粒子/后处理 |
-| 物理 | 14 | 刚体/力/冲量/重力/阻尼/碰撞检测/射线 |
+| 核心 | 10 | init/shutdown/frame/stats/platform/**时间缩放** |
+| 渲染 | 19 | clear/camera/rect/sprite/text/pixel/texture/粒子/后处理/**视锥剔除** |
+| 物理 | 14 | 刚体/力/冲量/重力/阻尼/碰撞检测/射线/空间分区/候选对统计 |
 | 输入 | 7 | key/touch/joystick |
 | 音频 | 10 | load/play/stop/volume/3D 空间/音调 |
 | 网络 | 8 | HTTP 请求/WebSocket/下载/上传 |
@@ -232,9 +302,11 @@ console.log(Lument.Cube.getCullStats());   // { nodes, visible, culled, drawCall
 | 存储 | 3 | save/load/clear |
 | 工具 | 4 | time/random/log |
 | **Cube 3D** | **75** | 3D 数学/相机(透视+正交)/网格/图元/材质/模型加载/场景图/光照/线框/视锥剔除 |
-| **合计** | **207** | 统一 C ABI（2D + 3D 并存）|
+| **合计** | **474** | 统一 C ABI（2D + 3D 并存）|
 
-> 计数口径：按 `core/include/lument.h` 中 `LUMENT_API` 声明数统计，Cube 3D 为 `lument_cube_*` 实测条目数。
+> 计数口径：合计按 `core/include/lument.h` 中全部 `LUMENT_API` 声明实测统计；
+> Cube 3D 为其中 `lument_cube_*` 条目数。上表各模块分栏为功能归类的约数，
+> 未单列的 GAL（66）、Live2D（30）等已包含在合计中，精确数量以头文件为准。
 
 ## 快速开始
 

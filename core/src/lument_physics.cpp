@@ -128,6 +128,9 @@ struct PhysicsWorld {
 
 PhysicsWorld g_world;
 
+// v2.1.0：步进耗时统计与帧缓冲
+float g_lastStepMs = 0.0f;
+
 // 碰撞接触（检测阶段缓存，供求解迭代使用）
 struct Contact {
     int idxA;            // 池索引
@@ -137,16 +140,35 @@ struct Contact {
 std::vector<Contact> g_contacts;
 
 // ---------- 池操作 ----------
-int alloc_body() {
-    // 线性扫描空闲槽位（池小，O(n) 可接受）
-    for (int i = 0; i < MAX_BODIES; ++i) {
-        if (!g_world.pool[i].alive) {
-            g_world.pool[i].reset();
-            g_world.pool[i].alive = true;
-            return i + 1; // id 从 1 开始，0 = 无效
-        }
+// v2.1.0：空闲槽位栈。此前 alloc_body 每帧线性扫描 MAX_BODIES(2048) 找空位，
+// 现在改为 O(1) 取用；所有回收点（reset / destroy / 全量重建）都会同步维护该栈。
+std::vector<int> g_freeList;
+
+void rebuild_free_list() {
+    g_freeList.clear();
+    g_freeList.reserve(MAX_BODIES);
+    // 倒序填充，使栈顶始终是最小空闲索引 —— 与原线性扫描"优先取最小空位"语义一致。
+    for (int i = MAX_BODIES - 1; i >= 0; --i) {
+        if (!g_world.pool[i].alive) g_freeList.push_back(i);
     }
-    return 0;
+}
+
+// 回收指定槽位（幂等：已空闲则忽略）
+void release_slot(int idx) {
+    if (idx < 0 || idx >= MAX_BODIES) return;
+    if (g_world.pool[idx].alive) g_world.pool[idx].reset();
+    g_freeList.push_back(idx);
+}
+
+int alloc_body() {
+    // O(1)：从空闲栈顶取用（栈顶始终是最小可用槽位之一，行为与原线性扫描一致）
+    if (g_freeList.empty()) rebuild_free_list();  // 兜底：栈被外部写脏时自愈
+    if (g_freeList.empty()) return 0;             // 池满
+    int i = g_freeList.back();
+    g_freeList.pop_back();
+    g_world.pool[i].reset();
+    g_world.pool[i].alive = true;
+    return i + 1; // id 从 1 开始，0 = 无效
 }
 
 PhysicsBody* find_body(int id) {
@@ -643,6 +665,7 @@ bool init_physics() {
     g_world.positionIter = DEFAULT_POSITION_ITER;
     g_world.frameCollisions.reserve(64);
     g_contacts.reserve(64);
+    rebuild_free_list();        // v2.1.0：初始化空闲槽位栈
     g_world.initialized = true;
     return true;
 }
@@ -651,11 +674,13 @@ void shutdown_physics() {
     g_world = PhysicsWorld{};
     g_contacts.clear();
     g_contacts.shrink_to_fit();
+    g_freeList.clear();         // v2.1.0：释放空闲槽位栈
 }
 
 // 物理世界步进：积分 -> 检测 -> 求解 -> 回调
 void physics_step(float dt) {
     if (!g_world.initialized) return;
+    const uint64_t t0 = lument_get_time_ms();   // v2.1.0：步进耗时统计
 
     // ---- 1. 积分 ----
     for (int i = 0; i < MAX_BODIES; ++i) {
@@ -709,21 +734,27 @@ void physics_step(float dt) {
         // 静态体：不移动
     }
 
-    // ---- 2. 碰撞检测（O(n^2) 宽相 + 窄相，池小可接受）----
+    // ---- 2. 碰撞检测（宽相 → 窄相）----
+    // v2.1.0 修复：此前此处是硬编码 O(n^2) 双循环（MAX_BODIES=2048 → 约 209 万次/帧），
+    // 而文件内已实现的 GRID/QUADTREE 宽相从未被接线，等于优化代码形同虚设。
+    // 现改为走统一宽相入口（默认均匀网格），复杂度降至 O(n·命中格数)。
     g_world.frameCollisions.clear();
     g_contacts.clear();
-    for (int i = 0; i < MAX_BODIES; ++i) {
-        PhysicsBody& A = g_world.pool[i];
-        if (!A.alive) continue;
-        for (int j = i + 1; j < MAX_BODIES; ++j) {
-            PhysicsBody& B = g_world.pool[j];
-            if (!B.alive) continue;
-            // 两者均非动态体则无响应意义，跳过
-            if (A.type != LUMENT_BODY_DYNAMIC && B.type != LUMENT_BODY_DYNAMIC) continue;
-            LumentCollision col;
-            if (compute_manifold(A, i + 1, B, j + 1, col)) {
-                g_contacts.push_back({i, j, col});
-            }
+
+    static std::vector<std::pair<int, int>> s_pairs;   // 复用缓冲，避免每帧分配
+    s_pairs.clear();
+    broadphase_pairs(s_pairs);
+    g_world.lastPairCount = (int)s_pairs.size();
+
+    for (const auto& pr : s_pairs) {
+        PhysicsBody& A = g_world.pool[pr.first];
+        PhysicsBody& B = g_world.pool[pr.second];
+        if (!A.alive || !B.alive) continue;
+        // 两者均非动态体则无响应意义，跳过
+        if (A.type != LUMENT_BODY_DYNAMIC && B.type != LUMENT_BODY_DYNAMIC) continue;
+        LumentCollision col;
+        if (compute_manifold(A, pr.first + 1, B, pr.second + 1, col)) {
+            g_contacts.push_back({pr.first, pr.second, col});
         }
     }
 
@@ -744,7 +775,11 @@ void physics_step(float dt) {
             g_world.callback(&c.info, g_world.callbackUserData);
         }
     }
+
+    g_lastStepMs = float(lument_get_time_ms() - t0);   // v2.1.0
 }
+
+float physics_last_step_ms() { return g_lastStepMs; }
 
 } // namespace ue
 
@@ -777,12 +812,20 @@ LUMENT_API void lument_physics_step(float dt) {
     ue::physics_step(dt);
 }
 
+// v2.1.0：返回上一步宽相生成的候选对数量。
+// 该 API 此前仅有头文件声明而无实现，导致 liblument.so 携带未定义符号；
+// 宽相接线后此处返回真实值，可用于评估宽相削减效果。
+LUMENT_API int lument_physics_get_broadphase_pairs(void) {
+    return g_world.lastPairCount;
+}
+
 LUMENT_API void lument_physics_reset(void) {
     ensure_init();
     // 清空所有物理体，保留重力与迭代配置
     for (int i = 0; i < MAX_BODIES; ++i) {
         g_world.pool[i].reset();
     }
+    rebuild_free_list();        // v2.1.0：全量清空后重建空闲栈
     g_world.frameCollisions.clear();
     g_contacts.clear();
 }
@@ -812,6 +855,7 @@ LUMENT_API void lument_physics_destroy_body(int bodyId) {
     PhysicsBody* b = find_body(bodyId);
     if (!b) return;
     b->reset();
+    release_slot(bodyId - 1);   // v2.1.0：归还槽位到空闲栈
 }
 
 LUMENT_API void lument_physics_set_shape(int bodyId, LumentShape shape) {

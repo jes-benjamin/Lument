@@ -136,6 +136,10 @@ void renderer_present();              // 交换缓冲
 void renderer_draw_sprite(uint32_t tex, LumentRect dest, LumentRect src, LumentColor color);
 uint32_t renderer_texture_count();    // 用于统计
 uint32_t renderer_draw_calls();       // 用于统计
+uint32_t renderer_culled_count();     // v2.1.0：本帧被视锥剔除的精灵数
+
+// --- 物理 ---
+float physics_last_step_ms();              // v2.1.0：上一步耗时统计
 
 // --- 输入 ---
 bool init_input();

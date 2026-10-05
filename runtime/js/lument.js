@@ -8,7 +8,7 @@ const Lument = (function() {
     'use strict';
 
     // ========== 常量 ==========
-    const VERSION = '2.0.0';
+    const VERSION = '2.1.0';
     const EDITION = 'Cube';
 
     const PLATFORM = {
@@ -1164,15 +1164,17 @@ const Lument = (function() {
         // 碰撞检测与响应
         const bodyList = Array.from(physicsWorld.bodies.values());
         const collisions = [];
-        for (let i = 0; i < bodyList.length; i++) {
-            for (let j = i + 1; j < bodyList.length; j++) {
-                const a = bodyList[i], b = bodyList[j];
-                if (a.type === BODY.STATIC && b.type === BODY.STATIC) continue;
-                const col = checkBodyCollision(a, b);
-                if (col) {
-                    collisions.push(col);
-                    resolveCollision(a, b, col);
-                }
+        // v2.1.0：此前此处是硬编码 O(n^2) 双循环，broadphase 配置项形同虚设。
+        // 现按 physicsWorld.broadphase 走统一宽相入口（0=grid 1=quadtree 2=brute）。
+        const pairs = broadphasePairs(bodyList);
+        physicsWorld.lastPairCount = pairs.length;
+        for (let k = 0; k < pairs.length; k++) {
+            const a = pairs[k][0], b = pairs[k][1];
+            if (a.type === BODY.STATIC && b.type === BODY.STATIC) continue;
+            const col = checkBodyCollision(a, b);
+            if (col) {
+                collisions.push(col);
+                resolveCollision(a, b, col);
             }
         }
         // 碰撞回调
@@ -1181,6 +1183,141 @@ const Lument = (function() {
                 physicsWorld.collisionCallback(col, physicsWorld.collisionUserData);
             }
         }
+    }
+
+    // ====== v2.1.0 宽相：空间分区（此前未接线，物理步进实际走 O(n^2)）======
+    // 世界包围矩形：注意 AABB 的 x/y 是左上角，Circle 的 x/y 是圆心。
+    function bodyWorldRect(b) {
+        const sh = b.shape;
+        if (sh && sh.type === SHAPE.CIRCLE) {
+            const r = sh.radius || 0;
+            return { x: b.x - r, y: b.y - r, w: r * 2, h: r * 2 };
+        }
+        return { x: b.x, y: b.y, w: (sh && sh.w) || 0, h: (sh && sh.h) || 0 };
+    }
+    function autoGridCellSize(bodies) {
+        let m = 1;
+        for (let i = 0; i < bodies.length; i++) {
+            const r = bodyWorldRect(bodies[i]);
+            if (r.w > m) m = r.w;
+            if (r.h > m) m = r.h;
+        }
+        return m;
+    }
+    // 均匀网格：按格分桶，仅对同格内的组合去重产出候选对。
+    function broadphaseGridPairs(bodies, out) {
+        const n = bodies.length;
+        let cs = physicsWorld.gridCellSize;
+        if (!cs || cs <= 0) cs = autoGridCellSize(bodies);
+        if (!(cs > 0)) cs = 64;
+        const buckets = new Map();
+        for (let idx = 0; idx < n; idx++) {
+            const r = bodyWorldRect(bodies[idx]);
+            const x0 = Math.floor(r.x / cs), x1 = Math.floor((r.x + r.w) / cs);
+            const y0 = Math.floor(r.y / cs), y1 = Math.floor((r.y + r.h) / cs);
+            for (let gx = x0; gx <= x1; gx++) {
+                for (let gy = y0; gy <= y1; gy++) {
+                    const key = gx + ':' + gy;
+                    let arr = buckets.get(key);
+                    if (!arr) { arr = []; buckets.set(key, arr); }
+                    arr.push(idx);
+                }
+            }
+        }
+        const seen = new Set();
+        buckets.forEach((arr) => {
+            for (let a = 0; a < arr.length; a++) {
+                for (let c = a + 1; c < arr.length; c++) {
+                    const i = arr[a] < arr[c] ? arr[a] : arr[c];
+                    const j = arr[a] < arr[c] ? arr[c] : arr[a];
+                    const key = i + ':' + j;
+                    if (!seen.has(key)) { seen.add(key); out.push([bodies[i], bodies[j]]); }
+                }
+            }
+        });
+    }
+    // 四叉树：容量超限且未达最大深度时细分，无法完全落入单个子象限的物体留在当前层。
+    function quadMake(x, y, w, h) { return { x: x, y: y, w: w, h: h, items: [], kids: null }; }
+    function quadContains(node, r) {
+        return r.x >= node.x && r.y >= node.y &&
+               r.x + r.w <= node.x + node.w && r.y + r.h <= node.y + node.h;
+    }
+    function quadSplit(node) {
+        const hw = node.w / 2, hh = node.h / 2;
+        node.kids = [ quadMake(node.x, node.y, hw, hh),
+                      quadMake(node.x + hw, node.y, hw, hh),
+                      quadMake(node.x, node.y + hh, hw, hh),
+                      quadMake(node.x + hw, node.y + hh, hw, hh) ];
+        // 子节点须继承引用表，否则 quadInsert 取不到刚体而退化
+        for (let k = 0; k < 4; k++) node.kids[k].ref = node.ref;
+        const carry = node.items; node.items = [];
+        for (let i = 0; i < carry.length; i++) quadInsert(node, carry[i], 0);
+    }
+    function quadInsert(node, idx, depth) {
+        if (node.kids) {
+            const r = bodyWorldRect(node.ref[idx]);
+            for (let k = 0; k < 4; k++) {
+                if (quadContains(node.kids[k], r)) { quadInsert(node.kids[k], idx, depth + 1); return; }
+            }
+            node.items.push(idx); return;
+        }
+        node.items.push(idx);
+        if (node.items.length > 8 && depth < 6 && node.w > 1 && node.h > 1) quadSplit(node);
+    }
+    function quadCollect(node, out, seen) {
+        const list = node.items;
+        for (let a = 0; a < list.length; a++) {
+            for (let c = a + 1; c < list.length; c++) {
+                const i = list[a] < list[c] ? list[a] : list[c];
+                const j = list[a] < list[c] ? list[c] : list[a];
+                const key = i + ':' + j;
+                if (!seen.has(key)) { seen.add(key); out.push([node.ref[i], node.ref[j]]); }
+            }
+        }
+        if (node.kids) for (let k = 0; k < 4; k++) quadCollect(node.kids[k], out, seen);
+    }
+    function broadphaseQuadtreePairs(bodies, out) {
+        const n = bodies.length;
+        if (n < 2) return;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (let i = 0; i < n; i++) {
+            const r = bodyWorldRect(bodies[i]);
+            if (r.x < minX) minX = r.x;
+            if (r.y < minY) minY = r.y;
+            if (r.x + r.w > maxX) maxX = r.x + r.w;
+            if (r.y + r.h > maxY) maxY = r.y + r.h;
+        }
+        const root = quadMake(minX, minY, Math.max(maxX - minX, 1), Math.max(maxY - minY, 1));
+        root.ref = bodies;                       // 各层节点共享同一份引用表
+        for (let i = 0; i < n; i++) quadInsert(root, i, 0);
+        quadCollect(root, out, new Set());
+    }
+    function broadphaseBrutePairs(bodies, out) {
+        for (let i = 0; i < bodies.length; i++)
+            for (let j = i + 1; j < bodies.length; j++)
+                out.push([bodies[i], bodies[j]]);
+    }
+    // 统一入口
+    function broadphasePairs(bodies) {
+        const out = [];
+        if (bodies.length < 2) return out;
+        try {
+            if (physicsWorld.broadphase === 1) broadphaseQuadtreePairs(bodies, out);
+            else if (physicsWorld.broadphase === 2) broadphaseBrutePairs(bodies, out);
+            else broadphaseGridPairs(bodies, out);
+        } catch (e) {
+            // 宽相异常时退回暴力枚举，保证物理结果正确优先于性能
+            out.length = 0;
+            broadphaseBrutePairs(bodies, out);
+        }
+        // 统一按 (idA, idB) 排序：使各宽相模式的候选对处理顺序与 brute 一致。
+        // 冲量求解器对处理顺序敏感，若不加这步，切换宽相会改变物理结果（表现为"手感变了"）。
+        // 注：宽相候选集基于「帧起始位置」构建（业界标准）。因此当物体初始就深度穿透时，
+        // 解算位移会动态产生新接触，grid 结果与 brute 会有差异——这是宽相固有特性，非漏检。
+        out.sort(function (p, q) {
+            return (p[0].id - q[0].id) || (p[1].id - q[1].id);
+        });
+        return out;
     }
 
     function checkBodyCollision(a, b) {

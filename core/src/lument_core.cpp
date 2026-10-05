@@ -33,6 +33,9 @@ float    g_deltaTimeMs = 0.0f; // 上一帧总耗时（含睡眠）
 float    g_cpuTimeMs = 0.0f;   // 帧内 CPU 耗时（不含睡眠）
 uint64_t g_cpuStartMs = 0;     // begin_frame 进入时刻（用于统计 CPU 时间）
 
+// v2.1.0：时间缩放（影响物理与脚本 DT，不影响渲染帧率；0=暂停，1=正常）
+float    g_timeScale = 1.0f;
+
 // 配置缓存
 LumentConfig g_config{};
 
@@ -150,13 +153,16 @@ LUMENT_API void lument_begin_frame(void) {
     // 重置本帧渲染统计与精灵批次
     ue::renderer_begin_frame();
 
+    // v2.1.0：按时间缩放推导游戏逻辑步长（渲染仍按真实帧率推进）
+    const float scaledDtMs = g_deltaTimeMs * g_timeScale;
+
     // 脚本逻辑更新（在宿主绘制之前）
-    ue::ecs_update_scripts(g_deltaTimeMs);
+    ue::ecs_update_scripts(scaledDtMs);
 
     // 物理世界步进（dt 转秒）
-    ue::physics_step(g_deltaTimeMs * 0.001f);
+    ue::physics_step(scaledDtMs * 0.001f);
 
-    // 音频系统更新（淡入淡出、3D距离衰减）
+    // 音频系统更新（淡入淡出、3D距离衰减）——不受时间缩放影响，避免变调
     ue::update_audio(g_deltaTimeMs * 0.001f);
 
     // 应用活动场景背景色（若有则执行 lument_clear）
@@ -205,6 +211,10 @@ LUMENT_API void lument_get_stats(LumentStats* stats) {
     bytes += size_t(ue::renderer_texture_count()) * 65536u;
     stats->memoryUsed = uint32_t(bytes / 1024u);
     stats->cpuTimeMs = g_cpuTimeMs;
+    // v2.1.0：性能剖析字段
+    stats->culledSprites = ue::renderer_culled_count();
+    stats->physicsPairs  = lument_physics_get_broadphase_pairs();
+    stats->physicsMs     = ue::physics_last_step_ms();
 }
 
 LUMENT_API LumentPlatform lument_get_platform(void) {
@@ -225,6 +235,18 @@ LUMENT_API uint32_t lument_get_version(void) {
 
 LUMENT_API const char* lument_get_edition(void) {
     return LUMENT_EDITION;
+}
+
+// --- 时间缩放（v2.1.0）---
+LUMENT_API void lument_set_time_scale(float scale) {
+    // 负值会导致 dt 反向引发物理发散，钳制到 [0, 16]
+    if (scale < 0.0f) scale = 0.0f;
+    if (scale > 16.0f) scale = 16.0f;
+    g_timeScale = scale;
+}
+
+LUMENT_API float lument_get_time_scale(void) {
+    return g_timeScale;
 }
 
 } // extern "C"

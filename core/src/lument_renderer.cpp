@@ -103,6 +103,11 @@ int  g_viewW = 0, g_viewH = 0;
 std::string g_assetPath;
 bool g_initialized = false;
 
+// v2.1.0：精灵视锥剔除状态与统计
+// 仅作用于世界坐标精灵 push_sprite；屏幕空间图元 push_quad_raw 不参与，避免误剔 UI。
+bool     g_cullEnabled = true;
+uint32_t g_culledCount = 0;
+
 // =====================================================================
 // 2D 场景渲染状态
 // =====================================================================
@@ -229,6 +234,23 @@ inline void compute_uv(const TexSlot* tex, LumentRect src,
 // 推入轴对齐四边形（sprite / rect / text 字形用）。
 void push_sprite(uint32_t texId, LumentRect dest, LumentRect src, LumentColor color) {
     if (!g_initialized) return;
+
+    // v2.1.0：世界可见区域 = [cam.x, cam.x + viewW/zoom] × [cam.y, cam.y + viewH/zoom]
+    // 该边界由后端 lument_set_camera 的 NDC 变换严格推导：ndc.x = wx*a - cam.x*a - 1，
+    // a = 2*zoom/viewW，故 -1<=ndc.x<=1 等价于 cam.x <= wx <= cam.x + viewW/zoom。
+    if (g_cullEnabled && g_viewW > 0 && g_viewH > 0 && g_cam.zoom > 0.0f) {
+        const float halfSpanX = float(g_viewW) / g_cam.zoom;
+        const float halfSpanY = float(g_viewH) / g_cam.zoom;
+        const float viewL = g_cam.x, viewR = g_cam.x + halfSpanX;
+        const float viewT = g_cam.y, viewB = g_cam.y + halfSpanY;
+        // 分离轴判定：完全在视野外则剔除
+        if (dest.x + dest.w < viewL || dest.x > viewR ||
+            dest.y + dest.h < viewT || dest.y > viewB) {
+            ++g_culledCount;
+            return;
+        }
+    }
+
     if (texId == 0) texId = g_whiteTexId; // 无纹理退化为纯色
 
     LumentColor c = apply_scene_tint(color);
@@ -630,6 +652,7 @@ void renderer_set_viewport(int w, int h) {
 
 void renderer_begin_frame() {
     g_drawCalls = 0;
+    g_culledCount = 0;
     g_batch.clear();
     g_manualBatch.clear();
     g_manualActive = false;
@@ -682,6 +705,7 @@ void renderer_present() {
 
 uint32_t renderer_texture_count() { return g_texPool.count; }
 uint32_t renderer_draw_calls() { return g_drawCalls; }
+uint32_t renderer_culled_count() { return g_culledCount; }
 
 } // namespace ue
 
@@ -698,6 +722,11 @@ LUMENT_API void lument_set_camera(float x, float y, float zoom) {
     g_cam.x = x; g_cam.y = y; g_cam.zoom = zoom > 0.0f ? zoom : 1.0f;
     if (g_backend) g_backend->setCamera(g_cam.x, g_cam.y, g_cam.zoom);
 }
+
+// --- 视锥剔除（v2.1.0）---
+LUMENT_API void lument_set_render_culling(bool enabled) { g_cullEnabled = enabled; }
+LUMENT_API bool lument_get_render_culling(void)         { return g_cullEnabled; }
+LUMENT_API uint32_t lument_get_culled_count(void)       { return g_culledCount; }
 
 LUMENT_API void lument_draw_rect(LumentRect rect, LumentColor color, bool filled) {
     if (!g_initialized) return;

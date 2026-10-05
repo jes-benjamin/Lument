@@ -37,9 +37,9 @@
 
 // 校验本模块对应的引擎版本（Lument Cube = 2.x）
 static_assert(LUMENT_VERSION_MAJOR == 2 &&
-              LUMENT_VERSION_MINOR == 0 &&
+              LUMENT_VERSION_MINOR == 1 &&
               LUMENT_VERSION_PATCH == 0,
-              "lument_network.cpp 对应引擎版本 2.0.0 (Cube)");
+              "lument_network.cpp 对应引擎版本 2.1.0 (Cube)");
 
 namespace {
 

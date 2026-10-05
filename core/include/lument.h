@@ -16,9 +16,9 @@ extern "C" {
 
 // ========== 引擎版本 ==========
 #define LUMENT_VERSION_MAJOR 2
-#define LUMENT_VERSION_MINOR 0
+#define LUMENT_VERSION_MINOR 1
 #define LUMENT_VERSION_PATCH 0
-#define LUMENT_VERSION_STRING "2.0.0"
+#define LUMENT_VERSION_STRING "2.1.0"
 // 发行代号（分支标识）。Cube = 3D 分支。
 #define LUMENT_EDITION "Cube"
 // 数值版本号：主*10000 + 次*100 + 补丁，便于比较。
@@ -118,6 +118,10 @@ typedef struct {
     uint32_t entityCount;
     uint32_t memoryUsed;     // KB
     float    cpuTimeMs;      // 帧内 CPU 耗时（不含睡眠），用于性能剖析
+    // v2.1.0 新增：性能剖析字段
+    uint32_t culledSprites;  // 本帧因视锥剔除跳过的精灵数
+    int      physicsPairs;   // 本帧物理宽相生成的候选碰撞对数
+    float    physicsMs;      // 本帧物理步进耗时（毫秒）
 } LumentStats;
 
 // ============================================================
@@ -324,12 +328,17 @@ LUMENT_API void lument_end_frame(void);
 LUMENT_API float lument_get_delta_time(void);     // 毫秒
 LUMENT_API void  lument_get_stats(LumentStats* stats);
 
+// --- 时间控制（v2.1.0）---
+// 时间缩放：影响物理步进与脚本 DT，不阻塞渲染。1.0=正常，0=暂停，<1 慢动作，>1 快进。
+LUMENT_API void  lument_set_time_scale(float scale);
+LUMENT_API float lument_get_time_scale(void);
+
 // --- 平台信息 ---
 LUMENT_API LumentPlatform    lument_get_platform(void);
 LUMENT_API LumentRendererType lument_get_renderer_type(void);
 
 // --- 版本信息 ---
-LUMENT_API const char* lument_get_version_string(void);  // "2.0.0"
+LUMENT_API const char* lument_get_version_string(void);  // "2.1.0"
 LUMENT_API uint32_t    lument_get_version(void);         // 数值版本号
 LUMENT_API const char* lument_get_edition(void);         // 发行代号，如 "Cube"
 
@@ -372,6 +381,13 @@ LUMENT_API void lument_end_batch(void);                      // 提交当前手�
 LUMENT_API uint32_t lument_get_batch_count(void);            // 当前挂起的图元数
 LUMENT_API void lument_set_blend_mode(int mode);              // 0=normal 1=additive 2=multiply
 LUMENT_API int  lument_get_blend_mode(void);
+
+// --- 视锥剔除（v2.1.0）---
+// 对世界坐标精灵做 camera+viewport 可见性剔除，超出视野的精灵不再进入批次。
+// 屏幕空间图元/UI（rect/line/text 等）不受影响，保证 UI 与调试绘制永远不会被误剔。
+LUMENT_API void lument_set_render_culling(bool enabled);      // 默认开启
+LUMENT_API bool lument_get_render_culling(void);              // 当前状态
+LUMENT_API uint32_t lument_get_culled_count(void);            // 本帧被剔除的精灵数
 
 // --- 纹理管理 ---
 LUMENT_API uint32_t lument_load_texture(const char* path);

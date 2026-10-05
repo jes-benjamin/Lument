@@ -101,10 +101,10 @@ __all__ = [
 # Version / constants  (mirror lument.h)
 # ===========================================================================
 
-VERSION_MAJOR = 1
-VERSION_MINOR = 0
+VERSION_MAJOR = 2
+VERSION_MINOR = 1
 VERSION_PATCH = 0
-VERSION_STRING = "1.0.0"
+VERSION_STRING = "2.1.0"
 
 #: Sentinel returned by the engine when an entity could not be created.
 INVALID_ENTITY: int = 0

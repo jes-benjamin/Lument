@@ -38,10 +38,10 @@ from __future__ import annotations
 # --------------------------------------------------------------------------- #
 # Version (mirrors lument.h)
 # --------------------------------------------------------------------------- #
-VERSION_MAJOR = 1
-VERSION_MINOR = 0
+VERSION_MAJOR = 2
+VERSION_MINOR = 1
 VERSION_PATCH = 0
-VERSION_STRING = "1.0.0"
+VERSION_STRING = "2.1.0"
 
 __version__ = VERSION_STRING
 

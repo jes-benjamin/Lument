@@ -24,7 +24,7 @@
 #   cmake --build build-web -j
 # ============================================================
 cmake_minimum_required(VERSION 3.13)
-project(Lument LANGUAGES C CXX VERSION 1.0.0)
+project(Lument LANGUAGES C CXX VERSION 2.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -172,4 +172,25 @@ if(LUMENT_BUILD_DEMO)
     add_executable(lument_demo
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/demo_main.c)
     target_link_libraries(lument_demo PRIVATE lument)
+endif()
+
+# ---------- 单元测试（可选，v2.1.0 起纳入构建系统） ----------
+# 此前 tests/ 下的测试无法通过 CMake 构建，只能手工 g++ 编译，容易漏跑。
+# 开启后可用 `ctest` 一键运行全部断言。
+option(LUMENT_BUILD_TESTS "构建单元测试（可用 ctest 运行）" OFF)
+if(LUMENT_BUILD_TESTS)
+    enable_testing()
+
+    # 3D 分支：加载器与数学
+    add_executable(cube_loader_test
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/cube_loader_test.cpp)
+    target_link_libraries(cube_loader_test PRIVATE lument)
+
+    # 引擎本体：宽相接线 / 槽位池 / 视锥剔除 / 时间缩放 / 统计
+    add_executable(core_perf_test
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/core_perf_test.cpp)
+    target_link_libraries(core_perf_test PRIVATE lument)
+
+    add_test(NAME cube_loader_test COMMAND cube_loader_test)
+    add_test(NAME core_perf_test   COMMAND core_perf_test)
 endif()
