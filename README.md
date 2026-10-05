@@ -1,9 +1,10 @@
-# Lument v1.3.0 · LumentGAL 分支
+# Lument v2.0.0 · LumentCube 分支（Cube / 3D）
 
-> **当前分支 `LumentGAL`**：在 Lument 引擎主版本之上，额外提供适合**视觉小说 / 美少女游戏 (GAL)** 类型开发的完整子系统，并内置 **Live2D 角色动画接入**。
-> 主分支 (`main`) 保留通用 2D 游戏引擎能力；`LumentGAL` 分支在完全兼容主分支的同时，追加 GAL 与 Live2D 两大模块。
+> **当前分支 `LumentCube`**：在 Lument 引擎之上新增 **3D 能力分支**，代号 **Cube**。在完全兼容原 2D / GAL / Live2D 能力的同时，新增原生 3D 渲染与主流 3D 建模文件加载（glTF 2.0 / OBJ / STL / PLY / DAE，可选 FBX，Blender 桥接）。
+> 其余分支：`main`（通用 2D）、`LumentGAL`（视觉小说 / Live2D）。
 
-轻量级跨平台 2D 游戏引擎，支持 C++/Python/Java/HTML 多语言开发，适配桌面、移动、Web 多设备平台。
+轻量级跨平台游戏引擎，支持 C++/Python/Java/HTML 多语言开发，适配桌面、移动、Web 多设备平台。
+**v2.0.0 起同时具备 2D 与 3D 能力**。
 
 ## 引擎架构
 
@@ -66,6 +67,7 @@
 - 物理模拟游戏
 - 网络游戏（接入网络模块）
 - AI 行为驱动的 NPC 系统
+- **3D 模型预览 / 3D 场景 / 加载 glTF·OBJ·STL·PLY 等建模文件** ← `LumentCube` 分支新增
 
 ## 🌟 LumentGAL 分支 · 视觉小说 / Live2D 能力
 
@@ -140,21 +142,67 @@
 - Live2D 侧边控制：表情/动作切换、随机表情、眼/头自动追踪开关、点击模型触发动作
 - 完整运行日志
 
+## 🧊 LumentCube 分支 · 3D 能力
+
+> 分支 `LumentCube`（代号 **Cube**）在保留全部 2D / GAL / Live2D 能力的同时，新增一套并行 3D 子系统。完整文档见 [docs/lument_cube.md](docs/lument_cube.md)。
+
+### 📦 原生 3D 模型 / 建模文件支持
+
+| 格式 | 扩展名 | 加载方式 |
+|------|--------|----------|
+| glTF 2.0 | `.gltf` / `.glb` | **引擎原生解析**（推荐，Blender 官方导出器）|
+| Wavefront | `.obj` | 引擎原生解析 |
+| STL | `.stl` | 引擎原生解析（ASCII / 二进制）|
+| PLY | `.ply` | 引擎原生解析（ASCII / 二进制小端）|
+| COLLADA | `.dae` | 引擎原生解析 |
+| FBX | `.fbx` | 可选 Assimp 集成（`-DLUMENT_ENABLE_ASSIMP=ON`）|
+| Blender | `.blend` | **Blender CLI 桥接** → 导出 glTF 后加载 |
+
+> **关于 Blender `.blend`**：Blender 原生二进制无公开稳定规范，业界通行做法是经 Blender 导出为 glTF 2.0（Khronos 标准）。引擎对 `.blend` 即自动调用 `blender` CLI 导出 `.glb` 再加载；也可手动导出 `.glb`/`.gltf` 后直接加载。详见 [docs/lument_cube.md §6](docs/lument_cube.md)。
+
+### 🧩 3D 子系统组成
+
+- **3D 数学**：`vec3 / quat / mat4`（透视、lookAt、四元数欧拉、TRS 组合）
+- **3D 场景图**：节点变换层级（位置/旋转/缩放/父子关系）
+- **网格 / 材质 / 模型**：PBR（金属度/粗糙度）+ 反照率/法线/自发光贴图
+- **3D 渲染**：WebGL2（JS Runtime 浏览器真渲染）/ GLES2（C++ 移动端与 Emscripten）；无 GPU 后端下 API 与加载器仍可用（无头测试友好）
+- **约 50+ 个 `lument_cube_*` C ABI 函数**，与 2D ABI 并存
+
+### 🚀 快速体验 Lument Cube 3D
+
+用浏览器打开 [examples/lument_cube_demo.html](examples/lument_cube_demo.html)：
+
+- 程序化立方体 / 球体 / 平面实时旋转预览（WebGL2）
+- 鼠标拖拽轨道相机、滚轮缩放
+- 粘贴 glTF / OBJ / STL / PLY 的 URL 原生加载并渲染
+
+```javascript
+Lument.Cube.init(document.getElementById('cube-canvas')); // 初始化 WebGL2
+const box = Lument.Cube.createBox(2,2,2);
+const root = Lument.Cube.createNode();
+Lument.Cube.nodeSetMesh(root, box);
+Lument.Cube.setLight([5,8,5], [1,1,1], 1.2, 1);
+const camera = { position:[0,1.5,6], target:[0,0,0], up:[0,1,0], fovY:55 };
+Lument.Cube.render(camera, root);
+```
+
 ## 目录结构
 
 | 路径 | 说明 |
 |------|------|
-| `core/include/lument.h` | C ABI 公共头文件（100+ API 函数）|
+| `core/include/lument.h` | C ABI 公共头文件（**150+ API 函数**，含 3D 子系统）|
 | `core/include/lument_internal.h` | 内部头文件 |
 | `core/include/lument_renderer_backend.h` | 渲染后端抽象接口 |
-| `core/src/` | C++17 核心实现（12+ 源文件）|
+| `core/src/` | C++17 核心实现（含 `lument_3d.cpp` 3D 子系统）|
 | `bindings/python/` | Python ctypes 绑定 |
 | `bindings/java/` | Java JNI 绑定 |
 | `platforms/android/` | Android 平台层 |
-| `runtime/js/lument.js` | Web 运行时（JS/Canvas 实现）|
+| `runtime/js/lument.js` | Web 运行时（JS/Canvas2D + `Lument.Cube` WebGL2 3D 实现）|
+| `tools/blender_export_glb.py` | Blender `.blend → glTF` 桥接导出脚本 |
 | `game/` | 《遮伞世界》游戏 Demo（使用引擎构建）|
-| `docs/` | 开发文档与 API 参考 |
-| `examples/` | 示例代码 |
+| `docs/` | 开发文档与 API 参考（含 `lument_cube.md`）|
+| `examples/` | 示例代码（含 `lument_cube_demo.html`）|
+| `tests/` | 单元测试（C++ / JS 3D 加载器）|
 | `CMakeLists.txt` | CMake 构建系统 |
 | `build.sh` | 跨平台构建脚本 |
 
@@ -174,7 +222,8 @@
 | UI/应用 | 33 | widget/layout/event/navigation |
 | 存储 | 3 | save/load/clear |
 | 工具 | 4 | time/random/log |
-| **合计** | **132** | 统一 C ABI |
+| **Cube 3D** | **52** | 3D 数学/相机/网格/材质/模型加载/场景图/光照/渲染 |
+| **合计** | **184** | 统一 C ABI（2D + 3D 并存）|
 
 ## 快速开始
 

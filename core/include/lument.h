@@ -15,10 +15,15 @@ extern "C" {
 #include <stddef.h>
 
 // ========== 引擎版本 ==========
-#define LUMENT_VERSION_MAJOR 1
-#define LUMENT_VERSION_MINOR 3
+#define LUMENT_VERSION_MAJOR 2
+#define LUMENT_VERSION_MINOR 0
 #define LUMENT_VERSION_PATCH 0
-#define LUMENT_VERSION_STRING "1.3.0"
+#define LUMENT_VERSION_STRING "2.0.0"
+// 发行代号（分支标识）。Cube = 3D 分支。
+#define LUMENT_EDITION "Cube"
+// 数值版本号：主*10000 + 次*100 + 补丁，便于比较。
+#define LUMENT_VERSION_NUMBER \
+    (LUMENT_VERSION_MAJOR * 10000 + LUMENT_VERSION_MINOR * 100 + LUMENT_VERSION_PATCH)
 
 // ========== 平台标识 ==========
 typedef enum {
@@ -108,10 +113,11 @@ typedef struct {
 // ========== 引擎统计 ==========
 typedef struct {
     float    fps;
-    float    frameTime;      // 毫秒
+    float    frameTime;      // 毫秒（含目标帧率睡眠）
     uint32_t drawCalls;
     uint32_t entityCount;
     uint32_t memoryUsed;     // KB
+    float    cpuTimeMs;      // 帧内 CPU 耗时（不含睡眠），用于性能剖析
 } LumentStats;
 
 // ============================================================
@@ -321,6 +327,11 @@ LUMENT_API void  lument_get_stats(LumentStats* stats);
 // --- 平台信息 ---
 LUMENT_API LumentPlatform    lument_get_platform(void);
 LUMENT_API LumentRendererType lument_get_renderer_type(void);
+
+// --- 版本信息 ---
+LUMENT_API const char* lument_get_version_string(void);  // "2.0.0"
+LUMENT_API uint32_t    lument_get_version(void);         // 数值版本号
+LUMENT_API const char* lument_get_edition(void);         // 发行代号，如 "Cube"
 
 // ============================================================
 // 渲染 API
@@ -874,6 +885,181 @@ LUMENT_API void lument_ai_agent_set_target(int agentId, LumentEntity target);
 LUMENT_API LumentEntity lument_ai_agent_get_target(int agentId);
 LUMENT_API void lument_ai_agent_tick(int agentId, float dt);
 LUMENT_API const char* lument_ai_agent_query(const char* query);  // AI查询引擎状态
+
+// ============================================================
+// Lument Cube 3D 引擎 API   —  LumentCube 分支新增
+// ------------------------------------------------------------
+// 在保留全部 2D 能力之上，新增 3D 渲染与建模文件加载能力。
+// 原生支持主流 3D 格式：glTF 2.0(.gltf/.glb)、Wavefront OBJ、
+// STL、PLY、COLLADA(.dae)；并可通过可选 Assimp 集成加载 FBX，
+// 通过 Blender CLI 桥接加载 .blend（Blender 原生二进制经导出为
+// glTF/glb 后由引擎原生渲染）。
+// 设计要点：
+//   - 与 2D 共用同一 C ABI 与帧循环（begin_frame/end_frame）。
+//   - 3D 数学、相机、网格、材质、场景图均为引擎内建，零第三方依赖。
+//   - 模型加载器按扩展名/格式枚举自动识别，统一为 LumentMesh。
+// ============================================================
+
+// ========== 3D 基础数学类型 ==========
+typedef struct { float x, y, z; } LumentVec3;
+typedef struct { float x, y, z, w; } LumentVec4;
+typedef struct { float x, y, z, w; } LumentQuat;  // 单位四元数（x,y,z,w）
+// 4x4 矩阵，列主序存储（与 OpenGL/WebGL 一致），m[col*4 + row]。
+typedef struct { float m[16]; } LumentMat4;
+
+// ========== 3D 包围盒 ==========
+typedef struct {
+    LumentVec3 min;
+    LumentVec3 max;
+} LumentAABB;
+
+// ========== 3D 模型格式 ==========
+typedef enum {
+    LUMENT_CUBE_FORMAT_UNKNOWN = 0,
+    LUMENT_CUBE_FORMAT_GLTF   = 1,   // .gltf (JSON 文本)
+    LUMENT_CUBE_FORMAT_GLB    = 2,   // .glb (二进制 glTF，含 JSON+二进制块)
+    LUMENT_CUBE_FORMAT_OBJ    = 3,   // Wavefront .obj + .mtl
+    LUMENT_CUBE_FORMAT_STL    = 4,   // .stl (ASCII / 二进制)
+    LUMENT_CUBE_FORMAT_PLY    = 5,   // .ply (ASCII / 二进制)
+    LUMENT_CUBE_FORMAT_DAE    = 6,   // COLLADA .dae (XML)
+    LUMENT_CUBE_FORMAT_FBX    = 7,   // .fbx (需启用 Assimp)
+    LUMENT_CUBE_FORMAT_BLEND  = 8,   // Blender .blend (经 glTF 桥接)
+} LumentCubeFormat;
+
+// ========== 句柄类型 ==========
+typedef uint32_t LumentMesh;        // 网格句柄
+typedef uint32_t LumentMaterial;    // 材质句柄
+typedef uint32_t LumentModel;       // 模型（含若干网格+材质）句柄
+typedef uint32_t LumentNode3D;      // 场景节点句柄
+typedef uint32_t LumentCamera3DHandle; // 3D 摄像机句柄
+#define LUMENT_CUBE_INVALID 0
+
+// ========== 3D 摄像机描述 ==========
+typedef struct {
+    LumentVec3 position;   // 摄像机位置（世界坐标）
+    LumentVec3 target;     // 注视点 (look-at)
+    LumentVec3 up;         // 上方向（默认 0,1,0）
+    float      fovY;       // 垂直视场角（度）
+    float      nearPlane;  // 近裁剪面
+    float      farPlane;   // 远裁剪面
+    float      aspect;     // 宽高比（宽/高）
+} LumentCamera3D;
+
+// ========== 材质描述 ==========
+typedef struct {
+    LumentColor baseColor;   // 反照率基色（含 alpha）
+    uint32_t    albedoMap;   // 反照率贴图（引擎纹理 id，0=无）
+    uint32_t    normalMap;   // 法线贴图（0=无）
+    uint32_t    emissiveMap; // 自发光贴图（0=无）
+    float       metallic;    // 金属度 0~1
+    float       roughness;   // 粗糙度 0~1
+    float       emissive[3]; // 自发光 RGB 0~1
+    float       opacity;     // 不透明度 0~1
+    bool        doubleSided; // 双面渲染
+} LumentCubeMaterial;
+
+// ========== 3D 光照类型 ==========
+typedef enum {
+    LUMENT_CUBE_LIGHT_DIRECTIONAL = 0,  // 方向光（平行光，position 用作方向）
+    LUMENT_CUBE_LIGHT_POINT       = 1,  // 点光源
+    LUMENT_CUBE_LIGHT_SPOT        = 2,  // 聚光灯
+} LumentCubeLightType;
+
+// --- 3D 数学工具 ---
+LUMENT_API void lument_cube_mat4_identity(LumentMat4* m);
+LUMENT_API void lument_cube_mat4_perspective(LumentMat4* m, float fovYDeg, float aspect, float nearP, float farP);
+LUMENT_API void lument_cube_mat4_look_at(LumentMat4* m, const LumentVec3* eye, const LumentVec3* target, const LumentVec3* up);
+LUMENT_API void lument_cube_mat4_multiply(LumentMat4* out, const LumentMat4* a, const LumentMat4* b);
+LUMENT_API void lument_cube_mat4_transpose(LumentMat4* m);
+LUMENT_API void lument_cube_mat4_invert(LumentMat4* m);
+LUMENT_API void lument_cube_quat_from_euler(LumentQuat* q, float pitchDeg, float yawDeg, float rollDeg);
+LUMENT_API void lument_cube_quat_normalize(LumentQuat* q);
+LUMENT_API void lument_cube_vec3_normalize(LumentVec3* v);
+
+// --- 3D 摄像机 ---
+LUMENT_API LumentCamera3DHandle lument_cube_create_camera(void);
+LUMENT_API void lument_cube_set_camera(LumentCamera3DHandle cam, const LumentCamera3D* desc);
+LUMENT_API void lument_cube_get_camera(LumentCamera3DHandle cam, LumentCamera3D* out);
+LUMENT_API void lument_cube_destroy_camera(LumentCamera3DHandle cam);
+
+// --- 网格（从原始数据创建，或程序化图元）---
+LUMENT_API LumentMesh lument_cube_create_mesh(
+    const float* positions, int vertexCount,
+    const float* normals,    // 可为 NULL（自动补 0 法线）
+    const float* uvs,        // 可为 NULL（2 floats/顶点）
+    const uint32_t* indices, int indexCount);
+LUMENT_API LumentMesh lument_cube_create_box(float sx, float sy, float sz);     // 立方体
+LUMENT_API LumentMesh lument_cube_create_plane(float w, float h);               // XY 平面
+LUMENT_API LumentMesh lument_cube_create_sphere(float radius, int segments);    // UV 球
+LUMENT_API void     lument_cube_destroy_mesh(LumentMesh mesh);
+LUMENT_API void     lument_cube_get_mesh_bounds(LumentMesh mesh, LumentAABB* out);
+LUMENT_API int      lument_cube_get_mesh_vertex_count(LumentMesh mesh);
+LUMENT_API int      lument_cube_get_mesh_index_count(LumentMesh mesh);
+
+// --- 材质 ---
+LUMENT_API LumentMaterial lument_cube_create_material(const LumentCubeMaterial* desc);
+LUMENT_API void           lument_cube_destroy_material(LumentMaterial mat);
+LUMENT_API void           lument_cube_material_set_color(LumentMaterial mat, LumentColor color);
+LUMENT_API void           lument_cube_material_set_map(LumentMaterial mat, uint32_t albedoMap,
+                                                       uint32_t normalMap, uint32_t emissiveMap);
+LUMENT_API void           lument_cube_material_set_pbr(LumentMaterial mat, float metallic, float roughness);
+
+// --- 模型加载（原生支持主流 3D 格式）---
+LUMENT_API LumentModel lument_cube_load_model(const char* path);                 // 按扩展名自动识别
+LUMENT_API LumentModel lument_cube_load_model_format(const char* path, LumentCubeFormat fmt);
+LUMENT_API LumentModel lument_cube_load_model_memory(const void* data, int size,
+                                                    LumentCubeFormat fmt, const char* hintName);
+LUMENT_API void       lument_cube_destroy_model(LumentModel model);
+LUMENT_API bool       lument_cube_model_ready(LumentModel model);
+LUMENT_API int        lument_cube_model_mesh_count(LumentModel model);
+LUMENT_API LumentMesh lument_cube_model_get_mesh(LumentModel model, int index);
+LUMENT_API LumentMaterial lument_cube_model_get_material(LumentModel model, int index);
+LUMENT_API void       lument_cube_model_get_bounds(LumentModel model, LumentAABB* out);
+LUMENT_API const char* lument_cube_format_name(LumentCubeFormat fmt);            // 格式可读名
+LUMENT_API int        lument_cube_supported_format_count(void);
+// 返回支持格式枚举数组（调用方提供缓冲 supportedFormats，容量 >= count）。
+LUMENT_API void       lument_cube_get_supported_formats(LumentCubeFormat* out, int maxCount, int* outCount);
+
+// --- 场景图（节点）---
+LUMENT_API LumentNode3D lument_cube_create_node(void);
+LUMENT_API void         lument_cube_destroy_node(LumentNode3D node);
+LUMENT_API void lument_cube_node_set_transform(LumentNode3D node, const LumentVec3* pos,
+                                               const LumentQuat* rot, const LumentVec3* scale);
+LUMENT_API void lument_cube_node_set_position(LumentNode3D node, LumentVec3 pos);
+LUMENT_API void lument_cube_node_set_rotation_euler(LumentNode3D node, float pitchDeg, float yawDeg, float rollDeg);
+LUMENT_API void lument_cube_node_set_scale(LumentNode3D node, LumentVec3 scale);
+LUMENT_API void lument_cube_node_get_world_position(LumentNode3D node, LumentVec3* outPos);
+LUMENT_API void lument_cube_node_set_mesh(LumentNode3D node, LumentMesh mesh);
+LUMENT_API void lument_cube_node_set_material(LumentNode3D node, LumentMaterial mat);
+LUMENT_API void lument_cube_node_set_model(LumentNode3D node, LumentModel model); // 自动展开模型子网格
+LUMENT_API void lument_cube_node_set_visible(LumentNode3D node, bool visible);
+LUMENT_API LumentNode3D lument_cube_node_add_child(LumentNode3D parent, LumentNode3D child);
+LUMENT_API void lument_cube_node_set_parent(LumentNode3D node, LumentNode3D parent);
+LUMENT_API void lument_cube_node_detach(LumentNode3D node);
+
+// --- 3D 光照 ---
+LUMENT_API int  lument_cube_add_light(LumentCubeLightType type, LumentVec3 posOrDir,
+                                      LumentColor color, float intensity, float range);
+LUMENT_API void lument_cube_set_light_position(int lightId, LumentVec3 posOrDir);
+LUMENT_API void lument_cube_set_light_intensity(int lightId, float intensity);
+LUMENT_API void lument_cube_set_light_color(int lightId, LumentColor color);
+LUMENT_API void lument_cube_set_ambient(LumentColor color, float intensity);
+LUMENT_API void lument_cube_remove_light(int lightId);
+LUMENT_API void lument_cube_clear_lights(void);
+
+// --- 3D 渲染 ---
+LUMENT_API void lument_cube_set_background(LumentColor color);
+LUMENT_API void lument_cube_clear(LumentColor color);              // 清屏（3D 深度缓冲）
+LUMENT_API void lument_cube_render(LumentCamera3DHandle cam);      // 渲染根场景（所有节点）
+LUMENT_API void lument_cube_render_node(LumentCamera3DHandle cam, LumentNode3D root);
+// 直接渲染一个模型（便捷接口，内部创建临时根节点）。
+LUMENT_API void lument_cube_render_model(LumentCamera3DHandle cam, LumentModel model,
+                                         const LumentVec3* pos, const LumentQuat* rot, const LumentVec3* scale);
+
+// --- 3D 子系统生命周期 ---
+LUMENT_API void lument_cube_init(void);
+LUMENT_API void lument_cube_shutdown(void);
+LUMENT_API int  lument_cube_get_mesh_total(void);   // 统计：当前网格数（用于性能面板）
 
 // ============================================================
 // 视觉小说 (GAL) 引擎 API   —  LumentGAL 分支新增

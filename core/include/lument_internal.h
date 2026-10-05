@@ -189,6 +189,10 @@ void shutdown_network();
 bool init_ai();
 void shutdown_ai();
 
+// --- Lument Cube 3D 模块 ---
+bool init_cube();
+void shutdown_cube();
+
 // ===== 7. 通用内部工具 =====
 // 平台/渲染后端类型由 lument_core.cpp 检测并缓存，供其它子系统查询。
 void core_set_platform(LumentPlatform p);

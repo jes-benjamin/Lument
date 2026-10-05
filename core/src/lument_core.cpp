@@ -30,6 +30,8 @@ bool g_initialized = false;
 // 计时
 uint64_t g_prevFrameMs = 0;   // 上一帧 begin 时刻
 float    g_deltaTimeMs = 0.0f; // 上一帧总耗时（含睡眠）
+float    g_cpuTimeMs = 0.0f;   // 帧内 CPU 耗时（不含睡眠）
+uint64_t g_cpuStartMs = 0;     // begin_frame 进入时刻（用于统计 CPU 时间）
 
 // 配置缓存
 LumentConfig g_config{};
@@ -101,6 +103,7 @@ LUMENT_API int lument_init(const LumentConfig* config) {
     if (!ue::init_physics()) { lument_log("lument_init: physics init failed"); return 0; }
     if (!ue::init_network()) { lument_log("lument_init: network init failed"); return 0; }
     if (!ue::init_ai())      { lument_log("lument_init: ai init failed"); return 0; }
+    if (!ue::init_cube())    { lument_log("lument_init: cube 3d init failed"); return 0; }
     if (!ue::init_renderer(g_config)) { lument_log("lument_init: renderer init failed"); return 0; }
 
     g_prevFrameMs = lument_get_time_ms();
@@ -114,6 +117,7 @@ LUMENT_API void lument_shutdown(void) {
     if (!g_initialized) return;
     g_running = false;
     ue::shutdown_renderer();
+    ue::shutdown_cube();
     ue::shutdown_ai();
     ue::shutdown_network();
     ue::shutdown_physics();
@@ -140,6 +144,8 @@ LUMENT_API void lument_begin_frame(void) {
     if (dt > 100.0f) dt = 100.0f;
     if (dt < 0.0f) dt = 0.0f;
     g_deltaTimeMs = dt;
+    // 记录 CPU 计时起点（统计帧内 CPU 工作量，不含末尾睡眠）
+    g_cpuStartMs = lument_get_time_ms();
 
     // 重置本帧渲染统计与精灵批次
     ue::renderer_begin_frame();
@@ -170,6 +176,9 @@ LUMENT_API void lument_end_frame(void) {
     // 输入：本帧 current -> previous（用于 just-pressed）
     ue::input_end_frame();
 
+    // 统计帧内 CPU 耗时（begin_frame 进入 至 此处，不含末尾睡眠）
+    g_cpuTimeMs = float(lument_get_time_ms() - g_cpuStartMs);
+
     // 目标帧率限制
     if (g_config.targetFPS > 0.0f) {
         const float targetMs = 1000.0f / g_config.targetFPS;
@@ -195,6 +204,7 @@ LUMENT_API void lument_get_stats(LumentStats* stats) {
     size_t bytes = ue::ecs_memory_bytes();
     bytes += size_t(ue::renderer_texture_count()) * 65536u;
     stats->memoryUsed = uint32_t(bytes / 1024u);
+    stats->cpuTimeMs = g_cpuTimeMs;
 }
 
 LUMENT_API LumentPlatform lument_get_platform(void) {
@@ -203,6 +213,18 @@ LUMENT_API LumentPlatform lument_get_platform(void) {
 
 LUMENT_API LumentRendererType lument_get_renderer_type(void) {
     return g_rendererType;
+}
+
+LUMENT_API const char* lument_get_version_string(void) {
+    return LUMENT_VERSION_STRING;
+}
+
+LUMENT_API uint32_t lument_get_version(void) {
+    return LUMENT_VERSION_NUMBER;
+}
+
+LUMENT_API const char* lument_get_edition(void) {
+    return LUMENT_EDITION;
 }
 
 } // extern "C"

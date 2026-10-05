@@ -532,9 +532,10 @@ namespace ue {
 bool init_renderer(const LumentConfig& cfg) {
     g_texPool.reset();
     g_batch.clear();
-    g_batch.reserve(512);
+    // 预分配批次缓冲，避免游戏运行时反复扩容（热路径零分配）。
+    g_batch.reserve(8192);
     g_batchVerts.clear();
-    g_batchVerts.reserve(512 * 4);
+    g_batchVerts.reserve(8192 * 4);
     g_drawCalls = 0;
     g_cam = { 0, 0, 1.0f };
     g_viewW = cfg.width;  g_viewH = cfg.height;
@@ -643,7 +644,23 @@ void renderer_flush_batch() {
     flush_manual_batch(); // 自动 flush 前关闭未提交的手动批次
 
     if (g_batch.empty()) return;
-    // 按纹理 id 排序，使同纹理命令连续（稳定排序保持绘制顺序）。
+
+    // 单次遍历统计不同纹理数量：绝大多数精灵场景仅含 1~2 种纹理，
+    // 此时无需全量排序即可单批次提交，显著降低 flush 开销。
+    uint32_t firstTex = g_batch[0].texId;
+    bool multiTex = false;
+    for (size_t k = 1; k < g_batch.size(); ++k) {
+        if (g_batch[k].texId != firstTex) { multiTex = true; break; }
+    }
+
+    if (!multiTex) {
+        // 快速路径：单一纹理，整体一次性提交。
+        flush_range(g_batch.data(), 0, g_batch.size(), firstTex);
+        g_batch.clear();
+        return;
+    }
+
+    // 多纹理：按纹理 id 排序，使同纹理命令连续（稳定排序保持绘制顺序）。
     std::stable_sort(g_batch.begin(), g_batch.end(),
         [](const SpriteCmd& a, const SpriteCmd& b) { return a.texId < b.texId; });
 

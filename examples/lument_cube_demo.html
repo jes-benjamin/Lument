@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lument Cube · 3D 演示</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0a0a14; color: #e8e8f0;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; overflow: hidden; }
+  #wrap { display: flex; height: 100%; }
+  #left { flex: 1; position: relative; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #hint { position: absolute; left: 12px; bottom: 12px; font-size: 12px; color: #9aa;
+    background: rgba(0,0,0,.35); padding: 6px 10px; border-radius: 6px; pointer-events: none; }
+  #panel { width: 280px; background: #12121f; padding: 16px; border-left: 1px solid #23233a; overflow-y: auto; }
+  h2 { font-size: 15px; margin: 0 0 10px; color: #8ad; }
+  .row { margin-bottom: 12px; }
+  button { width: 100%; padding: 8px; margin: 4px 0; background: #2a2a44; color: #e8e8f0;
+    border: 1px solid #3a3a5a; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  button:hover { background: #353560; }
+  input[type=text] { width: 100%; padding: 7px; background: #1a1a2c; color: #e8e8f0;
+    border: 1px solid #3a3a5a; border-radius: 6px; font-size: 12px; }
+  .small { font-size: 12px; color: #99a; line-height: 1.6; }
+  #log { font-family: monospace; font-size: 11px; color: #7c7; background: #0c0c16;
+    padding: 8px; border-radius: 6px; height: 140px; overflow-y: auto; white-space: pre-wrap; }
+  .tag { display:inline-block; background:#223; color:#7cf; padding:1px 6px; border-radius:4px; font-size:11px; margin-right:4px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="left">
+    <canvas id="cube-canvas" width="960" height="540"></canvas>
+    <div id="hint">拖拽旋转 · 滚轮缩放 · 右键平移</div>
+  </div>
+  <div id="panel">
+    <h2>🧊 Lument Cube · 3D</h2>
+    <div class="row small">
+      <span class="tag">v2.0.0</span><span class="tag">Cube</span> 原生 3D 渲染与建模文件加载。
+    </div>
+    <div class="row">
+      <button id="btn-box">立方体 Box</button>
+      <button id="btn-sphere">球体 Sphere</button>
+      <button id="btn-plane">平面 Plane</button>
+    </div>
+    <div class="row">
+      <input type="text" id="url" placeholder="粘贴 glTF/OBJ/STL/PLY 的 URL" />
+      <button id="btn-load">加载外部模型</button>
+    </div>
+    <div class="row small">示例 URL（任选其一）：<br/>
+      glTF: <code>https://modelviewer.dev/shared-assets/models/Astronaut.glb</code><br/>
+      glTF: <code>https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf</code>
+    </div>
+    <div class="row">
+      <div class="small">支持格式：</div>
+      <div class="small" id="fmts"></div>
+    </div>
+    <div class="row">
+      <div class="small">日志：</div>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../runtime/js/lument.js"></script>
+<script>
+(function(){
+  const Cube = Lument.Cube;
+  const cv = document.getElementById('cube-canvas');
+  if (!Cube.init(cv)) { alert('当前浏览器不支持 WebGL2，无法运行 3D 演示。'); return; }
+  log('Lument '+Lument.VERSION+' ['+Lument.EDITION+'] · Cube 初始化完成');
+
+  // 相机轨道参数
+  let az = 35, el = 25, radius = 5, target = [0,0,0];
+  const camera = { position:[0,0,5], target:[0,0,0], up:[0,1,0], fovY:55, near:0.05, far:500 };
+
+  // 场景根节点
+  const root = Cube.createNode();
+  Cube.setAmbient([0.22,0.22,0.28]);
+  Cube.setLight([6,9,6], [1,1,1], 1.1, 1);         // 点光
+  Cube.setLight([0,1,0.3], [0.6,0.7,1.0], 0.5, 0); // 方向光（冷色补光）
+
+  function currentGeo(){ return document.getElementById('url').dataset.kind || 'box'; }
+
+  function setPrimitive(kind){
+    let m;
+    if(kind==='sphere') m = Cube.createSphere(1.4, 24);
+    else if(kind==='plane') m = Cube.createPlane(4,4);
+    else m = Cube.createBox(2.4,2.4,2.4);
+    Cube.nodeSetModel(root, null);
+    Cube.nodeSetMesh(root, m);
+    root.euler = [0,0,0];
+    radius = (kind==='plane') ? 6 : 5;     // 程序化模型用固定观察半径
+    log('已生成程序化 '+kind);
+  }
+
+  function fitCameraToBounds(){ radius = (currentGeo()==='plane') ? 6 : 5; }
+
+  // 外部模型加载
+  async function loadURL(url){
+    log('加载中：'+url);
+    try {
+      const model = await Cube.loadModel(url);
+      if(!model){ log('✗ 加载失败或格式不支持'); return; }
+      Cube.nodeSetMesh(root, null);
+      Cube.nodeSetModel(root, model);
+      root.euler = [0,0,0];
+      const b = model.bounds || {min:[-1,-1,-1],max:[1,1,1]};
+      const cx=(b.min[0]+b.max[0])/2, cy=(b.min[1]+b.max[1])/2, cz=(b.min[2]+b.max[2])/2;
+      const size=Math.max(b.max[0]-b.min[0],b.max[1]-b.min[1],b.max[2]-b.min[2])||2;
+      target=[cx,cy,cz]; radius=size*1.8;
+      log('✓ 加载成功：'+model.meshes.length+' 个子网格');
+    } catch(e){ log('✗ 异常：'+e.message); }
+  }
+
+  // 轨道相机 -> 笛卡尔坐标
+  function updateCamera(){
+    const er = el*Math.PI/180, ar = az*Math.PI/180;
+    camera.position = [
+      target[0] + radius*Math.cos(er)*Math.sin(ar),
+      target[1] + radius*Math.sin(er),
+      target[2] + radius*Math.cos(er)*Math.cos(ar)
+    ];
+  }
+
+  // 动画循环
+  function frame(t){
+    updateCamera();
+    root.euler[1] = (root.euler[1]||0) + 0.4;     // 持续绕 Y 旋转
+    Cube.render(camera, root);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // 鼠标轨道控制
+  let dragging=false, lastX=0, lastY=0, panning=false;
+  cv.addEventListener('mousedown', e=>{ if(e.button===2){panning=true;} else {dragging=true;} lastX=e.clientX; lastY=e.clientY; });
+  window.addEventListener('mouseup', ()=>{ dragging=false; panning=false; });
+  window.addEventListener('mousemove', e=>{
+    if(!dragging&&!panning) return;
+    const dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY;
+    if(panning){ target[0]-=dx*0.01; target[1]+=dy*0.01; }
+    else { az+=dx*0.5; el=Math.max(-89,Math.min(89, el+dy*0.5)); }
+  });
+  cv.addEventListener('wheel', e=>{ radius=Math.max(0.5, radius*(e.deltaY>0?1.1:0.9)); e.preventDefault(); }, {passive:false});
+  cv.addEventListener('contextmenu', e=>e.preventDefault());
+
+  // 按钮
+  document.getElementById('btn-box').onclick = ()=>setPrimitive('box');
+  document.getElementById('btn-sphere').onclick = ()=>setPrimitive('sphere');
+  document.getElementById('btn-plane').onclick = ()=>setPrimitive('plane');
+  document.getElementById('btn-load').onclick = ()=>{ const u=document.getElementById('url').value.trim(); if(u) loadURL(u); };
+
+  // 列出支持格式
+  document.getElementById('fmts').innerHTML = Cube.supportedFormats.map(f=>'<span class="tag">'+(f.fmt||f.name)+'</span>').join(' ');
+
+  function log(s){ const el=document.getElementById('log'); el.textContent += s+'\n'; el.scrollTop=el.scrollHeight; }
+  window.log = log;
+
+  setPrimitive('box');
+})();
+</script>
+</body>
+</html>

@@ -33,6 +33,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # ---------- 选项 ----------
 option(LUMENT_BUILD_SHARED "构建为共享库（关闭则构建静态库）" ON)
 option(LUMENT_ENABLE_GLES2 "启用 OpenGL ES 2.0 / WebGL 渲染后端" OFF)
+option(LUMENT_ENABLE_ASSIMP "启用 Assimp 集成（加载 FBX 等格式）" OFF)
 set(LUMENT_MAX_ENTITIES 16384 CACHE STRING "最大实体数（稀疏集合 sparse 数组容量）")
 set(LUMENT_MAX_WIDGETS 4096 CACHE STRING "最大 UI 控件数（对象池容量）")
 
@@ -59,6 +60,7 @@ set(LUMENT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core/src/lument_physics.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core/src/lument_network.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core/src/lument_ai.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/src/lument_3d.cpp
 )
 
 if(LUMENT_BUILD_SHARED)
@@ -133,6 +135,18 @@ endif()
 # 数学库
 if(UNIX AND NOT EMSCRIPTEN)
     target_link_libraries(lument PRIVATE m)
+endif()
+
+# ---------- Assimp 集成（可选，用于 FBX 等格式） ----------
+if(LUMENT_ENABLE_ASSIMP)
+    find_package(assimp QUIET)
+    if(assimp_FOUND)
+        target_compile_definitions(lument PRIVATE LUMENT_ENABLE_ASSIMP)
+        target_link_libraries(lument PRIVATE assimp::assimp)
+        message(STATUS "Lument Cube: Assimp 已启用（支持 FBX 等格式）")
+    else()
+        message(WARNING "LUMENT_ENABLE_ASSIMP=ON 但未找到 Assimp，FBX 加载将回退为不可用")
+    endif()
 endif()
 
 # 线程库（Linux 旧平台可能需要）

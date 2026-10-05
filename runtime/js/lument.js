@@ -8,7 +8,8 @@ const Lument = (function() {
     'use strict';
 
     // ========== 常量 ==========
-    const VERSION = '1.3.0';
+    const VERSION = '2.0.0';
+    const EDITION = 'Cube';
 
     const PLATFORM = {
         DESKTOP: 0, ANDROID: 1, IOS: 2, WEB: 3,
@@ -5513,12 +5514,407 @@ const Lument = (function() {
     }
 
     // ============================================================
+    // Lument Cube 3D 引擎 (LumentCube 分支)
+    // ------------------------------------------------------------
+    // 原生支持主流 3D 格式：glTF 2.0(.gltf/.glb)、Wavefront OBJ、
+    // STL、PLY。提供 WebGL2 渲染、透视相机、Phong 光照、场景图。
+    // 与 C++ 侧 3D 子系统 API 命名保持一致。
+    // ============================================================
+    const Cube = (function() {
+        'use strict';
+
+        // ---------- 3D 数学 ----------
+        const V3 = {
+            sub:(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],
+            cross:(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]],
+            dot:(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],
+            norm:(a)=>{ const l=Math.hypot(a[0],a[1],a[2])||1; return [a[0]/l,a[1]/l,a[2]/l]; },
+        };
+        const M4 = {
+            identity(){ const m=new Float32Array(16); m[0]=m[5]=m[10]=m[15]=1; return m; },
+            perspective(fovYDeg, aspect, near, far){
+                const f=1/Math.tan(fovYDeg*Math.PI/360), m=new Float32Array(16);
+                m[0]=f/aspect; m[5]=f; m[10]=(far+near)/(near-far); m[11]=-1;
+                m[14]=(2*far*near)/(near-far); return m;
+            },
+            lookAt(eye, center, up){
+                const z=V3.norm(V3.sub(eye,center));
+                const x=V3.norm(V3.cross(up,z)); const y=V3.cross(z,x); const m=new Float32Array(16);
+                m[0]=x[0];m[1]=y[0];m[2]=z[0];m[3]=0;
+                m[4]=x[1];m[5]=y[1];m[6]=z[1];m[7]=0;
+                m[8]=x[2];m[9]=y[2];m[10]=z[2];m[11]=0;
+                m[12]=-V3.dot(x,eye);m[13]=-V3.dot(y,eye);m[14]=-V3.dot(z,eye);m[15]=1; return m;
+            },
+            mul(a,b){ const r=new Float32Array(16);
+                for(let c=0;c<4;c++) for(let r2=0;r2<4;r2++){
+                    let s=0; for(let k=0;k<4;k++) s+=a[k*4+r2]*b[c*4+k]; r[c*4+r2]=s;
+                } return r; },
+            // 由位移/欧拉角/缩放构建局部矩阵（列主序）
+            fromTRS(pos, eulerDeg, scl){
+                const p=eulerDeg, yr=p[1]*Math.PI/180*0.5, pr=p[0]*Math.PI/180*0.5, rr=p[2]*Math.PI/180*0.5;
+                const cy=Math.cos(yr),sy=Math.sin(yr),cp=Math.cos(pr),sp=Math.sin(pr),cr=Math.cos(rr),sr=Math.sin(rr);
+                // 逐轴四元数相乘（yaw*pitch*roll）
+                const qy=[0,sy,0,cy], qp=[sp,0,0,cp], qr=[0,0,sr,cr];
+                const qmul=(a,b)=>[a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],
+                                   a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],
+                                   a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],
+                                   a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];
+                const t=qmul(qp,qr); const q=qmul(qy,t);
+                const x=q[0],y2=q[1],z=q[2],w=q[3];
+                const r=[1-2*(y2*y2+z*z), 2*(x*y2+w*z), 2*(x*z-w*y2),
+                         2*(x*y2-w*z), 1-2*(x*x+z*z), 2*(y2*z+w*x),
+                         2*(x*z+w*y2), 2*(y2*z-w*x), 1-2*(x*x+y2*y2)];
+                const m=new Float32Array(16);
+                m[0]=r[0]*scl[0];m[1]=r[1]*scl[0];m[2]=r[2]*scl[0];
+                m[4]=r[3]*scl[1];m[5]=r[4]*scl[1];m[6]=r[5]*scl[1];
+                m[8]=r[6]*scl[2];m[9]=r[7]*scl[2];m[10]=r[8]*scl[2];
+                m[12]=pos[0];m[13]=pos[1];m[14]=pos[2];m[15]=1; return m;
+            },
+        };
+
+        // ---------- 图元 ----------
+        function makeBox(sx,sy,sz){
+            const hx=sx/2,hy=sy/2,hz=sz/2;
+            const v=[-hx,-hy,-hz, hx,-hy,-hz, hx,hy,-hz, -hx,hy,-hz,
+                     hx,-hy,hz, -hx,-hy,hz, -hx,hy,hz, hx,hy,hz,
+                     -hx,-hy,hz, hx,-hy,hz, hx,-hy,-hz, -hx,-hy,-hz,
+                     -hx,hy,hz, hx,hy,hz, hx,hy,-hz, -hx,hy,-hz,
+                     hx,-hy,hz, hx,-hy,-hz, hx,hy,-hz, hx,hy,hz,
+                     -hx,-hy,-hz, -hx,-hy,hz, -hx,hy,hz, -hx,hy,-hz];
+            const n=[0,0,-1,0,0,-1,0,0,-1,0,0,-1, 0,0,1,0,0,1,0,0,1,0,0,1,
+                     0,-1,0,0,-1,0,0,-1,0,0,-1,0, 0,1,0,0,1,0,0,1,0,0,1,0,
+                     1,0,0,1,0,0,1,0,0,1,0,0, -1,0,0,-1,0,0,-1,0,0,-1,0,0];
+            const uv=new Array(24*2).fill(0);
+            const idx=[]; for(let i=0;i<6;i++){ const b=i*4; idx.push(b,b+1,b+2,b,b+2,b+3); }
+            return { positions:v, normals:n, uvs:uv, indices:idx };
+        }
+        function makePlane(w,h){ const hw=w/2,hh=h/2;
+            const v=[-hw,-hh,0, hw,-hh,0, hw,hh,0, -hw,hh,0]; const n=[0,0,1,0,0,1,0,0,1,0,0,1];
+            const uv=[0,0,1,0,1,1,0,1]; const idx=[0,1,2,0,2,3];
+            return { positions:v, normals:n, uvs:uv, indices:idx };
+        }
+        function makeSphere(radius,seg){ if(seg<3)seg=3;
+            const positions=[],normals=[],uvs=[],indices=[];
+            for(let y=0;y<=seg;y++){ const v=y/seg, th=v*Math.PI;
+                for(let x=0;x<=seg;x++){ const u=x/seg, ph=u*2*Math.PI;
+                    const nx=Math.sin(th)*Math.cos(ph), ny=Math.cos(th), nz=Math.sin(th)*Math.sin(ph);
+                    positions.push(nx*radius,ny*radius,nz*radius); normals.push(nx,ny,nz); uvs.push(u,v); } }
+            const stride=seg+1;
+            for(let y=0;y<seg;y++) for(let x=0;x<seg;x++){ const a=y*stride+x,b=a+1,c=a+stride,d=c+1;
+                indices.push(a,c,b,b,c,d); }
+            return { positions, normals, uvs, indices };
+        }
+
+        // ---------- 加载器 ----------
+        function parseOBJ(text){
+            const verts=[],norms=[],uvs=[],pos=[],nrm=[],uvout=[],indices=[];
+            const lines=text.split('\n');
+            const addV=(vi,ti,ni)=>{ vi=Math.abs(vi);ti=Math.abs(ti);ni=Math.abs(ni);
+                const x=verts[(vi-1)*3],y=verts[(vi-1)*3+1],z=verts[(vi-1)*3+2];
+                let nx=0,ny=0,nz=0,u=0,vv=0;
+                if(ni>0&&(ni-1)*3<norms.length){ nx=norms[(ni-1)*3];ny=norms[(ni-1)*3+1];nz=norms[(ni-1)*3+2]; }
+                if(ti>0&&(ti-1)*2<uvs.length){ u=uvs[(ti-1)*2];vv=uvs[(ti-1)*2+1]; }
+                const id=pos.length/3; pos.push(x,y,z); nrm.push(nx,ny,nz); uvout.push(u,vv); return id; };
+            for(const line of lines){ if(!line||line[0]==='#') continue;
+                const tk=line.trim().split(/\s+/); const tag=tk[0];
+                if(tag==='v'){ verts.push(+tk[1],+tk[2],+tk[3]); }
+                else if(tag==='vn'){ norms.push(+tk[1],+tk[2],+tk[3]); }
+                else if(tag==='vt'){ uvs.push(+tk[1],+tk[2]); }
+                else if(tag==='f'){ const face=[];
+                    for(let i=1;i<tk.length;i++){ const p=tk[i]; let vi=0,ti=0,ni=0;
+                        const s1=p.indexOf('/'), s2=p.indexOf('/',s1+1);
+                        if(s1<0) vi=+p;
+                        else { vi=+p.slice(0,s1); if(s2<0) ti=+p.slice(s1+1);
+                            else { ti=+p.slice(s1+1,s2); ni=+p.slice(s2+1); } }
+                        face.push(addV(vi,ti,ni)); }
+                    for(let i=1;i+1<face.length;i++) indices.push(face[0],face[i],face[i+1]);
+                } }
+            return { positions:pos, normals:nrm, uvs:uvout, indices };
+        }
+        function parseSTL(buf){
+            // 启发：以 "solid" 开头按 ASCII
+            const head=new TextDecoder().decode(new Uint8Array(buf.slice(0,5)));
+            const pos=[],idx=[];
+            if(head==='solid'){
+                const text=new TextDecoder().decode(new Uint8Array(buf)); const lines=text.split('\n');
+                let tri=[]; let cnt=0;
+                for(const line of lines){ const tk=line.trim().split(/\s+/);
+                    if(tk[0]==='vertex'){ tri.push(+tk[1],+tk[2],+tk[3]); cnt++;
+                        if(cnt===3){ for(let k=0;k<3;k++) pos.push(tri[k*3],tri[k*3+1],tri[k*3+2]);
+                            const b=pos.length/3-3; idx.push(b,b+1,b+2); cnt=0; tri=[]; } } }
+            } else {
+                const dv=new DataView(buf); let n=dv.getUint32(80,true); let off=84;
+                for(let i=0;i<n&&off+50<=buf.byteLength;i++){ off+=12;
+                    for(let v=0;v<3;v++){ const bp=off+v*12;
+                        pos.push(dv.getFloat32(bp,true),dv.getFloat32(bp+4,true),dv.getFloat32(bp+8,true)); }
+                    const base=pos.length/3-3; idx.push(base,base+1,base+2); off+=50; }
+            }
+            // 生成法线
+            const nrm=new Array(pos.length).fill(0);
+            for(let i=0;i+2<idx.length;i+=3){ const a=idx[i]*3,b=idx[i+1]*3,c=idx[i+2]*3;
+                const ux=pos[b]-pos[a],uy=pos[b+1]-pos[a+1],uz=pos[b+2]-pos[a+2];
+                const vx=pos[c]-pos[a],vy=pos[c+1]-pos[a+1],vz=pos[c+2]-pos[a+2];
+                const nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+                for(const id of [a,b,c]){ nrm[id]+=nx;nrm[id+1]+=ny;nrm[id+2]+=nz; } }
+            for(let i=0;i<nrm.length;i+=3){ const l=Math.hypot(nrm[i],nrm[i+1],nrm[i+2])||1; nrm[i]/=l;nrm[i+1]/=l;nrm[i+2]/=l; }
+            return { positions:pos, normals:nrm, uvs:new Array(pos.length/3*2).fill(0), indices:idx };
+        }
+        function parsePLY(text){
+            const lines=text.split('\n'); let i=0, binary=false, le=true, vcount=0,fcount=0;
+            const vprops=[]; let inV=false,inF=false; let dataOffset=0;
+            for(;i<lines.length;i++){ const tk=lines[i].trim().split(/\s+/); const t=tk[0];
+                if(t==='format'){ binary=(tk[1]==='binary_little_endian'||tk[1]==='binary_big_endian'); le=(tk[1]==='binary_little_endian'); }
+                else if(t==='element'){ if(tk[1]==='vertex'){ vcount=+tk[2]; inV=true; inF=false; } else if(tk[1]==='face'){ fcount=+tk[2]; inV=false; inF=true; } else { inV=false; inF=false; } }
+                else if(t==='property'&&inV){ vprops.push(tk[2]); }
+                else if(t==='end_header'){ dataOffset=i+1; break; }
+            }
+            const piX=vprops.indexOf('x'),piY=vprops.indexOf('y'),piZ=vprops.indexOf('z');
+            const piNx=vprops.indexOf('nx'),piNy=vprops.indexOf('ny'),piNz=vprops.indexOf('nz');
+            const stride=vprops.length; const pos=[],nrm=[],idx=[];
+            if(!binary){
+                let p=lines.slice(dataOffset).join('\n'); const ts=p.trim().split(/\s+/); let p2=0;
+                const get=()=>ts[p2++];
+                for(let v=0;v<vcount;v++){ const row=[]; for(let k=0;k<stride;k++) row.push(+get());
+                    pos.push(row[piX],row[piY],row[piZ]); if(piNx>=0) nrm.push(row[piNx],row[piNy],row[piNz]); }
+                for(let f=0;f<fcount;f++){ const nn=+get(); const ids=[]; for(let k=0;k<nn;k++) ids.push(+get());
+                    for(let k=1;k+1<nn;k++) idx.push(ids[0],ids[k],ids[k+1]); }
+            } else {
+                // 需要二进制体；从原始 text 重建不可靠，故这里对二进制 PLY 回退到提示。
+                console.warn('Lument.Cube: 二进制 PLY 解析需 ArrayBuffer，请使用 ArrayBuffer 版本的 loadModel');
+            }
+            return { positions:pos, normals:nrm, uvs:new Array(pos.length/3*2).fill(0), indices:idx };
+        }
+        function parsePLYBinary(buf){
+            const text=new TextDecoder('latin1').decode(new Uint8Array(buf.slice(0, Math.min(buf.byteLength, 4096))));
+            const lines=text.split('\n'); let i=0, le=true, vcount=0,fcount=0;
+            const vprops=[]; let inV=false; let dataOffsetBytes=-1;
+            for(;i<lines.length;i++){ const tk=lines[i].trim().split(/\s+/); const t=tk[0];
+                if(t==='format'){ le=(tk[1]==='binary_little_endian'); }
+                else if(t==='element'){ if(tk[1]==='vertex'){ vcount=+tk[2]; inV=true; } else if(tk[1]==='face'){ fcount=+tk[2]; inV=false; } else inV=false; }
+                else if(t==='property'&&inV){ vprops.push(tk[2]); }
+                else if(t==='end_header'){ dataOffsetBytes=lines[i].length+1; break; }
+            }
+            const headBytes=new TextEncoder().encode(lines.slice(0,i+1).join('\n')+'\n').length;
+            const piX=vprops.indexOf('x'),piY=vprops.indexOf('y'),piZ=vprops.indexOf('z');
+            const piNx=vprops.indexOf('nx'),piNy=vprops.indexOf('ny'),piNz=vprops.indexOf('nz');
+            const stride=vprops.length*4; const dv=new DataView(buf); let off=headBytes;
+            const rdF=(o)=>{ const v=dv.getFloat32(o,le); return v; };
+            const pos=[],nrm=[];
+            for(let v=0;v<vcount;v++){ const o=off+v*stride;
+                pos.push(rdF(o+piX*4),rdF(o+piY*4),rdF(o+piZ*4));
+                if(piNx>=0) nrm.push(rdF(o+piNx*4),rdF(o+piNy*4),rdF(o+piNz*4)); }
+            off+=vcount*stride;
+            const idx=[];
+            for(let f=0;f<fcount;f++){ const n=dv.getUint8(off); off+=1;
+                const ids=[]; for(let k=0;k<n;k++){ ids.push(dv.getUint32(off,le)); off+=4; }
+                for(let k=1;k+1<n;k++) idx.push(ids[0],ids[k],ids[k+1]); }
+            return { positions:pos, normals:nrm, uvs:new Array(pos.length/3*2).fill(0), indices:idx };
+        }
+        // glTF：返回 { meshes:[{positions,normals,uvs,indices,material}], materials:[...] }
+        function parseGLTF(json, binBlob, baseURL){
+            const meshes=[]; const materials=[];
+            const getBuf=(bv)=>{ const buf=json.buffers[bv.buffer]; let blob;
+                if(buf.uri && buf.uri.startsWith('data:')){ const comma=buf.uri.indexOf(','); const b64=buf.uri.slice(comma+1);
+                    const bin=atob(b64); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); blob=arr; }
+                else if(binBlob){ blob=binBlob; }
+                else { blob=null; }
+                if(!blob) return null;
+                return { data:blob, offset:bv.byteOffset||0, length:bv.byteLength, stride:bv.byteStride||0 };
+            };
+            const readAcc=(accIdx)=>{ const acc=json.accessors[accIdx]; if(!acc) return null;
+                const res=getBuf(json.bufferViews[acc.bufferView]); if(!res) return null;
+                const ct=acc.componentType, type=acc.type; const comps=(type==='VEC3')?3:(type==='VEC2')?2:(type==='VEC4')?4:1;
+                const dv=new DataView(res.data.buffer, res.data.byteOffset, res.data.byteLength);
+                const st=res.stride||comps*((ct===5126)?4:2); const out=[];
+                for(let i=0;i<acc.count;i++){ const base=res.offset+i*st;
+                    for(let c=0;c<comps;c++){ const e=base+c*((ct===5126)?4:2);
+                        if(ct===5126) out.push(dv.getFloat32(e,true));
+                        else if(ct===5123) out.push(dv.getUint16(e,true));
+                        else if(ct===5125) out.push(dv.getUint32(e,true));
+                        else if(ct===5121) out.push(dv.getUint8(e));
+                        else out.push(0); } }
+                return { data:out, comps };
+            };
+            const mList=json.meshes||[];
+            for(const mesh of mList){ for(const prim of (mesh.primitives||[])){
+                const posA=readAcc(prim.attributes.POSITION); if(!posA) continue;
+                const nrmA=prim.attributes.NORMAL!=null?readAcc(prim.attributes.NORMAL):null;
+                const uvA=prim.attributes.TEXCOORD_0!=null?readAcc(prim.attributes.TEXCOORD_0):null;
+                let idxA=null; if(prim.indices!=null) idxA=readAcc(prim.indices);
+                const meshObj={ positions:posA.data, normals:nrmA?nrmA.data:[], uvs:uvA?uvA.data:[], indices:idxA?idxA.data:[], material:0 };
+                meshes.push(meshObj);
+                const matIdx=prim.material; const mat={ baseColor:[1,1,1,1], metallic:0, roughness:1, albedoMap:null };
+                if(matIdx!=null && json.materials && json.materials[matIdx]){ const pbr=json.materials[matIdx].pbrMetallicRoughness||{};
+                    if(pbr.baseColorFactor) mat.baseColor=pbr.baseColorFactor;
+                    if(pbr.metallicFactor!=null) mat.metallic=pbr.metallicFactor;
+                    if(pbr.roughnessFactor!=null) mat.roughness=pbr.roughnessFactor;
+                    const texIdx=pbr.baseColorTexture && pbr.baseColorTexture.index;
+                    if(texIdx!=null && json.textures && json.images){ const img=json.images[json.textures[texIdx].source];
+                        if(img){ let uri=img.uri; if(uri && !uri.startsWith('data:') && baseURL) uri=baseURL+uri; mat.albedoUri=uri; } } }
+                materials.push(mat);
+            } }
+            return { meshes, materials };
+        }
+        async function parseGLB(arrayBuffer){
+            const dv=new DataView(arrayBuffer); const magic=dv.getUint32(0,true); if(magic!==0x46546C67) return null;
+            let off=12; let jsonText=null, binBlob=null;
+            while(off+8<=arrayBuffer.byteLength){ const len=dv.getUint32(off,true); const type=dv.getUint32(off+4,true); off+=8;
+                if(type===0x4E4F534A) jsonText=new TextDecoder().decode(new Uint8Array(arrayBuffer.slice(off,off+len)));
+                else if(type===0x004E4942) binBlob=new Uint8Array(arrayBuffer.slice(off,off+len));
+                if(off+len>arrayBuffer.byteLength) break; off+=len; }
+            if(!jsonText) return null;
+            return parseGLTF(JSON.parse(jsonText), binBlob, null);
+        }
+
+        // ---------- WebGL2 渲染器 ----------
+        let gl=null, canvas=null, prog=null;
+        const lights=[]; let ambient=[0.15,0.15,0.15];
+        function initGL(cnv){
+            canvas=cnv; gl=cnv.getContext('webgl2');
+            if(!gl){ console.warn('Lument.Cube: WebGL2 不可用'); return false; }
+            const VS='#version 300 es\nin vec3 aPos; in vec3 aNormal; in vec2 aUV;\n'
+                +'uniform mat4 uMVP; uniform mat4 uModel;\nout vec3 vN; out vec2 vUV; out vec3 vWP;\n'
+                +'void main(){ vec4 wp=uModel*vec4(aPos,1.0); vWP=wp.xyz; vN=mat3(uModel)*aNormal; vUV=aUV; gl_Position=uMVP*vec4(aPos,1.0); }';
+            const FS='#version 300 es\nprecision highp float;\n'
+                +'in vec3 vN; in vec2 vUV; in vec3 vWP;\nuniform vec3 uCamPos; uniform vec3 uBaseColor; uniform sampler2D uAlbedo;\n'
+                +'uniform int uHasAlbedo; uniform float uMetallic; uniform float uRoughness;\n'
+                +'uniform vec3 uAmbient; uniform int uNumLights;\n'
+                +'uniform vec3 uLightPos[4]; uniform vec3 uLightColor[4]; uniform float uLightIntensity[4]; uniform int uLightType[4];\n'
+                +'out vec4 frag;\nvoid main(){\n'
+                +' vec3 N=normalize(vN); vec3 base=uBaseColor; if(uHasAlbedo==1) base*=texture(uAlbedo,vUV).rgb;\n'
+                +' vec3 V=normalize(uCamPos-vWP); vec3 col=uAmbient*base;\n'
+                +' for(int i=0;i<4;i++){ if(i>=uNumLights) break; vec3 Ld=uLightPos[i]; float att=1.0;\n'
+                +'  if(uLightType[i]==1){ vec3 D=vWP-uLightPos[i]; float d=length(D); Ld=-normalize(D); att=clamp(1.0-d/30.0,0.0,1.0); } else Ld=normalize(Ld);\n'
+                +'  float diff=max(dot(N,Ld),0.0); vec3 H=normalize(Ld+V); float spec=pow(max(dot(N,H),0.0), mix(16.0,64.0,uRoughness));\n'
+                +'  vec3 lc=uLightColor[i]*uLightIntensity[i]*att; col+= base*diff*lc + spec*lc*(1.0-uRoughness); }\n'
+                +' frag=vec4(col,1.0); }';
+            const sh=(t,s)=>{ const o=gl.createShader(t); gl.shaderSource(o,s); gl.compileShader(o);
+                if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; };
+            prog=gl.createProgram(); gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS)); gl.linkProgram(prog);
+            return true;
+        }
+        function uploadMesh(m){
+            if(m._gl) return; const vao=gl.createVertexArray(); gl.bindVertexArray(vao);
+            const mk=(arr,size)=>{ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(arr),gl.STATIC_DRAW); return {b,size}; };
+            m._pos=mk(m.positions,3); m._nrm=mk(m.normals&&m.normals.length?m.normals:m.positions.map(()=>0),3);
+            m._uv=mk(m.uvs&&m.uvs.length?m.uvs:new Array(m.positions.length/3*2).fill(0),2);
+            const ib=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint32Array(m.indices),gl.STATIC_DRAW);
+            m._ib=ib; m._count=m.indices.length; m._gl=true; m._vao=vao; gl.bindVertexArray(null);
+        }
+        function loadTexture(url){
+            return new Promise((resolve)=>{ const img=new Image(); img.crossOrigin='anonymous'; img.onload=()=>{
+                const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+                gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR); resolve(t); };
+                img.onerror=()=>resolve(null); img.src=url; });
+        }
+        function drawMesh(m, mvp, model, mat){
+            uploadMesh(m); gl.bindVertexArray(m._vao);
+            gl.useProgram(prog);
+            const aPos=gl.getAttribLocation(prog,'aPos'), aN=gl.getAttribLocation(prog,'aNormal'), aUV=gl.getAttribLocation(prog,'aUV');
+            gl.bindBuffer(gl.ARRAY_BUFFER,m._pos.b); gl.enableVertexAttribArray(aPos); gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,0,0);
+            gl.bindBuffer(gl.ARRAY_BUFFER,m._nrm.b); gl.enableVertexAttribArray(aN); gl.vertexAttribPointer(aN,3,gl.FLOAT,false,0,0);
+            gl.bindBuffer(gl.ARRAY_BUFFER,m._uv.b); gl.enableVertexAttribArray(aUV); gl.vertexAttribPointer(aUV,2,gl.FLOAT,false,0,0);
+            gl.uniformMatrix4fv(gl.getUniformLocation(prog,'uMVP'),false,mvp);
+            gl.uniformMatrix4fv(gl.getUniformLocation(prog,'uModel'),false,model);
+            gl.uniform3f(gl.getUniformLocation(prog,'uCamPos'), 0,0,5);
+            gl.uniform3f(gl.getUniformLocation(prog,'uBaseColor'), (mat.baseColor?mat.baseColor[0]:1),(mat.baseColor?mat.baseColor[1]:1),(mat.baseColor?mat.baseColor[2]:1));
+            gl.uniform1f(gl.getUniformLocation(prog,'uMetallic'), mat.metallic||0);
+            gl.uniform1f(gl.getUniformLocation(prog,'uRoughness'), mat.roughness==null?1:mat.roughness);
+            gl.uniform3fv(gl.getUniformLocation(prog,'uAmbient'), ambient);
+            const nl=Math.min(lights.length,4); gl.uniform1i(gl.getUniformLocation(prog,'uNumLights'), nl);
+            const lp=[],lc=[],li=[],lt=[]; for(let i=0;i<4;i++){ const L=lights[i]||{pos:[0,5,0],color:[1,1,1],intensity:1,type:0};
+                lp.push(...(L.pos||[0,5,0])); lc.push(...(L.color||[1,1,1])); li.push(L.intensity==null?1:L.intensity); lt.push(L.type||0); }
+            gl.uniform3fv(gl.getUniformLocation(prog,'uLightPos'), lp);
+            gl.uniform3fv(gl.getUniformLocation(prog,'uLightColor'), lc);
+            gl.uniform1fv(gl.getUniformLocation(prog,'uLightIntensity'), li);
+            gl.uniform1iv(gl.getUniformLocation(prog,'uLightType'), lt);
+            // 纹理
+            let hasTex=(mat.albedoMap)?1:0;
+            gl.activeTexture(gl.TEXTURE0);
+            if(mat.albedoMap) gl.bindTexture(gl.TEXTURE_2D,mat.albedoMap); else gl.bindTexture(gl.TEXTURE_2D,null);
+            gl.uniform1i(gl.getUniformLocation(prog,'uHasAlbedo'), hasTex);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,m._ib);
+            gl.drawElements(gl.TRIANGLES, m._count, gl.UNSIGNED_INT, 0);
+            gl.bindVertexArray(null);
+        }
+
+        // ---------- 场景图 ----------
+        function createNode(){ return { position:[0,0,0], euler:[0,0,0], scale:[1,1,1], mesh:null, material:null, model:null, visible:true, children:[], parent:null }; }
+        function nodeSetMesh(n,m){ n.mesh=m; }
+        function nodeSetModel(n,model){ n.model=model; }
+        function nodeAddChild(n,c){ c.parent=n; n.children.push(c); }
+
+        // 递归绘制节点
+        function renderNode(n, viewProj, parentM){
+            if(!n.visible) return;
+            const localM=M4.fromTRS(n.position,n.euler,n.scale);
+            const worldM=(parentM)?M4.mul(parentM,localM):localM;
+            if(n.mesh){ const mvp=M4.mul(viewProj,worldM); drawMesh(n.mesh, mvp, worldM, n.material||{}); }
+            if(n.model){ for(let i=0;i<n.model.meshes.length;i++){ const mvp=M4.mul(viewProj,worldM); drawMesh(n.model.meshes[i], mvp, worldM, n.model.materials[i]||{}); } }
+            for(const c of n.children) renderNode(c, viewProj, worldM);
+        }
+
+        // ---------- 公开 API ----------
+        const supportedFormats=[
+            {fmt:'gltf',name:'glTF'},{fmt:'glb',name:'glTF Binary'},{fmt:'obj',name:'Wavefront OBJ'},
+            {fmt:'stl',name:'STL'},{fmt:'ply',name:'PLY'},{fmt:'dae',name:'COLLADA'},
+            {fmt:'fbx',name:'FBX (需转换)'},{fmt:'blend',name:'Blender (导出glTF)'}];
+
+        async function loadModel(url){
+            const ext=url.split('.').pop().toLowerCase();
+            const res=await fetch(url); const buf=await res.arrayBuffer();
+            let parsed=null;
+            if(ext==='glb') parsed=await parseGLB(buf);
+            else if(ext==='gltf'){ const json=JSON.parse(new TextDecoder().decode(buf)); parsed=parseGLTF(json,null, url.slice(0,url.lastIndexOf('/')+1)); }
+            else if(ext==='obj'){ const t=parseOBJ(new TextDecoder().decode(buf)); parsed={ meshes:[t], materials:[{baseColor:[0.8,0.8,0.85,1],roughness:0.8}] }; }
+            else if(ext==='stl'){ const t=parseSTL(buf); parsed={ meshes:[t], materials:[{baseColor:[0.8,0.8,0.85,1],roughness:0.6,metallic:0.1}] }; }
+            else if(ext==='ply'){ let t; if(new TextDecoder().decode(new Uint8Array(buf.slice(0,5)))==='ply' && new TextDecoder().decode(new Uint8Array(buf.slice(0,30))).includes('format ascii')) t=parsePLY(new TextDecoder().decode(buf)); else t=parsePLYBinary(buf);
+                parsed={ meshes:[t], materials:[{baseColor:[0.82,0.82,0.86,1],roughness:0.7}] }; }
+            else { console.warn('Lument.Cube: 不支持的格式 '+ext); return null; }
+            // 异步加载 albedo 贴图
+            if(parsed){ for(const mat of parsed.materials){ if(mat.albedoUri) mat.albedoMap=await loadTexture(mat.albedoUri); } }
+            parsed.bounds=computeBounds(parsed.meshes[0]);
+            return parsed;
+        }
+        function computeBounds(mesh){ let mn=[1e30,1e30,1e30],mx=[-1e30,-1e30,-1e30]; const p=mesh.positions;
+            for(let i=0;i<p.length;i+=3){ for(let c=0;c<3;c++){ if(p[i+c]<mn[c])mn[c]=p[i+c]; if(p[i+c]>mx[c])mx[c]=p[i+c]; } } return {min:mn,max:mx}; }
+
+        return {
+            VERSION, EDITION,
+            math:{ V3, M4 },
+            // 初始化（传入 WebGL2 canvas）
+            init(canvas){ return initGL(canvas); },
+            // 图元
+            createBox:(sx,sy,sz)=>makeBox(sx,sy,sz),
+            createPlane:(w,h)=>makePlane(w,h),
+            createSphere:(r,s)=>makeSphere(r,s),
+            // 模型加载
+            loadModel, parseGLTF, parseGLB, parseOBJ, parseSTL, parsePLY, parsePLYBinary,
+            // 场景图
+            createNode, nodeSetMesh, nodeSetModel, nodeAddChild,
+            // 渲染
+            setLight:(pos,color,intensity,type)=>{ lights.push({pos,color:color||[1,1,1],intensity:intensity==null?1:intensity,type:type||0}); },
+            setAmbient:(c)=>{ ambient=c||[0.15,0.15,0.15]; },
+            clearLights:()=>{ lights.length=0; },
+            render:(camera, rootNode)=>{
+                if(!gl) return; gl.viewport(0,0,canvas.width,canvas.height);
+                gl.clearColor(0.06,0.06,0.12,1); gl.enable(gl.DEPTH_TEST); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+                const eye=camera.position, ctr=camera.target, up=camera.up||[0,1,0];
+                const proj=M4.perspective(camera.fovY||60, canvas.width/canvas.height, camera.near||0.1, camera.far||100);
+                const view=M4.lookAt(eye,ctr,up); const vp=M4.mul(proj,view);
+                renderNode(rootNode, vp, null);
+            },
+            supportedFormats,
+        };
+    })();
+
+    // ============================================================
     // 公开 API
     // ============================================================
 
     return {
         // 常量
-        VERSION, PLATFORM, RENDERER, KEY,
+        VERSION, EDITION, PLATFORM, RENDERER, KEY,
         WIDGET, LAYOUT, EVENT, LIGHT,
         AUTOSIZE, BROADPHASE,
 
@@ -5730,6 +6126,11 @@ const Lument = (function() {
         live2dEnableAutoBlink, live2dEnableAutoMouth,
         live2dHitTest, galAttachLive2d,
         live2dUpdate, live2dRender,
+
+        // ============================================================
+        // Lument Cube 3D 引擎 (LumentCube 分支)
+        // ============================================================
+        Cube,
     };
 })();
 
