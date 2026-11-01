@@ -1,0 +1,251 @@
+<template>
+  <div class="page">
+    <div class="header-bar">
+      <text class="header-title">设置</text>
+    </div>
+
+    <list class="settings-list">
+      <list-item class="setting-item" onclick="toggleVibration">
+        <text class="setting-label">按键震动反馈</text>
+        <image class="toggle-img" src="{{vibrationOn ? '/Common/toggle_on.png' : '/Common/toggle_off.png'}}"></image>
+      </list-item>
+
+      <list-item class="setting-item" onclick="toggleAutoCalc">
+        <text class="setting-label">化学方程式自动计算</text>
+        <image class="toggle-img" src="{{autoCalcOn ? '/Common/toggle_on.png' : '/Common/toggle_off.png'}}"></image>
+      </list-item>
+
+      <list-item class="desc-item">
+        <div class="setting-desc">
+          <text class="desc-text">开启后输入化学方程式将自动运算结果，</text>
+          <text class="desc-text">关闭后仅进行配平。</text>
+        </div>
+      </list-item>
+
+      <list-item class="setting-item" onclick="toggleSmoothCurve">
+        <text class="setting-label">图像平滑曲线</text>
+        <image class="toggle-img" src="{{smoothOn ? '/Common/toggle_on.png' : '/Common/toggle_off.png'}}"></image>
+      </list-item>
+
+      <list-item class="desc-item">
+        <div class="setting-desc">
+          <text class="desc-text">开启后函数图像采样点增至150个，</text>
+          <text class="desc-text">曲线更平滑；关闭则使用默认采样。</text>
+        </div>
+      </list-item>
+
+      <list-item class="setting-item" onclick="openReward">
+        <text class="setting-label">赞赏我们</text>
+      </list-item>
+
+      <list-item class="setting-item" onclick="openAbout">
+        <text class="setting-label">关于应用</text>
+      </list-item>
+
+      <list-item class="bottom-spacer">
+        <text class="spacer-text"></text>
+      </list-item>
+    </list>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 466px;
+    height: 466px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .header-bar {
+    width: 430px;
+    height: 60px;
+    margin-top: 16px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .header-title {
+    color: #ffffff;
+    font-size: 34px;
+    font-weight: 800;
+  }
+
+  .settings-list {
+    width: 430px;
+    height: 390px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .setting-item {
+    width: 430px;
+    height: 120px;
+    border-radius: 60px;
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 4px;
+    border-color: #888888;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 36px;
+    padding-right: 36px;
+  }
+
+  .desc-item {
+    width: 430px;
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding-left: 36px;
+  }
+
+  .setting-desc {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .setting-label {
+    color: #ffffff;
+    font-size: 32px;
+    font-weight: 800;
+  }
+
+  .toggle-img {
+    width: 90px;
+    height: 45px;
+  }
+
+  .desc-text {
+    color: #888888;
+    font-size: 18px;
+    line-height: 24px;
+  }
+
+  .bottom-spacer {
+    width: 430px;
+    height: 120px;
+  }
+
+  .spacer-text {
+    font-size: 1px;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  var KEY_VIBRATION = 'setting_vibration'
+  var KEY_AUTOCALC = 'setting_autocalc'
+  var KEY_SMOOTH = 'setting_smooth_curve'
+
+  export default {
+    private: {
+      vibrationOn: true,
+      autoCalcOn: true,
+      smoothOn: true
+    },
+
+    onBackPress() {
+      router.back()
+      return true
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: KEY_VIBRATION,
+        success: function(data) {
+          if (data === 'false') {
+            self.vibrationOn = false
+          } else {
+            self.vibrationOn = true
+          }
+        },
+        fail: function() {
+          self.vibrationOn = true
+        }
+      })
+      storage.get({
+        key: KEY_AUTOCALC,
+        success: function(data) {
+          if (data === 'false') {
+            self.autoCalcOn = false
+          } else {
+            self.autoCalcOn = true
+          }
+        },
+        fail: function() {
+          self.autoCalcOn = true
+        }
+      })
+      storage.get({
+        key: KEY_SMOOTH,
+        success: function(data) {
+          if (data === 'false') {
+            self.smoothOn = false
+          } else {
+            self.smoothOn = true
+          }
+        },
+        fail: function() {
+          self.smoothOn = true
+        }
+      })
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    toggleVibration() {
+      this.vibrationOn = !this.vibrationOn
+      this.doVibrate()
+      storage.set({
+        key: KEY_VIBRATION,
+        value: this.vibrationOn ? 'true' : 'false'
+      })
+    },
+
+    toggleAutoCalc() {
+      this.autoCalcOn = !this.autoCalcOn
+      this.doVibrate()
+      storage.set({
+        key: KEY_AUTOCALC,
+        value: this.autoCalcOn ? 'true' : 'false'
+      })
+    },
+
+    toggleSmoothCurve() {
+      this.smoothOn = !this.smoothOn
+      this.doVibrate()
+      storage.set({
+        key: KEY_SMOOTH,
+        value: this.smoothOn ? 'true' : 'false'
+      })
+    },
+
+    openReward() {
+      this.doVibrate()
+      router.push({ uri: '/pages/Reward' })
+    },
+
+    openAbout() {
+      this.doVibrate()
+      router.push({ uri: '/pages/About' })
+    }
+  }
+</script>

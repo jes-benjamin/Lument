@@ -1,0 +1,354 @@
+<template>
+  <div class="page">
+    <text class="title-text">随机数生成</text>
+
+    <div class="input-row">
+      <div class="field-btn {{activeField==='min'?'field-active':''}}" onclick="selectField('min')">
+        <text class="field-label">最小值</text>
+        <text class="field-value">{{unlimited?'∞':minText}}</text>
+      </div>
+      <div class="field-btn {{activeField==='max'?'field-active':''}}" onclick="selectField('max')">
+        <text class="field-label">最大值</text>
+        <text class="field-value">{{unlimited?'∞':maxText}}</text>
+      </div>
+    </div>
+
+    <div class="result-card">
+      <text class="result-main">{{resultText}}</text>
+      <text class="result-desc">{{resultDesc}}</text>
+    </div>
+
+    <div class="keyboard">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('7')"><text class="key-text">7</text></div>
+        <div class="key key-num" onclick="pressKey('8')"><text class="key-text">8</text></div>
+        <div class="key key-num" onclick="pressKey('9')"><text class="key-text">9</text></div>
+        <div class="key key-func" onclick="deleteInput"><text class="key-small">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('4')"><text class="key-text">4</text></div>
+        <div class="key key-num" onclick="pressKey('5')"><text class="key-text">5</text></div>
+        <div class="key key-num" onclick="pressKey('6')"><text class="key-text">6</text></div>
+        <div class="key key-func" onclick="clearInput"><text class="key-text">C</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('1')"><text class="key-text">1</text></div>
+        <div class="key key-num" onclick="pressKey('2')"><text class="key-text">2</text></div>
+        <div class="key key-num" onclick="pressKey('3')"><text class="key-text">3</text></div>
+        <div class="key key-func" onclick="pressKey('-')"><text class="key-text">−</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('0')"><text class="key-text">0</text></div>
+        <div class="key key-func" onclick="pressKey('.')"><text class="key-text">.</text></div>
+        <div class="key key-toggle {{unlimited?'toggle-on':''}}" onclick="toggleUnlimited"><text class="key-small">无限</text></div>
+        <div class="key key-gen" onclick="generate"><text class="key-small">生成</text></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 466px;
+    height: 466px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .title-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+    margin-top: 14px;
+  }
+
+  .input-row {
+    width: 430px;
+    height: 64px;
+    margin-top: 6px;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .field-btn {
+    width: 200px;
+    height: 60px;
+    border-radius: 30px;
+    background-color: #1a1a1a;
+    margin-left: 5px;
+    margin-right: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-width: 2px;
+    border-color: transparent;
+  }
+
+  .field-active {
+    border-color: #6495ed;
+    background-color: rgba(100, 149, 237, 0.15);
+  }
+
+  .field-label {
+    color: #888888;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .field-value {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 800;
+    margin-top: 1px;
+  }
+
+  .result-card {
+    width: 420px;
+    height: 52px;
+    border-radius: 26px;
+    background-color: #2a2a2a;
+    margin-top: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .result-main {
+    color: #9370db;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .result-desc {
+    color: #888888;
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 1px;
+  }
+
+  .keyboard {
+    width: 430px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-row {
+    width: 430px;
+    height: 56px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key {
+    width: 94px;
+    height: 50px;
+    margin-left: 3px;
+    margin-right: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-num {
+    border-radius: 25px;
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 2px;
+    border-color: #888888;
+  }
+
+  .key-func {
+    border-radius: 25px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-toggle {
+    border-radius: 25px;
+    background-color: rgba(255, 165, 0, 0.35);
+    border-width: 2px;
+    border-color: #ffa500;
+  }
+
+  .toggle-on {
+    background-color: rgba(100, 149, 237, 0.5);
+    border-color: #6495ed;
+  }
+
+  .key-gen {
+    border-radius: 25px;
+    background-color: rgba(147, 112, 219, 0.35);
+    border-width: 2px;
+    border-color: #9370db;
+  }
+
+  .key-text {
+    color: #ffffff;
+    font-size: 26px;
+    font-weight: 700;
+  }
+
+  .key-small {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 700;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  export default {
+    private: {
+      minText: '0',
+      maxText: '100',
+      activeField: 'min',
+      unlimited: false,
+      resultText: '—',
+      resultDesc: '点击生成随机数',
+      vibrationOn: true
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    onBackPress() {
+      router.back()
+      return true
+    },
+
+    selectField(field) {
+      this.doVibrate()
+      this.activeField = field
+    },
+
+    toggleUnlimited() {
+      this.doVibrate()
+      this.unlimited = !this.unlimited
+    },
+
+    pressKey(ch) {
+      this.doVibrate()
+      if (this.unlimited) return
+      var field = this.activeField
+      var text = field === 'min' ? this.minText : this.maxText
+      if (ch === '.') {
+        if (text.indexOf('.') === -1) {
+          text = text === '' ? '0.' : text + '.'
+        }
+      } else if (ch === '-') {
+        if (text.charAt(0) === '-') {
+          text = text.substring(1)
+        } else {
+          text = '-' + text
+        }
+      } else {
+        if (text === '0') text = ch
+        else if (text === '-0') text = '-' + ch
+        else text += ch
+      }
+      if (field === 'min') this.minText = text
+      else this.maxText = text
+    },
+
+    deleteInput() {
+      this.doVibrate()
+      if (this.unlimited) return
+      var field = this.activeField
+      var text = field === 'min' ? this.minText : this.maxText
+      if (text.length <= 1 || (text.length === 2 && text.charAt(0) === '-')) {
+        text = '0'
+      } else {
+        text = text.substring(0, text.length - 1)
+      }
+      if (field === 'min') this.minText = text
+      else this.maxText = text
+    },
+
+    clearInput() {
+      this.doVibrate()
+      if (this.unlimited) return
+      var field = this.activeField
+      if (field === 'min') this.minText = '0'
+      else this.maxText = '0'
+    },
+
+    generate() {
+      this.doVibrate()
+      var minVal, maxVal
+      if (this.unlimited) {
+        minVal = -1000000
+        maxVal = 1000000
+      } else {
+        minVal = parseFloat(this.minText)
+        maxVal = parseFloat(this.maxText)
+        if (isNaN(minVal)) minVal = 0
+        if (isNaN(maxVal)) maxVal = 100
+      }
+
+      var lo = Math.min(minVal, maxVal)
+      var hi = Math.max(minVal, maxVal)
+
+      var minIsInt = (lo === Math.floor(lo))
+      var maxIsInt = (hi === Math.floor(hi))
+
+      var result, desc
+      if (minIsInt && maxIsInt) {
+        result = Math.floor(Math.random() * (hi - lo + 1)) + lo
+        desc = '整数 [' + lo + ', ' + hi + ']'
+      } else {
+        result = Math.random() * (hi - lo) + lo
+        result = Math.round(result * 100000) / 100000
+        desc = '浮点 [' + lo + ', ' + hi + ']'
+      }
+
+      this.resultText = String(result)
+      this.resultDesc = desc
+      this.addHistory(desc, String(result))
+    },
+
+    addHistory(expr, result) {
+      var HISTORY_KEY = 'calc_history_v2'
+      storage.get({
+        key: HISTORY_KEY,
+        success: function(data) {
+          var list = []
+          if (data) {
+            try { list = JSON.parse(data) } catch (e) { list = [] }
+          }
+          list.push({ type: '随机数', expr: expr, result: result })
+          if (list.length > 30) list = list.slice(1)
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify(list) })
+        },
+        fail: function() {
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify([{ type: '随机数', expr: expr, result: result }]) })
+        }
+      })
+    }
+  }
+</script>

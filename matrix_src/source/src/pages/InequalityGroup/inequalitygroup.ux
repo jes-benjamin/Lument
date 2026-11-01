@@ -6,100 +6,100 @@
     </div>
 
     <list class="kb-list">
-      <list-item class="kb-section" type="section">
+      <list-item class="kb-section">
         <text class="kb-section-text">数字输入</text>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="pressChar('7')"><text class="num-text">7</text></div>
         <div class="key key-num" onclick="pressChar('8')"><text class="num-text">8</text></div>
         <div class="key key-num" onclick="pressChar('9')"><text class="num-text">9</text></div>
         <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="pressChar('4')"><text class="num-text">4</text></div>
         <div class="key key-num" onclick="pressChar('5')"><text class="num-text">5</text></div>
         <div class="key key-num" onclick="pressChar('6')"><text class="num-text">6</text></div>
         <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="pressChar('1')"><text class="num-text">1</text></div>
         <div class="key key-num" onclick="pressChar('2')"><text class="num-text">2</text></div>
         <div class="key key-num" onclick="pressChar('3')"><text class="num-text">3</text></div>
         <div class="key key-equal" onclick="solve"><text class="num-dark">=</text></div>
       </list-item>
 
-      <list-item class="kb-section" type="section">
+      <list-item class="kb-section">
         <text class="kb-section-text">运算符</text>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-op" onclick="pressChar('+')"><text class="num-text">+</text></div>
         <div class="key key-op" onclick="pressChar('-')"><text class="num-text">−</text></div>
         <div class="key key-op" onclick="pressChar('*')"><text class="num-text">×</text></div>
         <div class="key key-op" onclick="pressChar('/')"><text class="num-text">÷</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-op" onclick="pressChar('>')"><text class="num-text">></text></div>
         <div class="key key-op" onclick="pressChar('<')"><text class="num-text"><</text></div>
         <div class="key key-num" onclick="pressChar('≥')"><text class="num-text">≥</text></div>
         <div class="key key-num" onclick="pressChar('≤')"><text class="num-text">≤</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-op" onclick="pressChar('^')"><text class="num-text">^</text></div>
         <div class="key key-num" onclick="pressChar('x')"><text class="num-text">x</text></div>
         <div class="key key-num" onclick="pressChar('(')"><text class="num-text">(</text></div>
         <div class="key key-num" onclick="pressChar(')')"><text class="num-text">)</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
         <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
         <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
         <div class="key key-equal" onclick="solve"><text class="num-dark">=</text></div>
       </list-item>
 
-      <list-item class="kb-section" type="section">
+      <list-item class="kb-section">
         <text class="kb-section-text">科学函数</text>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-sci" onclick="pressChar('sin(')"><text class="func-text">sin</text></div>
         <div class="key key-sci" onclick="pressChar('cos(')"><text class="func-text">cos</text></div>
         <div class="key key-sci" onclick="pressChar('tan(')"><text class="func-text">tan</text></div>
         <div class="key key-sci" onclick="pressChar('sqrt(')"><text class="func-text">√</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-sci" onclick="pressChar('log(')"><text class="func-text">log</text></div>
         <div class="key key-sci" onclick="pressChar('ln(')"><text class="func-text">ln</text></div>
         <div class="key key-sci" onclick="pressChar('lg(')"><text class="func-text">lg</text></div>
         <div class="key key-sci" onclick="pressChar('abs(')"><text class="func-text">|x|</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-sci" onclick="pressChar('e^')"><text class="func-text">e^x</text></div>
         <div class="key key-sci" onclick="pressChar('π')"><text class="num-text">π</text></div>
         <div class="key key-num" onclick="pressChar('(')"><text class="num-text">(</text></div>
         <div class="key key-num" onclick="pressChar(')')"><text class="num-text">)</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
         <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
         <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
         <div class="key key-equal" onclick="solve"><text class="num-dark">=</text></div>
       </list-item>
 
-      <list-item class="kb-section" type="section">
+      <list-item class="kb-section">
         <text class="kb-section-text">分隔符</text>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-sep" onclick="pressChar(';')"><text class="num-text">;</text></div>
         <div class="key key-op" onclick="pressChar('(')"><text class="num-text">(</text></div>
         <div class="key key-op" onclick="pressChar(')')"><text class="num-text">)</text></div>
         <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="pressChar('.')"><text class="num-text">.</text></div>
         <div class="key key-num" onclick="pressChar('x')"><text class="num-text">x</text></div>
         <div class="key key-op" onclick="pressChar('^')"><text class="num-text">^</text></div>
         <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
         <div class="key key-num" onclick="pressChar('≥')"><text class="num-text">≥</text></div>
         <div class="key key-num" onclick="pressChar('≤')"><text class="num-text">≤</text></div>
@@ -111,8 +111,8 @@
 
 <style>
   .page {
-    width: 336px;
-    height: 480px;
+    width: 100%;
+    height: 100%;
     background-color: #000000;
     display: flex;
     flex-direction: column;
@@ -150,8 +150,8 @@
   }
 
   .kb-list {
-    width: 336px;
-    height: 396px;
+    width: 100%;
+    flex-grow: 1;
     margin-top: 2px;
     display: flex;
     flex-direction: column;

@@ -1,0 +1,1082 @@
+<template>
+  <div class="page">
+    <div class="display-box">
+      <text class="expr-text">{{displayExpression}}</text>
+      <text class="result-text">{{result}}</text>
+    </div>
+
+    <div class="kb-wrapper">
+      <div class="nav-side" onclick="prevPage"><text class="nav-side-text">‹</text></div>
+      <div class="keyboard" if="{{keyPage === 0}}">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('7')"><text class="num-text">7</text></div>
+        <div class="key key-num" onclick="pressChar('8')"><text class="num-text">8</text></div>
+        <div class="key key-num" onclick="pressChar('9')"><text class="num-text">9</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('4')"><text class="num-text">4</text></div>
+        <div class="key key-num" onclick="pressChar('5')"><text class="num-text">5</text></div>
+        <div class="key key-num" onclick="pressChar('6')"><text class="num-text">6</text></div>
+        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('1')"><text class="num-text">1</text></div>
+        <div class="key key-num" onclick="pressChar('2')"><text class="num-text">2</text></div>
+        <div class="key key-num" onclick="pressChar('3')"><text class="num-text">3</text></div>
+        <div class="key key-equal" onclick="solve"><text class="num-dark">=</text></div>
+      </div>
+    </div>
+
+    <div class="keyboard" if="{{keyPage === 1}}">
+      <div class="key-row">
+        <div class="key key-op" onclick="pressChar('+')"><text class="num-text">+</text></div>
+        <div class="key key-op" onclick="pressChar('-')"><text class="num-text">−</text></div>
+        <div class="key key-op" onclick="pressChar('*')"><text class="num-text">×</text></div>
+        <div class="key key-op" onclick="pressChar('/')"><text class="num-text">÷</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-op" onclick="pressChar('>')"><text class="num-text">></text></div>
+        <div class="key key-op" onclick="pressChar('<')"><text class="num-text"><</text></div>
+        <div class="key key-num" onclick="pressChar('≥')"><text class="num-text">≥</text></div>
+        <div class="key key-num" onclick="pressChar('≤')"><text class="num-text">≤</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-op" onclick="pressChar('^')"><text class="num-text">^</text></div>
+        <div class="key key-num" onclick="pressChar('x')"><text class="num-text">x</text></div>
+        <div class="key key-num" onclick="pressChar('(')"><text class="num-text">(</text></div>
+        <div class="key key-num" onclick="pressChar(')')"><text class="num-text">)</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
+        <div class="key key-equal" onclick="solve"><text class="num-dark">=</text></div>
+      </div>
+    </div>
+
+    <div class="keyboard" if="{{keyPage === 2}}">
+      <div class="key-row">
+        <div class="key key-sci" onclick="pressChar('sin(')"><text class="func-text">sin</text></div>
+        <div class="key key-sci" onclick="pressChar('cos(')"><text class="func-text">cos</text></div>
+        <div class="key key-sci" onclick="pressChar('tan(')"><text class="func-text">tan</text></div>
+        <div class="key key-sci" onclick="pressChar('sqrt(')"><text class="func-text">√</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-sci" onclick="pressChar('log(')"><text class="func-text">log</text></div>
+        <div class="key key-sci" onclick="pressChar('ln(')"><text class="func-text">ln</text></div>
+        <div class="key key-sci" onclick="pressChar('lg(')"><text class="func-text">lg</text></div>
+        <div class="key key-sci" onclick="pressChar('abs(')"><text class="func-text">|x|</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-sci" onclick="pressChar('e^')"><text class="func-text">e^x</text></div>
+        <div class="key key-sci" onclick="pressChar('π')"><text class="num-text">π</text></div>
+        <div class="key key-num" onclick="pressChar('(')"><text class="num-text">(</text></div>
+        <div class="key key-num" onclick="pressChar(')')"><text class="num-text">)</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
+        <div class="key key-equal" onclick="solve"><text class="num-dark">=</text></div>
+      </div>
+    </div>
+
+    <div class="keyboard" if="{{keyPage === 3}}">
+      <div class="key-row">
+        <div class="key key-sep" onclick="pressChar(';')"><text class="num-text">;</text></div>
+        <div class="key key-op" onclick="pressChar('(')"><text class="num-text">(</text></div>
+        <div class="key key-op" onclick="pressChar(')')"><text class="num-text">)</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('.')"><text class="num-text">.</text></div>
+        <div class="key key-num" onclick="pressChar('x')"><text class="num-text">x</text></div>
+        <div class="key key-op" onclick="pressChar('^')"><text class="num-text">^</text></div>
+        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
+        <div class="key key-num" onclick="pressChar('≥')"><text class="num-text">≥</text></div>
+        <div class="key key-num" onclick="pressChar('≤')"><text class="num-text">≤</text></div>
+        <div class="key key-equal" onclick="solve"><text class="num-dark">=</text></div>
+      </div>
+    </div>
+      <div class="nav-side" onclick="nextPage"><text class="nav-side-text">›</text></div>
+    </div>
+    <text class="page-label-bottom">{{currentLabel}}</text>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 466px;
+    height: 466px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .display-box {
+    width: 380px;
+    height: 84px;
+    border-radius: 22px;
+    background-color: #1a1a1a;
+    margin-top: 36px;
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .expr-text {
+    width: 352px;
+    height: 22px;
+    color: #888888;
+    font-size: 13px;
+    text-align: right;
+  }
+
+  .result-text {
+    width: 352px;
+    height: 48px;
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .kb-wrapper {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-side {
+    width: 43px;
+    height: 43px;
+    border-radius: 21.5px;
+    background-color: #2a2a2a;
+    margin-left: 4px;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-side-text {
+    color: #ffffff;
+    font-size: 31px;
+    font-weight: 700;
+  }
+
+  .page-label-bottom {
+    color: #888888;
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: 6px;
+    text-align: center;
+  }
+
+  .keyboard {
+    width: 356px;
+    height: 308px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-row {
+    width: 356px;
+    height: 74px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key {
+    width: 80px;
+    height: 66px;
+    margin-left: 3px;
+    margin-right: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-num {
+    border-radius: 37px;
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 2px;
+    border-color: #888888;
+  }
+
+  .key-soft {
+    border-radius: 30px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-op {
+    border-radius: 30px;
+    background-color: rgba(147, 112, 219, 0.35);
+    border-width: 2px;
+    border-color: #9370db;
+  }
+
+  .key-sep {
+    border-radius: 30px;
+    background-color: rgba(255, 165, 0, 0.35);
+    border-width: 2px;
+    border-color: #ffa500;
+  }
+
+  .key-equal {
+    border-radius: 30px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-sci {
+    border-radius: 30px;
+    background-color: rgba(255, 165, 0, 0.35);
+    border-width: 2px;
+    border-color: #ffa500;
+  }
+
+  .num-text {
+    color: #ffffff;
+    font-size: 35px;
+    font-weight: 700;
+  }
+
+  .num-dark {
+    color: #ffffff;
+    font-size: 35px;
+    font-weight: 700;
+  }
+
+  .func-text {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 700;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  var LABELS = ['数字输入', '运算符', '科学函数', '分隔符']
+  var TOTAL = 4
+  var HISTORY_KEY = 'calc_history_v2'
+
+  export default {
+    private: {
+      expression: '',
+      result: '等待输入',
+      keyPage: 0,
+      vibrationOn: true
+    },
+
+    computed: {
+      displayExpression() {
+        return this.expression || '如: 2x+3>7;x<6'
+      },
+      currentLabel() {
+        return LABELS[this.keyPage]
+      }
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    onBackPress() {
+      router.back()
+      return true
+    },
+
+    prevPage() {
+      this.doVibrate()
+      this.keyPage = this.keyPage > 0 ? this.keyPage - 1 : TOTAL - 1
+    },
+
+    nextPage() {
+      this.doVibrate()
+      this.keyPage = this.keyPage < TOTAL - 1 ? this.keyPage + 1 : 0
+    },
+
+    clearAll() {
+      this.doVibrate()
+      this.expression = ''
+      this.result = '等待输入'
+    },
+
+    deleteLast() {
+      this.doVibrate()
+      if (this.expression.length > 0) {
+        this.expression = this.expression.substring(0, this.expression.length - 1)
+      }
+      if (this.expression.length === 0) {
+        this.result = '等待输入'
+      }
+    },
+
+    pressChar(ch) {
+      this.doVibrate()
+      if (this.result !== '等待输入' && this.result !== '格式错误' && this.result !== '无法解析' && this.result !== '请输入不等式组') {
+        this.expression = ''
+        this.result = '等待输入'
+      }
+      this.expression += ch
+    },
+
+    solve() {
+      this.doVibrate()
+      var expr = this.expression.replace(/\s/g, '').replace(/−/g, '-')
+      if (expr.length === 0) {
+        this.result = '请输入不等式组'
+        return
+      }
+
+      if (/log\(|ln\(|lg\(|sin\(|cos\(|tan\(|e\^|π/.test(expr)) {
+        this.result = '暂不支持超越函数组'
+        return
+      }
+
+      var parts = expr.split(';')
+      var inequalities = []
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].length > 0) inequalities.push(parts[i])
+      }
+
+      if (inequalities.length === 0) {
+        this.result = '请输入不等式组'
+        return
+      }
+
+      var ranges = []
+      for (var i = 0; i < inequalities.length; i++) {
+        var parsed = this.splitInequality(inequalities[i])
+        if (!parsed) {
+          this.result = '格式错误'
+          return
+        }
+        try {
+          var range = this.solveIneqRange(parsed.left, parsed.op, parsed.right)
+          ranges.push(range)
+        } catch (e) {
+          this.result = '无法解析'
+          return
+        }
+      }
+
+      try {
+        var result = this.intersectRanges(ranges)
+        this.result = this.rangeToStr(result)
+        if (this.result !== '无解' && this.result !== '格式错误' && this.result !== '无法解析') {
+          this.addHistory(this.expression, this.result)
+        }
+      } catch (e) {
+        this.result = '无法解析'
+      }
+    },
+
+    /* ===== 不等式组交集计算 ===== */
+
+    rangeToIntervals(r) {
+      if (r.type === 'all') return [{ lo: null, loStrict: false, hi: null, hiStrict: false }]
+      if (r.type === 'none') return []
+      if (r.type === 'single') return [{ lo: r.val, loStrict: false, hi: r.val, hiStrict: false }]
+      if (r.type === 'gt') return [{ lo: r.val, loStrict: true, hi: null, hiStrict: false }]
+      if (r.type === 'lt') return [{ lo: null, loStrict: false, hi: r.val, hiStrict: true }]
+      if (r.type === 'ge') return [{ lo: r.val, loStrict: false, hi: null, hiStrict: false }]
+      if (r.type === 'le') return [{ lo: null, loStrict: false, hi: r.val, hiStrict: false }]
+      if (r.type === 'middle') return [{ lo: r.lo, loStrict: r.loStrict, hi: r.hi, hiStrict: r.hiStrict }]
+      if (r.type === 'union') {
+        return this.rangeToIntervals(r.r1).concat(this.rangeToIntervals(r.r2))
+      }
+      return []
+    },
+
+    intersectIntervals(a, b) {
+      var lo, loStrict, hi, hiStrict
+
+      if (a.lo === null && b.lo === null) {
+        lo = null; loStrict = false
+      } else if (a.lo === null) {
+        lo = b.lo; loStrict = b.loStrict
+      } else if (b.lo === null) {
+        lo = a.lo; loStrict = a.loStrict
+      } else if (a.lo > b.lo) {
+        lo = a.lo; loStrict = a.loStrict
+      } else if (b.lo > a.lo) {
+        lo = b.lo; loStrict = b.loStrict
+      } else {
+        lo = a.lo; loStrict = a.loStrict || b.loStrict
+      }
+
+      if (a.hi === null && b.hi === null) {
+        hi = null; hiStrict = false
+      } else if (a.hi === null) {
+        hi = b.hi; hiStrict = b.hiStrict
+      } else if (b.hi === null) {
+        hi = a.hi; hiStrict = a.hiStrict
+      } else if (a.hi < b.hi) {
+        hi = a.hi; hiStrict = a.hiStrict
+      } else if (b.hi < a.hi) {
+        hi = b.hi; hiStrict = b.hiStrict
+      } else {
+        hi = a.hi; hiStrict = a.hiStrict || b.hiStrict
+      }
+
+      if (lo !== null && hi !== null) {
+        if (lo > hi) return null
+        if (lo === hi && (loStrict || hiStrict)) return null
+      }
+
+      return { lo: lo, loStrict: loStrict, hi: hi, hiStrict: hiStrict }
+    },
+
+    intersectRanges(ranges) {
+      if (ranges.length === 0) return { type: 'all' }
+
+      for (var i = 0; i < ranges.length; i++) {
+        if (ranges[i].type === 'none') return { type: 'none' }
+      }
+
+      var intervals = this.rangeToIntervals(ranges[0])
+
+      for (var i = 1; i < ranges.length; i++) {
+        var nextIntervals = this.rangeToIntervals(ranges[i])
+        var result = []
+        for (var j = 0; j < intervals.length; j++) {
+          for (var k = 0; k < nextIntervals.length; k++) {
+            var inter = this.intersectIntervals(intervals[j], nextIntervals[k])
+            if (inter) result.push(inter)
+          }
+        }
+        intervals = result
+        if (intervals.length === 0) return { type: 'none' }
+      }
+
+      return this.intervalsToRange(intervals)
+    },
+
+    intervalsToRange(intervals) {
+      if (intervals.length === 0) return { type: 'none' }
+      if (intervals.length === 1) {
+        return this.intervalToRange(intervals[0])
+      }
+
+      intervals.sort(function(a, b) {
+        if (a.lo === null && b.lo === null) return 0
+        if (a.lo === null) return -1
+        if (b.lo === null) return 1
+        if (a.lo < b.lo) return -1
+        if (a.lo > b.lo) return 1
+        return 0
+      })
+
+      var ranges = []
+      for (var i = 0; i < intervals.length; i++) {
+        var r = this.intervalToRange(intervals[i])
+        if (r.type !== 'none') ranges.push(r)
+      }
+
+      if (ranges.length === 0) return { type: 'none' }
+      if (ranges.length === 1) return ranges[0]
+
+      var result = ranges[0]
+      for (var i = 1; i < ranges.length; i++) {
+        result = { type: 'union', r1: result, r2: ranges[i] }
+      }
+      return result
+    },
+
+    intervalToRange(iv) {
+      if (iv.lo === null && iv.hi === null) return { type: 'all' }
+      if (iv.lo === null) {
+        if (iv.hiStrict) return { type: 'lt', val: iv.hi }
+        return { type: 'le', val: iv.hi }
+      }
+      if (iv.hi === null) {
+        if (iv.loStrict) return { type: 'gt', val: iv.lo }
+        return { type: 'ge', val: iv.lo }
+      }
+      if (iv.lo === iv.hi) {
+        if (iv.loStrict || iv.hiStrict) return { type: 'none' }
+        return { type: 'single', val: iv.lo }
+      }
+      return { type: 'middle', lo: iv.lo, loStrict: iv.loStrict, hi: iv.hi, hiStrict: iv.hiStrict }
+    },
+
+    /* ===== 单个不等式解析与求解 ===== */
+
+    splitInequality(expr) {
+      var ops = ['\u2265', '\u2264', '>', '<']
+      var i = -1
+      var op = ''
+      for (var k = 0; k < ops.length; k++) {
+        var idx = expr.indexOf(ops[k])
+        if (idx !== -1) {
+          if (i === -1 || idx < i) {
+            i = idx
+            op = ops[k]
+          }
+        }
+      }
+      if (i === -1) return null
+      return {
+        left: expr.substring(0, i),
+        op: op,
+        right: expr.substring(i + op.length)
+      }
+    },
+
+    hasTranscendental(s) {
+      return /log\(|ln\(|lg\(|sin\(|cos\(|tan\(|e\^|π|sqrt\(|abs\(/.test(s)
+    },
+
+    evalAtX(expr, xVal) {
+      var text = expr.replace(/ /g, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-')
+      text = text.replace(/π/g, '3.141592653589793')
+      text = text.replace(/e\^x/g, 'exp(x)')
+      text = text.replace(/e\^/g, 'exp(')
+      var openCount = 0
+      for (var i = 0; i < text.length; i++) {
+        if (text.charAt(i) === '(') openCount++
+        else if (text.charAt(i) === ')') openCount--
+      }
+      while (openCount > 0) { text += ')'; openCount-- }
+
+      text = text.replace(/([0-9.])x/g, '$1*x')
+      text = text.replace(/x([0-9.])/g, 'x*$1')
+      text = text.replace(/([0-9.])\(/g, '$1*(')
+      text = text.replace(/\)([0-9.])/g, ')*$1')
+      text = text.replace(/\)x/g, ')*x')
+      text = text.replace(/x\(/g, 'x*(')
+      text = text.replace(/([0-9.])(sin|cos|tan|log|ln|lg|exp|sqrt|abs)/g, '$1*$2')
+      text = text.replace(/\)(sin|cos|tan|log|ln|lg|exp|sqrt|abs)/g, ')*$1')
+
+      var index = 0
+      function peek() { return text.charAt(index) }
+      function eat(ch) { if (peek() === ch) { index++; return true } return false }
+      function parse() { var v = parseAddSub(); return v }
+      function parseAddSub() { var v = parseMulDiv(); while (index < text.length) { if (eat('+')) v += parseMulDiv(); else if (eat('-')) v -= parseMulDiv(); else break } return v }
+      function parseMulDiv() { var v = parsePower(); while (index < text.length) { if (eat('*')) v *= parsePower(); else if (eat('/')) v /= parsePower(); else break } return v }
+      function parsePower() { var v = parseUnary(); if (eat('^')) v = Math.pow(v, parsePower()); return v }
+      function parseUnary() { if (eat('+')) return parseUnary(); if (eat('-')) return -parseUnary(); return parsePrimary() }
+      function parsePrimary() {
+        var ch = peek()
+        if (eat('(')) { var v = parseAddSub(); eat(')'); return v }
+        if (ch === 'x') { index++; return xVal }
+        if ((ch >= '0' && ch <= '9') || ch === '.') { var start = index; while (index < text.length && ((peek() >= '0' && peek() <= '9') || peek() === '.')) index++; return parseFloat(text.substring(start, index)) }
+        return parseName()
+      }
+      function parseName() {
+        var start = index
+        while (index < text.length && ((text.charAt(index) >= 'a' && text.charAt(index) <= 'z') || (text.charAt(index) >= 'A' && text.charAt(index) <= 'Z'))) index++
+        var name = text.substring(start, index)
+        if (name === '') return 0
+        if (name === 'e') return Math.E
+        eat('(')
+        var arg = parseAddSub()
+        eat(')')
+        if (name === 'sin') return Math.sin(arg)
+        if (name === 'cos') return Math.cos(arg)
+        if (name === 'tan') return Math.tan(arg)
+        if (name === 'log') return Math.log10(arg)
+        if (name === 'lg') return Math.log10(arg)
+        if (name === 'ln') return Math.log(arg)
+        if (name === 'exp') return Math.exp(arg)
+        if (name === 'sqrt') return Math.sqrt(arg)
+        if (name === 'abs') return Math.abs(arg)
+        return 0
+      }
+      return parse()
+    },
+
+    solveNumerical(leftStr, op, rightStr) {
+      var self = this
+      var isStrict = (op === '>' || op === '<')
+      var f = function(x) {
+        try { return self.evalAtX(leftStr, x) - self.evalAtX(rightStr, x) } catch(e) { return NaN }
+      }
+
+      var samples = []
+      for (var xi = -60; xi <= 60; xi++) {
+        var x = xi * 0.5
+        var y = f(x)
+        if (!isNaN(y) && isFinite(y)) samples.push({x: x, y: y})
+      }
+      if (samples.length === 0) return { type: 'none' }
+
+      var roots = []
+      for (var i = 1; i < samples.length; i++) {
+        if (samples[i-1].y * samples[i].y < 0) {
+          var a = samples[i-1].x, b = samples[i].x
+          var fa = samples[i-1].y
+          for (var iter = 0; iter < 15; iter++) {
+            var m = (a + b) / 2
+            var fm = f(m)
+            if (Math.abs(fm) < 1e-6) { a = b = m; break }
+            if (fa * fm < 0) { b = m } else { a = m; fa = fm }
+          }
+          roots.push((a + b) / 2)
+        } else if (Math.abs(samples[i].y) < 1e-9) {
+          roots.push(samples[i].x)
+        }
+      }
+
+      roots.sort(function(a,b){return a-b})
+      var uniqueRoots = []
+      for (var i = 0; i < roots.length; i++) {
+        if (i === 0 || Math.abs(roots[i] - roots[i-1]) > 0.01) uniqueRoots.push(roots[i])
+      }
+
+      if (uniqueRoots.length === 0) {
+        var testVal = f(0)
+        if (isNaN(testVal)) return { type: 'none' }
+        var holds = false
+        if (op === '>') holds = testVal > 0
+        else if (op === '<') holds = testVal < 0
+        else if (op === '\u2265') holds = testVal >= 0
+        else if (op === '\u2264') holds = testVal <= 0
+        return holds ? { type: 'all' } : { type: 'none' }
+      }
+
+      if (uniqueRoots.length === 1) {
+        var r = uniqueRoots[0]
+        var leftTest = f(r - 1)
+        var leftHolds = false
+        if (op === '>') leftHolds = leftTest > 0
+        else if (op === '<') leftHolds = leftTest < 0
+        else if (op === '\u2265') leftHolds = leftTest >= 0
+        else if (op === '\u2264') leftHolds = leftTest <= 0
+        var rightTest = f(r + 1)
+        var rightHolds = false
+        if (op === '>') rightHolds = rightTest > 0
+        else if (op === '<') rightHolds = rightTest < 0
+        else if (op === '\u2265') rightHolds = rightTest >= 0
+        else if (op === '\u2264') rightHolds = rightTest <= 0
+        if (leftHolds && rightHolds) return { type: 'all' }
+        if (leftHolds) return { type: isStrict ? 'lt' : 'le', val: r }
+        if (rightHolds) return { type: isStrict ? 'gt' : 'ge', val: r }
+        return { type: 'none' }
+      }
+
+      var intervals = []
+      var pts = [-1e9].concat(uniqueRoots).concat([1e9])
+      for (var i = 0; i < pts.length - 1; i++) {
+        var mid = (pts[i] + pts[i+1]) / 2
+        if (mid < -1e8) mid = pts[i+1] - 1
+        if (mid > 1e8) mid = pts[i] + 1
+        var val = f(mid)
+        var ok = false
+        if (op === '>') ok = val > 0
+        else if (op === '<') ok = val < 0
+        else if (op === '\u2265') ok = val >= 0
+        else if (op === '\u2264') ok = val <= 0
+        if (ok) {
+          var lo = i === 0 ? null : pts[i]
+          var hi = i === pts.length - 2 ? null : pts[i+1]
+          intervals.push({ lo: lo, hi: hi, loStrict: isStrict, hiStrict: isStrict })
+        }
+      }
+
+      if (intervals.length === 0) return { type: 'none' }
+      if (intervals.length === 1) {
+        var iv = intervals[0]
+        if (iv.lo === null && iv.hi === null) return { type: 'all' }
+        if (iv.lo === null) return { type: iv.hiStrict ? 'lt' : 'le', val: iv.hi }
+        if (iv.hi === null) return { type: iv.loStrict ? 'gt' : 'ge', val: iv.lo }
+        return { type: 'middle', lo: iv.lo, loStrict: iv.loStrict, hi: iv.hi, hiStrict: iv.hiStrict }
+      }
+      var result = null
+      for (var i = intervals.length - 1; i >= 0; i--) {
+        var iv2 = intervals[i]
+        var rng
+        if (iv2.lo === null && iv2.hi === null) rng = { type: 'all' }
+        else if (iv2.lo === null) rng = { type: iv2.hiStrict ? 'lt' : 'le', val: iv2.hi }
+        else if (iv2.hi === null) rng = { type: iv2.loStrict ? 'gt' : 'ge', val: iv2.lo }
+        else rng = { type: 'middle', lo: iv2.lo, loStrict: iv2.loStrict, hi: iv2.hi, hiStrict: iv2.hiStrict }
+        if (result === null) result = rng
+        else result = { type: 'union', r1: rng, r2: result }
+      }
+      return result
+    },
+
+    solveIneqRange(leftStr, op, rightStr) {
+      if (this.hasTranscendental(leftStr) || this.hasTranscendental(rightStr)) {
+        return this.solveNumerical(leftStr, op, rightStr)
+      }
+
+      var left = this.parseExpr(leftStr)
+      var right = this.parseExpr(rightStr)
+
+      var a = (left.x2 || 0) - (right.x2 || 0)
+      var b = (left.x1 || 0) - (right.x1 || 0)
+      var c = (left['const'] || 0) - (right['const'] || 0)
+
+      var eps = 1e-9
+      if (Math.abs(a) < eps) {
+        if (Math.abs(b) < eps) {
+          var holds = false
+          if (op === '>') holds = c > 0
+          else if (op === '<') holds = c < 0
+          else if (op === '\u2265') holds = c >= 0
+          else if (op === '\u2264') holds = c <= 0
+          return holds ? { type: 'all' } : { type: 'none' }
+        }
+
+        var val = -c / b
+        var actualOp = op
+        if (b < 0) {
+          if (op === '>') actualOp = '<'
+          else if (op === '<') actualOp = '>'
+          else if (op === '\u2265') actualOp = '\u2264'
+          else if (op === '\u2264') actualOp = '\u2265'
+        }
+
+        if (actualOp === '>') return { type: 'gt', val: val }
+        if (actualOp === '<') return { type: 'lt', val: val }
+        if (actualOp === '\u2265') return { type: 'ge', val: val }
+        if (actualOp === '\u2264') return { type: 'le', val: val }
+        return { type: 'none' }
+      }
+
+      var disc = b * b - 4 * a * c
+      var isStrict = (op === '>' || op === '<')
+
+      if (disc < -eps) {
+        var alwaysPositive = (a > 0)
+        var wantPositive = (op === '>' || op === '\u2265')
+        if (alwaysPositive === wantPositive) {
+          return { type: 'all' }
+        } else {
+          return { type: 'none' }
+        }
+      }
+
+      if (Math.abs(disc) <= eps) {
+        var x0 = -b / (2 * a)
+        var parabolaUp = (a > 0)
+
+        if (parabolaUp) {
+          if (op === '>') {
+            return { type: 'union', r1: { type: 'lt', val: x0 }, r2: { type: 'gt', val: x0 } }
+          } else if (op === '<') {
+            return { type: 'none' }
+          } else if (op === '\u2265') {
+            return { type: 'all' }
+          } else if (op === '\u2264') {
+            return { type: 'single', val: x0 }
+          }
+        } else {
+          if (op === '<') {
+            return { type: 'union', r1: { type: 'lt', val: x0 }, r2: { type: 'gt', val: x0 } }
+          } else if (op === '>') {
+            return { type: 'none' }
+          } else if (op === '\u2264') {
+            return { type: 'all' }
+          } else if (op === '\u2265') {
+            return { type: 'single', val: x0 }
+          }
+        }
+        return { type: 'none' }
+      }
+
+      var sqrtDisc = Math.sqrt(disc)
+      var x1 = (-b - sqrtDisc) / (2 * a)
+      var x2 = (-b + sqrtDisc) / (2 * a)
+      if (x1 > x2) {
+        var tmp = x1
+        x1 = x2
+        x2 = tmp
+      }
+
+      var aPositive = (a > 0)
+      var wantMiddle = false
+      if (aPositive) {
+        if (op === '<' || op === '\u2264') wantMiddle = true
+      } else {
+        if (op === '>' || op === '\u2265') wantMiddle = true
+      }
+
+      if (wantMiddle) {
+        if (isStrict) {
+          return { type: 'middle', lo: x1, loStrict: true, hi: x2, hiStrict: true }
+        } else {
+          return { type: 'middle', lo: x1, loStrict: false, hi: x2, hiStrict: false }
+        }
+      } else {
+        return { type: 'union', r1: { type: isStrict ? 'lt' : 'le', val: x1 }, r2: { type: isStrict ? 'gt' : 'ge', val: x2 } }
+      }
+    },
+
+    rangeToStr(r) {
+      if (r.type === 'all') return '\u5168\u4f53\u5b9e\u6570'
+      if (r.type === 'none') return '\u65e0\u89e3'
+      if (r.type === 'single') return 'x=' + this.formatNum(r.val)
+      if (r.type === 'gt') return 'x > ' + this.formatNum(r.val)
+      if (r.type === 'lt') return 'x < ' + this.formatNum(r.val)
+      if (r.type === 'ge') return 'x \u2265 ' + this.formatNum(r.val)
+      if (r.type === 'le') return 'x \u2264 ' + this.formatNum(r.val)
+      if (r.type === 'middle') {
+        var loBracket = r.loStrict ? '(' : '['
+        var hiBracket = r.hiStrict ? ')' : ']'
+        return loBracket + this.formatNum(r.lo) + ', ' + this.formatNum(r.hi) + hiBracket
+      }
+      if (r.type === 'union') {
+        return this.rangeToStr(r.r1) + ' \u6216 ' + this.rangeToStr(r.r2)
+      }
+      return '\u65e0\u89e3'
+    },
+
+    /* ===== 表达式解析器 ===== */
+
+    parseExpr(s) {
+      if (s.length === 0) return { x2: 0, x1: 0, 'const': 0 }
+      s = s.replace(/\u00d7/g, '*').replace(/\u00f7/g, '/')
+      var tokens = this.tokenize(s)
+      var result = this.parseExprRD(tokens, 0)
+      var coeffs = result.coeffs
+      if (!coeffs.x2) coeffs.x2 = 0
+      if (!coeffs.x1) coeffs.x1 = 0
+      if (!coeffs['const']) coeffs['const'] = 0
+      return coeffs
+    },
+
+    parseExprRD(tokens, pos) {
+      var sign = 1
+      if (pos < tokens.length && tokens[pos] === '-') {
+        sign = -1
+        pos++
+      } else if (pos < tokens.length && tokens[pos] === '+') {
+        pos++
+      }
+      var res = this.parseTerm(tokens, pos)
+      var coeffs = res.coeffs
+      if (sign === -1) {
+        for (var key in coeffs) {
+          if (coeffs.hasOwnProperty(key)) {
+            coeffs[key] = -coeffs[key]
+          }
+        }
+      }
+      var i = res.pos
+      while (i < tokens.length && (tokens[i] === '+' || tokens[i] === '-')) {
+        var op = tokens[i]
+        var termRes = this.parseTerm(tokens, i + 1)
+        for (var key2 in termRes.coeffs) {
+          var val = termRes.coeffs[key2]
+          if (op === '-') val = -val
+          coeffs[key2] = (coeffs[key2] || 0) + val
+        }
+        i = termRes.pos
+      }
+      return { coeffs: coeffs, pos: i }
+    },
+
+    parseTerm(tokens, pos) {
+      var res = this.parseFactor(tokens, pos)
+      var coeffs = res.coeffs
+      var i = res.pos
+      while (i < tokens.length) {
+        if (tokens[i] === '*' || tokens[i] === '/') {
+          var op = tokens[i]
+          var factorRes = this.parseFactor(tokens, i + 1)
+          if (op === '*') {
+            coeffs = this.multiplyPoly(coeffs, factorRes.coeffs)
+          } else {
+            coeffs = this.dividePoly(coeffs, factorRes.coeffs)
+          }
+          i = factorRes.pos
+        } else if (tokens[i] === '(' || tokens[i] === 'x') {
+          var factorRes2 = this.parseFactor(tokens, i)
+          coeffs = this.multiplyPoly(coeffs, factorRes2.coeffs)
+          i = factorRes2.pos
+        } else {
+          break
+        }
+      }
+      return { coeffs: coeffs, pos: i }
+    },
+
+    parseFactor(tokens, pos) {
+      if (pos >= tokens.length) return { coeffs: {}, pos: pos }
+      var t = tokens[pos]
+
+      if (t === '(') {
+        var exprRes = this.parseExprRD(tokens, pos + 1)
+        var endPos = exprRes.pos
+        if (endPos < tokens.length && tokens[endPos] === ')') {
+          endPos++
+        }
+        return { coeffs: exprRes.coeffs, pos: endPos }
+      }
+
+      if (t === 'x') {
+        var coeff = 1
+        if (pos + 1 < tokens.length && tokens[pos + 1] === '^') {
+          var power = parseInt(tokens[pos + 2])
+          if (!isNaN(power) && power >= 1) {
+            var key = 'x' + power
+            var obj = {}
+            obj[key] = coeff
+            return { coeffs: obj, pos: pos + 3 }
+          }
+        }
+        var obj2 = {}
+        obj2['x1'] = coeff
+        return { coeffs: obj2, pos: pos + 1 }
+      }
+
+      var num = parseFloat(t)
+      if (!isNaN(num)) {
+        if (pos + 1 < tokens.length && tokens[pos + 1] === 'x') {
+          var varCoeff = num
+          if (pos + 2 < tokens.length && tokens[pos + 2] === '^') {
+            var varPower = parseInt(tokens[pos + 3])
+            if (!isNaN(varPower) && varPower >= 1) {
+              var obj3 = {}
+              obj3['x' + varPower] = varCoeff
+              return { coeffs: obj3, pos: pos + 4 }
+            }
+          }
+          var obj4 = {}
+          obj4['x1'] = varCoeff
+          return { coeffs: obj4, pos: pos + 2 }
+        }
+        return { coeffs: { 'const': num }, pos: pos + 1 }
+      }
+
+      return { coeffs: {}, pos: pos + 1 }
+    },
+
+    multiplyPoly(c1, c2) {
+      var result = {}
+      for (var k1 in c1) {
+        if (!c1.hasOwnProperty(k1)) continue
+        for (var k2 in c2) {
+          if (!c2.hasOwnProperty(k2)) continue
+          var v = c1[k1] * c2[k2]
+          var deg1 = k1 === 'const' ? 0 : parseInt(k1.substring(1))
+          var deg2 = k2 === 'const' ? 0 : parseInt(k2.substring(1))
+          var newDeg = deg1 + deg2
+          var newKey = newDeg === 0 ? 'const' : 'x' + newDeg
+          result[newKey] = (result[newKey] || 0) + v
+        }
+      }
+      return result
+    },
+
+    dividePoly(c1, c2) {
+      var keys = Object.keys(c2)
+      if (keys.length === 1 && keys[0] === 'const') {
+        var divisor = c2['const']
+        if (divisor === 0) return c1
+        var result = {}
+        for (var k in c1) {
+          if (c1.hasOwnProperty(k)) {
+            result[k] = c1[k] / divisor
+          }
+        }
+        return result
+      }
+      return c1
+    },
+
+    tokenize(s) {
+      var tokens = []
+      var i = 0
+      while (i < s.length) {
+        var ch = s.charAt(i)
+        if (ch === '+' || ch === '-' || ch === '*' || ch === '/' || ch === '(' || ch === ')') {
+          if (ch === '-' && (tokens.length === 0 || tokens[tokens.length - 1] === '(' || tokens[tokens.length - 1] === '+' || tokens[tokens.length - 1] === '-' || tokens[tokens.length - 1] === '*' || tokens[tokens.length - 1] === '/')) {
+            var num = '-'
+            i++
+            while (i < s.length && ((s.charAt(i) >= '0' && s.charAt(i) <= '9') || s.charAt(i) === '.')) {
+              num += s.charAt(i)
+              i++
+            }
+            tokens.push(num)
+            continue
+          }
+          tokens.push(ch)
+          i++
+        } else if (ch === '^') {
+          tokens.push(ch)
+          i++
+        } else if ((ch >= '0' && ch <= '9') || ch === '.') {
+          var num2 = ''
+          while (i < s.length && ((s.charAt(i) >= '0' && s.charAt(i) <= '9') || s.charAt(i) === '.')) {
+            num2 += s.charAt(i)
+            i++
+          }
+          tokens.push(num2)
+        } else if (ch === 'x') {
+          tokens.push(ch)
+          i++
+        } else {
+          i++
+        }
+      }
+      return tokens
+    },
+
+    formatNum(n) {
+      var rounded = Math.round(n * 100000) / 100000
+      if (Math.abs(rounded - Math.round(rounded)) < 0.000001) {
+        return String(Math.round(rounded))
+      }
+      var str = String(rounded)
+      if (str.length > 10) {
+        str = rounded.toExponential(4)
+      }
+      return str
+    },
+
+    addHistory(expr, result) {
+      storage.get({
+        key: HISTORY_KEY,
+        success: function(data) {
+          var list = []
+          if (data) {
+            try { list = JSON.parse(data) } catch (e) { list = [] }
+          }
+          list.push({ type: '解不等式组', expr: expr, result: result })
+          if (list.length > 30) list = list.slice(1)
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify(list) })
+        },
+        fail: function() {
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify([{ type: '解不等式组', expr: expr, result: result }]) })
+        }
+      })
+    }
+  }
+</script>

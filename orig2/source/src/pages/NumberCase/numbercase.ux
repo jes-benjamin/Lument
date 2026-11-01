@@ -1,0 +1,382 @@
+<template>
+  <div class="page">
+    <div class="display-box">
+      <text class="expr-text">{{inputText}}</text>
+      <text class="result-text">{{resultText}}</text>
+    </div>
+
+    <div class="keyboard">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('7')"><text class="num-text">7</text></div>
+        <div class="key key-num" onclick="pressKey('8')"><text class="num-text">8</text></div>
+        <div class="key key-num" onclick="pressKey('9')"><text class="num-text">9</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('4')"><text class="num-text">4</text></div>
+        <div class="key key-num" onclick="pressKey('5')"><text class="num-text">5</text></div>
+        <div class="key key-num" onclick="pressKey('6')"><text class="num-text">6</text></div>
+        <div class="key key-op" onclick="clearAll"><text class="func-text">AC</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('1')"><text class="num-text">1</text></div>
+        <div class="key key-num" onclick="pressKey('2')"><text class="num-text">2</text></div>
+        <div class="key key-num" onclick="pressKey('3')"><text class="num-text">3</text></div>
+        <div class="key key-equal" onclick="saveResult"><text class="func-text">记录</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-zero" onclick="pressKey('0')"><text class="num-text">0</text></div>
+        <div class="key key-num" onclick="pressKey('.')"><text class="num-text">.</text></div>
+        <div class="key key-soft" onclick="toggleMode"><text class="mode-text">{{isUpper ? '大' : '小'}}</text></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 466px;
+    height: 466px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .display-box {
+    width: 300px;
+    height: 84px;
+    border-radius: 22px;
+    background-color: #1a1a1a;
+    margin-top: 28px;
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .expr-text {
+    width: 272px;
+    height: 22px;
+    color: #888888;
+    font-size: 16px;
+    text-align: right;
+  }
+
+  .result-text {
+    width: 272px;
+    height: 48px;
+    color: #9370db;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .keyboard {
+    width: 356px;
+    height: 300px;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-row {
+    width: 356px;
+    height: 72px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key {
+    width: 80px;
+    height: 66px;
+    margin-left: 3px;
+    margin-right: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-zero {
+    width: 166px;
+    height: 66px;
+    margin-left: 3px;
+    margin-right: 3px;
+    border-radius: 33px;
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 2px;
+    border-color: #888888;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-num {
+    border-radius: 37px;
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 2px;
+    border-color: #888888;
+  }
+
+  .key-soft {
+    border-radius: 30px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-op {
+    border-radius: 30px;
+    background-color: rgba(147, 112, 219, 0.35);
+    border-width: 2px;
+    border-color: #9370db;
+  }
+
+  .key-equal {
+    border-radius: 30px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .num-text {
+    color: #ffffff;
+    font-size: 35px;
+    font-weight: 700;
+  }
+
+  .func-text {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .mode-text {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 700;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  var HISTORY_KEY = 'calc_history_v2'
+
+  var UPPER_DIGIT = ['零','壹','贰','叁','肆','伍','陆','柒','捌','玖']
+  var LOWER_DIGIT = ['〇','一','二','三','四','五','六','七','八','九']
+  var UPPER_UNIT = ['','拾','佰','仟']
+  var LOWER_UNIT = ['','十','百','千']
+  var UPPER_BIG = ['','万','亿','万亿']
+  var LOWER_BIG = ['','万','亿','万亿']
+
+  function convertUpper(numStr, isUpper) {
+    var digitMap = isUpper ? UPPER_DIGIT : LOWER_DIGIT
+    var unitMap = isUpper ? UPPER_UNIT : LOWER_UNIT
+    var bigMap = isUpper ? UPPER_BIG : LOWER_BIG
+
+    if (numStr === '' || numStr === '.') return ''
+
+    var neg = false
+    if (numStr.charAt(0) === '-') {
+      neg = true
+      numStr = numStr.substring(1)
+    }
+
+    var intPart = numStr
+    var decPart = ''
+
+    var dotIdx = numStr.indexOf('.')
+    if (dotIdx >= 0) {
+      intPart = numStr.substring(0, dotIdx)
+      decPart = numStr.substring(dotIdx + 1)
+    }
+
+    if (intPart === '') intPart = '0'
+
+    var result = ''
+
+    if (intPart === '0') {
+      if (decPart === '') {
+        result = digitMap[0]
+      }
+    } else {
+      var intLen = intPart.length
+      var zeroFlag = false
+      var needBig = false
+      var sections = []
+
+      while (intPart.length > 0) {
+        var secLen = Math.min(intPart.length, 4)
+        var sec = intPart.substring(intPart.length - secLen)
+        sections.unshift(sec)
+        intPart = intPart.substring(0, intPart.length - secLen)
+      }
+
+      for (var si = 0; si < sections.length; si++) {
+        var section = sections[si]
+        var secResult = ''
+        var secZero = false
+        var hasNonZero = false
+
+        for (var i = 0; i < section.length; i++) {
+          var d = parseInt(section.charAt(i))
+          var pos = section.length - 1 - i
+
+          if (d === 0) {
+            secZero = true
+          } else {
+            if (secZero) {
+              secResult += digitMap[0]
+              secZero = false
+            }
+            secResult += digitMap[d] + unitMap[pos]
+            hasNonZero = true
+          }
+        }
+
+        if (hasNonZero) {
+          var bigIdx = sections.length - 1 - si
+          secResult += bigMap[bigIdx]
+          result += secResult
+        } else {
+          if (si < sections.length - 1) {
+            secZero = true
+          }
+        }
+
+        if (secZero && si < sections.length - 1) {
+          zeroFlag = true
+        }
+      }
+
+      if (zeroFlag && result.length > 0 && result.charAt(result.length - 1) !== digitMap[0]) {
+        result += digitMap[0]
+      }
+    }
+
+    if (decPart !== '') {
+      result += (isUpper ? '点' : '点')
+      for (var j = 0; j < decPart.length; j++) {
+        var dd = parseInt(decPart.charAt(j))
+        result += digitMap[dd]
+      }
+    }
+
+    if (neg) {
+      result = '负' + result
+    }
+
+    return result
+  }
+
+  export default {
+    private: {
+      inputText: '',
+      resultText: '',
+      isUpper: true,
+      vibrationOn: true
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    onBackPress() {
+      router.back()
+      return true
+    },
+
+    computed: {
+      currentResult() {
+        if (this.inputText === '') return ''
+        return convertUpper(this.inputText, this.isUpper)
+      }
+    },
+
+    pressKey(key) {
+      this.doVibrate()
+      if (key === '.') {
+        if (this.inputText.indexOf('.') >= 0) return
+        if (this.inputText === '') {
+          this.inputText = '0.'
+        } else {
+          this.inputText += '.'
+        }
+      } else {
+        if (this.inputText === '0') {
+          this.inputText = key
+        } else {
+          this.inputText += key
+        }
+      }
+      this.resultText = convertUpper(this.inputText, this.isUpper)
+    },
+
+    deleteLast() {
+      this.doVibrate()
+      if (this.inputText.length > 0) {
+        this.inputText = this.inputText.substring(0, this.inputText.length - 1)
+        this.resultText = convertUpper(this.inputText, this.isUpper)
+      }
+    },
+
+    clearAll() {
+      this.doVibrate()
+      this.inputText = ''
+      this.resultText = ''
+    },
+
+    toggleMode() {
+      this.doVibrate()
+      this.isUpper = !this.isUpper
+      this.resultText = convertUpper(this.inputText, this.isUpper)
+    },
+
+    saveResult() {
+      this.doVibrate()
+      if (this.inputText === '' || this.resultText === '') return
+      var type = this.isUpper ? '数字大写' : '数字小写'
+      this.addHistory(type, this.inputText, this.resultText)
+      this.inputText = ''
+      this.resultText = ''
+    },
+
+    addHistory(type, expr, result) {
+      storage.get({
+        key: HISTORY_KEY,
+        success: function(data) {
+          var list = []
+          if (data) {
+            try { list = JSON.parse(data) } catch (e) { list = [] }
+          }
+          list.push({ type: type, expr: expr, result: result })
+          if (list.length > 30) list = list.slice(1)
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify(list) })
+        },
+        fail: function() {
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify([{ type: type, expr: expr, result: result }]) })
+        }
+      })
+    }
+  }
+</script>

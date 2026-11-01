@@ -5,28 +5,28 @@
     </div>
 
     <list class="kb-list">
-      <list-item class="kb-section" type="section">
+      <list-item class="kb-section">
         <text class="kb-section-text">数字输入</text>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="appendToken('7')"><text class="num-text">7</text></div>
         <div class="key key-num" onclick="appendToken('8')"><text class="num-text">8</text></div>
         <div class="key key-num" onclick="appendToken('9')"><text class="num-text">9</text></div>
         <div class="key key-soft" onclick="deleteToken"><text class="func-text">DEL</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="appendToken('4')"><text class="num-text">4</text></div>
         <div class="key key-num" onclick="appendToken('5')"><text class="num-text">5</text></div>
         <div class="key key-num" onclick="appendToken('6')"><text class="num-text">6</text></div>
         <div class="key key-soft" onclick="clearExpr"><text class="func-text">AC</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="appendToken('1')"><text class="num-text">1</text></div>
         <div class="key key-num" onclick="appendToken('2')"><text class="num-text">2</text></div>
         <div class="key key-num" onclick="appendToken('3')"><text class="num-text">3</text></div>
         <div class="key key-equal" onclick="openResult"><text class="num-dark">绘制</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="appendToken('0')"><text class="num-text">0</text></div>
         <div class="key key-num" onclick="appendToken('.')"><text class="num-text">.</text></div>
         <div class="key key-num" onclick="appendToken('x')"><text class="num-text">x</text></div>
@@ -34,54 +34,54 @@
       </list-item>
 
 
-      <list-item class="kb-section" type="section">
+      <list-item class="kb-section">
         <text class="kb-section-text">运算符号</text>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-op" onclick="appendToken('+')"><text class="num-text">+</text></div>
         <div class="key key-op" onclick="appendToken('-')"><text class="num-text">&#8722;</text></div>
         <div class="key key-op" onclick="appendToken('*')"><text class="num-text">&#215;</text></div>
         <div class="key key-soft" onclick="deleteToken"><text class="func-text">DEL</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-op" onclick="appendToken('^')"><text class="num-text">^</text></div>
         <div class="key key-op" onclick="appendToken('(')"><text class="num-text">(</text></div>
         <div class="key key-op" onclick="appendToken(')')"><text class="num-text">)</text></div>
         <div class="key key-soft" onclick="clearExpr"><text class="func-text">AC</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-num" onclick="appendToken('e')"><text class="num-text">e</text></div>
         <div class="key key-num" onclick="appendToken('&#960;')"><text class="num-text">&#960;</text></div>
         <div class="key key-sci" onclick="appendToken(';')"><text class="num-text">;</text></div>
         <div class="key key-op" onclick="appendToken('/')"><text class="num-text">&#247;</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key-solve" onclick="openResult"><text class="solve-text">绘制图像</text></div>
       </list-item>
 
 
-      <list-item class="kb-section" type="section">
+      <list-item class="kb-section">
         <text class="kb-section-text">函数预设</text>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-sci" onclick="setPreset('sin')"><text class="func-text">sin</text></div>
         <div class="key key-sci" onclick="setPreset('cos')"><text class="func-text">cos</text></div>
         <div class="key key-sci" onclick="setPreset('tan')"><text class="func-text">tan</text></div>
         <div class="key key-soft" onclick="deleteToken"><text class="func-text">DEL</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-sci" onclick="setPreset('ln')"><text class="func-text">ln</text></div>
         <div class="key key-sci" onclick="setPreset('log')"><text class="func-text">log</text></div>
         <div class="key key-sci" onclick="setPreset('lg')"><text class="func-text">lg</text></div>
         <div class="key key-soft" onclick="clearExpr"><text class="func-text">AC</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-sci" onclick="setPreset('e^x')"><text class="func-text">e^x</text></div>
         <div class="key key-sci" onclick="setPreset('x^2')"><text class="func-text">x&#178;</text></div>
         <div class="key key-sci" onclick="setPreset('x^3')"><text class="func-text">x&#179;</text></div>
         <div class="key key-equal" onclick="openResult"><text class="num-dark">绘制</text></div>
       </list-item>
-      <list-item class="key-row" type="row">
+      <list-item class="key-row">
         <div class="key key-sci" onclick="setPreset('sqrt')"><text class="func-text">&#8730;x</text></div>
         <div class="key key-sci" onclick="setPreset('abs')"><text class="func-text">|x|</text></div>
         <div class="key key-num" onclick="appendToken('(')"><text class="num-text">(</text></div>
@@ -93,8 +93,8 @@
 
 <style>
   .page {
-    width: 336px;
-    height: 480px;
+    width: 100%;
+    height: 100%;
     background-color: #000000;
     display: flex;
     flex-direction: column;
@@ -124,8 +124,8 @@
   }
 
   .kb-list {
-    width: 336px;
-    height: 394px;
+    width: 100%;
+    flex-grow: 1;
     margin-top: 2px;
     display: flex;
     flex-direction: column;

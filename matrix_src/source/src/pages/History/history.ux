@@ -14,10 +14,10 @@
         <text class="history-expr" style="height: {{$item.exprH}}px">{{$item.expr}}</text>
         <text class="history-result" style="height: {{$item.resH}}px">{{$item.result}}</text>
       </list-item>
-      <list-item class="bottom-spacer" type="spacer" if="{{historyList.length > 0}}">
+      <list-item class="bottom-spacer" if="{{historyList.length > 0}}">
         <text class="spacer-text"></text>
       </list-item>
-      <list-item class="empty-cell" type="empty" if="{{historyList.length === 0}}">
+      <list-item class="empty-cell" if="{{historyList.length === 0}}">
         <text class="empty-text">暂无历史记录</text>
       </list-item>
     </list>
@@ -37,8 +37,8 @@
 
 <style>
   .page {
-    width: 336px;
-    height: 480px;
+    width: 100%;
+    height: 100%;
     background-color: #000000;
     display: flex;
     flex-direction: column;
@@ -81,8 +81,8 @@
   }
 
   .history-list {
-    width: 320px;
-    height: 350px;
+    width: 100%;
+    flex-grow: 1;
     margin-top: 6px;
     display: flex;
     flex-direction: column;
@@ -153,8 +153,8 @@
     position: absolute;
     top: 0px;
     left: 0px;
-    width: 336px;
-    height: 480px;
+    width: 100%;
+    height: 100%;
     background-color: #000000;
     display: flex;
     flex-direction: column;

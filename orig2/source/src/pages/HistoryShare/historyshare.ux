@@ -1,0 +1,110 @@
+<template>
+  <div class="page">
+    <div class="back-btn" onclick="goBack">
+      <text class="back-text">‹ 返回</text>
+    </div>
+    <div class="qr-box">
+      <qrcode class="qr-code" value="{{qrText}}"></qrcode>
+    </div>
+    <text class="qr-caption">扫码查看记录内容</text>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 466px;
+    height: 466px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .back-btn {
+    width: 128px;
+    height: 46px;
+    border-radius: 23px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 24px;
+  }
+
+  .back-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .qr-box {
+    width: 290px;
+    height: 290px;
+    background-color: #ffffff;
+    border-radius: 16px;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .qr-code {
+    width: 270px;
+    height: 270px;
+    color: #000000;
+    background-color: #ffffff;
+  }
+
+  .qr-caption {
+    color: #888888;
+    font-size: 20px;
+    margin-top: 6px;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  var SHARE_KEY = 'history_share_v1'
+
+  export default {
+    private: {
+      qrText: '',
+      vibrationOn: true
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+      storage.get({
+        key: SHARE_KEY,
+        success: function(data) {
+          if (data) {
+            try {
+              var obj = JSON.parse(data)
+              self.qrText = '矩阵计算器历史记录\n类型: ' + (obj.type || '计算器') + '\n表达式: ' + (obj.expr || '') + '\n结果: ' + (obj.result || '')
+            } catch (e) {
+              self.qrText = data
+            }
+          }
+        }
+      })
+    },
+
+    goBack() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+      router.back()
+    }
+  }
+</script>
