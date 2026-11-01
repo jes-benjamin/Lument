@@ -654,6 +654,17 @@
         if (endPos < tokens.length && tokens[endPos] === ')') {
           endPos++
         }
+        // 括号组后的幂运算，如 (x+2)^2
+        if (endPos < tokens.length && tokens[endPos] === '^' && endPos + 1 < tokens.length) {
+          var groupPow = parseFloat(tokens[endPos + 1])
+          if (!isNaN(groupPow) && groupPow === Math.floor(groupPow) && groupPow >= 1 && groupPow <= 12) {
+            var acc = { const: 1 }
+            for (var pi = 0; pi < groupPow; pi++) {
+              acc = this.multiplyPoly(acc, exprRes.coeffs)
+            }
+            return { coeffs: acc, pos: endPos + 2 }
+          }
+        }
         return { coeffs: exprRes.coeffs, pos: endPos }
       }
 
@@ -691,6 +702,13 @@
           obj4[varToken + '1'] = varCoeff
           return { coeffs: obj4, pos: pos + 2 }
         }
+        // 常数幂，如 2^3
+        if (pos + 1 < tokens.length && tokens[pos + 1] === '^' && pos + 2 < tokens.length) {
+          var constPow = parseFloat(tokens[pos + 2])
+          if (!isNaN(constPow) && constPow === Math.floor(constPow) && Math.abs(constPow) <= 12) {
+            return { coeffs: { const: Math.pow(num, constPow) }, pos: pos + 3 }
+          }
+        }
         return { coeffs: { const: num }, pos: pos + 1 }
       }
 
@@ -699,6 +717,16 @@
 
     multiplyPoly(c1, c2) {
       var result = {}
+      // 保留变量字母（x/y），避免 y 参与乘法后被误算成 x
+      var vname = 'x'
+      for (var vk1 in c1) {
+        if (c1.hasOwnProperty(vk1) && vk1 !== 'const') { vname = vk1.charAt(0); break }
+      }
+      if (vname === 'x') {
+        for (var vk2 in c2) {
+          if (c2.hasOwnProperty(vk2) && vk2 !== 'const') { vname = vk2.charAt(0); break }
+        }
+      }
       for (var k1 in c1) {
         if (!c1.hasOwnProperty(k1)) continue
         for (var k2 in c2) {
@@ -707,7 +735,7 @@
           var deg1 = k1 === 'const' ? 0 : parseInt(k1.substring(1))
           var deg2 = k2 === 'const' ? 0 : parseInt(k2.substring(1))
           var newDeg = deg1 + deg2
-          var newKey = newDeg === 0 ? 'const' : 'x' + newDeg
+          var newKey = newDeg === 0 ? 'const' : vname + newDeg
           result[newKey] = (result[newKey] || 0) + v
         }
       }

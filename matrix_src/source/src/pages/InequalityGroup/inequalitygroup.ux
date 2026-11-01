@@ -322,7 +322,7 @@
 
     solve() {
       this.doVibrate()
-      var expr = this.expression.replace(/\s/g, '').replace(/−/g, '-')
+      var expr = this.expression.replace(/\s/g, '').replace(/−/g, '-').replace(/<=/g, '≤').replace(/>=/g, '≥')
       if (expr.length === 0) {
         this.result = '请输入不等式组'
         return
@@ -903,6 +903,17 @@
         if (endPos < tokens.length && tokens[endPos] === ')') {
           endPos++
         }
+        // 括号组后的幂运算，如 (x+2)^2
+        if (endPos < tokens.length && tokens[endPos] === '^' && endPos + 1 < tokens.length) {
+          var groupPow = parseFloat(tokens[endPos + 1])
+          if (!isNaN(groupPow) && groupPow === Math.floor(groupPow) && groupPow >= 1 && groupPow <= 12) {
+            var acc = { 'const': 1 }
+            for (var pi = 0; pi < groupPow; pi++) {
+              acc = this.multiplyPoly(acc, exprRes.coeffs)
+            }
+            return { coeffs: acc, pos: endPos + 2 }
+          }
+        }
         return { coeffs: exprRes.coeffs, pos: endPos }
       }
 
@@ -937,6 +948,13 @@
           var obj4 = {}
           obj4['x1'] = varCoeff
           return { coeffs: obj4, pos: pos + 2 }
+        }
+        // 常数幂，如 2^3
+        if (pos + 1 < tokens.length && tokens[pos + 1] === '^' && pos + 2 < tokens.length) {
+          var constPow = parseFloat(tokens[pos + 2])
+          if (!isNaN(constPow) && constPow === Math.floor(constPow) && Math.abs(constPow) <= 12) {
+            return { coeffs: { 'const': Math.pow(num, constPow) }, pos: pos + 3 }
+          }
         }
         return { coeffs: { 'const': num }, pos: pos + 1 }
       }
