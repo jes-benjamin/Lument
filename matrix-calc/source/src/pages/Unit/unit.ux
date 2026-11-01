@@ -1,0 +1,537 @@
+<template>
+  <div class="page">
+    <div class="title-bar">
+      <text class="title-text">单位换算</text>
+    </div>
+
+    <div class="cat-nav">
+      <div class="small-btn" onclick="prevCat"><text class="small-text">‹</text></div>
+      <text class="cat-title">{{catName}}</text>
+      <div class="small-btn" onclick="nextCat"><text class="small-text">›</text></div>
+    </div>
+
+    <div class="unit-row">
+      <div class="unit-btn" onclick="nextFromUnit"><text class="unit-btn-text">{{fromUnit}}</text></div>
+      <div class="swap-btn" onclick="swapUnit"><text class="swap-text">⇄</text></div>
+      <div class="unit-btn" onclick="nextToUnit"><text class="unit-btn-text">{{toUnit}}</text></div>
+    </div>
+
+    <div class="input-box">
+      <text class="input-value">{{inputValue}}</text>
+      <text class="unit-label">{{fromUnit}}</text>
+    </div>
+
+    <div class="result-box">
+      <text class="result-value">{{outputValue}}</text>
+      <text class="unit-label">{{toUnit}}</text>
+    </div>
+
+    <div class="keyboard">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('7')"><text class="key-label">7</text></div>
+        <div class="key key-num" onclick="pressKey('8')"><text class="key-label">8</text></div>
+        <div class="key key-num" onclick="pressKey('9')"><text class="key-label">9</text></div>
+        <div class="key key-func" onclick="deleteInput"><text class="key-label-sm">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('4')"><text class="key-label">4</text></div>
+        <div class="key key-num" onclick="pressKey('5')"><text class="key-label">5</text></div>
+        <div class="key key-num" onclick="pressKey('6')"><text class="key-label">6</text></div>
+        <div class="key key-ac" onclick="clearInput"><text class="key-label">C</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('1')"><text class="key-label">1</text></div>
+        <div class="key key-num" onclick="pressKey('2')"><text class="key-label">2</text></div>
+        <div class="key key-num" onclick="pressKey('3')"><text class="key-label">3</text></div>
+        <div class="key key-num" onclick="pressKey('0')"><text class="key-label">0</text></div>
+      </div>
+      <div class="key-row">
+        <div class="wide-key key-func" onclick="pressKey('.')"><text class="key-label">.</text></div>
+        <div class="wide-key key-func" onclick="pressKey('00')"><text class="key-label">00</text></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 466px;
+    height: 466px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .title-bar {
+    width: 360px;
+    height: 30px;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .title-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .cat-nav {
+    width: 360px;
+    height: 42px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .small-btn {
+    width: 58px;
+    height: 40px;
+    border-radius: 20px;
+    background-color: #2a2a2a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .small-text {
+    color: #ffffff;
+    font-size: 32px;
+    font-weight: 800;
+  }
+
+  .cat-title {
+    width: 160px;
+    height: 40px;
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .unit-row {
+    width: 360px;
+    height: 42px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .unit-btn {
+    width: 136px;
+    height: 40px;
+    border-radius: 20px;
+    background-color: #555555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .swap-btn {
+    width: 58px;
+    height: 40px;
+    border-radius: 20px;
+    background-color: #9370db;
+    margin-left: 6px;
+    margin-right: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .unit-btn-text {
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .swap-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .input-box {
+    width: 360px;
+    height: 44px;
+    border-radius: 18px;
+    background-color: #1a1a1a;
+    margin-top: 4px;
+    padding-left: 14px;
+    padding-right: 14px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .result-box {
+    width: 360px;
+    height: 44px;
+    border-radius: 18px;
+    background-color: #1a1a1a;
+    margin-top: 4px;
+    padding-left: 14px;
+    padding-right: 14px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .input-value {
+    width: 240px;
+    color: #ffffff;
+    font-size: 25px;
+    font-weight: 800;
+  }
+
+  .result-value {
+    width: 240px;
+    color: #9370db;
+    font-size: 25px;
+    font-weight: 800;
+  }
+
+  .unit-label {
+    color: #888888;
+    font-size: 17px;
+    font-weight: 800;
+  }
+
+  .keyboard {
+    width: 360px;
+    margin-top: 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .key-row {
+    width: 360px;
+    height: 54px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key {
+    width: 82px;
+    height: 50px;
+    margin-left: 3px;
+    margin-right: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .wide-key {
+    width: 168px;
+    height: 50px;
+    border-radius: 25px;
+    margin-left: 4px;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-num {
+    border-radius: 25px;
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 2px;
+    border-color: #888888;
+  }
+
+  .key-func {
+    border-radius: 25px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-ac {
+    border-radius: 25px;
+    background-color: #d32f2f;
+  }
+
+  .key-label {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 800;
+  }
+
+  .key-label-sm {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 800;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  var HISTORY_KEY = 'calc_history_v2'
+
+  var categories = [
+    {
+      name: '长度',
+      units: [
+        { name: '毫米', rate: 0.001 },
+        { name: '厘米', rate: 0.01 },
+        { name: '米', rate: 1 },
+        { name: '千米', rate: 1000 },
+        { name: '英寸', rate: 0.0254 },
+        { name: '英尺', rate: 0.3048 },
+        { name: '英里', rate: 1609.344 }
+      ]
+    },
+    {
+      name: '重量',
+      units: [
+        { name: '毫克', rate: 0.000001 },
+        { name: '克', rate: 0.001 },
+        { name: '千克', rate: 1 },
+        { name: '吨', rate: 1000 },
+        { name: '盎司', rate: 0.0283495 },
+        { name: '磅', rate: 0.45359237 }
+      ]
+    },
+    {
+      name: '温度',
+      units: [
+        { name: '摄氏度', key: 'C' },
+        { name: '华氏度', key: 'F' },
+        { name: '开尔文', key: 'K' }
+      ]
+    },
+    {
+      name: '面积',
+      units: [
+        { name: '平方厘米', rate: 0.0001 },
+        { name: '平方米', rate: 1 },
+        { name: '平方千米', rate: 1000000 },
+        { name: '平方英尺', rate: 0.092903 },
+        { name: '亩', rate: 666.6667 },
+        { name: '公顷', rate: 10000 }
+      ]
+    },
+    {
+      name: '体积',
+      units: [
+        { name: '毫升', rate: 0.001 },
+        { name: '升', rate: 1 },
+        { name: '立方米', rate: 1000 },
+        { name: '茶匙', rate: 0.00492892 },
+        { name: '杯', rate: 0.236588 },
+        { name: '加仑', rate: 3.78541 }
+      ]
+    },
+    {
+      name: '数据大小',
+      units: [
+        { name: 'bit', rate: 0.125 },
+        { name: 'B', rate: 1 },
+        { name: 'KB', rate: 1024 },
+        { name: 'MB', rate: 1048576 },
+        { name: 'GB', rate: 1073741824 },
+        { name: 'TB', rate: 1099511627776 }
+      ]
+    }
+  ]
+
+  export default {
+    private: {
+      catIndex: 0,
+      fromIndex: 2,
+      toIndex: 5,
+      inputValue: '1',
+      outputValue: '3.28084',
+      catName: '长度',
+      fromUnit: '米',
+      toUnit: '英尺',
+      vibrationOn: true
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+      this.refreshLabels()
+      this.doConvert()
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    onBackPress() {
+      this.saveHistory()
+      router.back()
+      return true
+    },
+
+    prevCat() {
+      this.doVibrate()
+      this.catIndex = this.catIndex > 0 ? this.catIndex - 1 : categories.length - 1
+      this.resetUnits()
+    },
+
+    nextCat() {
+      this.doVibrate()
+      this.catIndex = this.catIndex < categories.length - 1 ? this.catIndex + 1 : 0
+      this.resetUnits()
+    },
+
+    resetUnits() {
+      this.fromIndex = 0
+      this.toIndex = categories[this.catIndex].units.length > 1 ? 1 : 0
+      if (categories[this.catIndex].name === '长度') {
+        this.fromIndex = 2
+        this.toIndex = 5
+      }
+      if (categories[this.catIndex].name === '数据大小') {
+        this.fromIndex = 2
+        this.toIndex = 3
+      }
+      this.refreshLabels()
+      this.doConvert()
+    },
+
+    nextFromUnit() {
+      this.doVibrate()
+      var units = categories[this.catIndex].units
+      this.fromIndex = this.fromIndex < units.length - 1 ? this.fromIndex + 1 : 0
+      this.refreshLabels()
+      this.doConvert()
+    },
+
+    nextToUnit() {
+      this.doVibrate()
+      var units = categories[this.catIndex].units
+      this.toIndex = this.toIndex < units.length - 1 ? this.toIndex + 1 : 0
+      this.refreshLabels()
+      this.doConvert()
+    },
+
+    swapUnit() {
+      this.doVibrate()
+      var tmp = this.fromIndex
+      this.fromIndex = this.toIndex
+      this.toIndex = tmp
+      this.refreshLabels()
+      this.doConvert()
+    },
+
+    refreshLabels() {
+      var cat = categories[this.catIndex]
+      this.catName = cat.name
+      this.fromUnit = cat.units[this.fromIndex].name
+      this.toUnit = cat.units[this.toIndex].name
+    },
+
+    pressKey(key) {
+      this.doVibrate()
+      if (this.inputValue === '0' && key !== '.') {
+        this.inputValue = key
+      } else if (key === '.' && this.inputValue.indexOf('.') !== -1) {
+        return
+      } else {
+        this.inputValue += key
+      }
+      this.doConvert()
+    },
+
+    clearInput() {
+      this.doVibrate()
+      this.inputValue = '0'
+      this.outputValue = '0'
+    },
+
+    deleteInput() {
+      this.doVibrate()
+      if (this.inputValue.length > 1) {
+        this.inputValue = this.inputValue.substring(0, this.inputValue.length - 1)
+      } else {
+        this.inputValue = '0'
+      }
+      this.doConvert()
+    },
+
+    doConvert() {
+      var val = parseFloat(this.inputValue)
+      if (isNaN(val)) {
+        this.outputValue = '0'
+        return
+      }
+      var cat = categories[this.catIndex]
+      var from = cat.units[this.fromIndex]
+      var to = cat.units[this.toIndex]
+      var result
+      if (cat.name === '温度') {
+        var celsius = this.toCelsius(val, from.key)
+        result = this.fromCelsius(celsius, to.key)
+      } else {
+        var base = val * from.rate
+        result = base / to.rate
+      }
+      this.outputValue = this.formatNumber(result)
+    },
+
+    toCelsius(value, key) {
+      if (key === 'F') return (value - 32) * 5 / 9
+      if (key === 'K') return value - 273.15
+      return value
+    },
+
+    fromCelsius(value, key) {
+      if (key === 'F') return value * 9 / 5 + 32
+      if (key === 'K') return value + 273.15
+      return value
+    },
+
+    formatNumber(value) {
+      if (Math.abs(value) >= 1000000000 || (Math.abs(value) > 0 && Math.abs(value) < 0.00001)) {
+        return value.toExponential(4)
+      }
+      return parseFloat(value.toFixed(6)).toString()
+    },
+
+    saveHistory() {
+      if (this.inputValue === '0' || !this.inputValue) return
+      if (this.outputValue === '0' || this.outputValue === '错误') return
+      var expr = this.inputValue + ' ' + this.fromUnit
+      var result = this.outputValue + ' ' + this.toUnit
+      storage.get({
+        key: HISTORY_KEY,
+        success: function(data) {
+          var list = []
+          if (data) {
+            try { list = JSON.parse(data) } catch (e) { list = [] }
+          }
+          list.push({ type: '单位换算', expr: expr, result: result })
+          if (list.length > 30) list = list.slice(1)
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify(list) })
+        },
+        fail: function() {
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify([{ type: '单位换算', expr: expr, result: result }]) })
+        }
+      })
+    }
+  }
+</script>

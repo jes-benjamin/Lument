@@ -1,0 +1,887 @@
+<template>
+  <div class="page">
+    <div class="display-box">
+      <text class="expr-text">{{displayExpression}}</text>
+      <text class="result-text">{{result}}</text>
+    </div>
+
+    <div class="kb-wrapper">
+      <div class="nav-side" onclick="prevPage"><text class="nav-side-text">‹</text></div>
+      <div class="keyboard" if="{{keyPage === 0}}">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('7')"><text class="num-text">7</text></div>
+        <div class="key key-num" onclick="pressChar('8')"><text class="num-text">8</text></div>
+        <div class="key key-num" onclick="pressChar('9')"><text class="num-text">9</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('4')"><text class="num-text">4</text></div>
+        <div class="key key-num" onclick="pressChar('5')"><text class="num-text">5</text></div>
+        <div class="key key-num" onclick="pressChar('6')"><text class="num-text">6</text></div>
+        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('1')"><text class="num-text">1</text></div>
+        <div class="key key-num" onclick="pressChar('2')"><text class="num-text">2</text></div>
+        <div class="key key-num" onclick="pressChar('3')"><text class="num-text">3</text></div>
+        <div class="key key-equal" onclick="pressChar('=')"><text class="num-dark">=</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
+        <div class="key key-num" onclick="pressChar('.')"><text class="num-text">.</text></div>
+        <div class="key key-num" onclick="pressChar('x')"><text class="num-text">x</text></div>
+        <div class="key key-op" onclick="pressChar(';')"><text class="num-text">;</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key-solve" onclick="solve"><text class="solve-text">计算结果</text></div>
+      </div>
+    </div>
+
+    <div class="keyboard" if="{{keyPage === 1}}">
+      <div class="key-row">
+        <div class="key key-op" onclick="pressChar('+')"><text class="num-text">+</text></div>
+        <div class="key key-op" onclick="pressChar('-')"><text class="num-text">−</text></div>
+        <div class="key key-op" onclick="pressChar('*')"><text class="num-text">×</text></div>
+        <div class="key key-op" onclick="pressChar('/')"><text class="num-text">÷</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-op" onclick="pressChar('^')"><text class="num-text">^</text></div>
+        <div class="key key-soft" onclick="pressChar('(')"><text class="num-text">(</text></div>
+        <div class="key key-soft" onclick="pressChar(')')"><text class="num-text">)</text></div>
+        <div class="key key-equal" onclick="pressChar('=')"><text class="num-dark">=</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressChar('x')"><text class="num-text">x</text></div>
+        <div class="key key-num" onclick="pressChar('y')"><text class="num-text">y</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key-solve" onclick="solve"><text class="solve-text">计算结果</text></div>
+      </div>
+    </div>
+
+    <div class="keyboard" if="{{keyPage === 2}}">
+      <div class="key-row">
+        <div class="key key-sci" onclick="pressChar('sin(')"><text class="func-text">sin</text></div>
+        <div class="key key-sci" onclick="pressChar('cos(')"><text class="func-text">cos</text></div>
+        <div class="key key-sci" onclick="pressChar('tan(')"><text class="func-text">tan</text></div>
+        <div class="key key-sci" onclick="pressChar('sqrt(')"><text class="func-text">√</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-sci" onclick="pressChar('log(')"><text class="func-text">log</text></div>
+        <div class="key key-sci" onclick="pressChar('ln(')"><text class="func-text">ln</text></div>
+        <div class="key key-sci" onclick="pressChar('lg(')"><text class="func-text">lg</text></div>
+        <div class="key key-sci" onclick="pressChar('abs(')"><text class="func-text">|x|</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-sci" onclick="pressChar('π')"><text class="num-text">π</text></div>
+        <div class="key key-sci" onclick="pressChar('e')"><text class="num-text">e</text></div>
+        <div class="key key-sci" onclick="pressChar('e^x')"><text class="func-text">e^x</text></div>
+        <div class="key key-op" onclick="pressChar(';')"><text class="num-text">;</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key-solve" onclick="solve"><text class="solve-text">计算结果</text></div>
+      </div>
+    </div>
+      <div class="nav-side" onclick="nextPage"><text class="nav-side-text">›</text></div>
+    </div>
+    <text class="page-label-bottom">{{currentLabel}}</text>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 466px;
+    height: 466px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .display-box {
+    width: 300px;
+    height: 84px;
+    border-radius: 22px;
+    background-color: #1a1a1a;
+    margin-top: 28px;
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .expr-text {
+    width: 272px;
+    height: 22px;
+    color: #888888;
+    font-size: 15px;
+    text-align: right;
+  }
+
+  .result-text {
+    width: 272px;
+    height: 48px;
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .kb-wrapper {
+    margin-top: 4px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-side {
+    width: 43px;
+    height: 43px;
+    border-radius: 21.5px;
+    background-color: #2a2a2a;
+    margin-left: 4px;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-side-text {
+    color: #ffffff;
+    font-size: 31px;
+    font-weight: 700;
+  }
+
+  .page-label-bottom {
+    color: #888888;
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: 6px;
+    text-align: center;
+  }
+
+  .keyboard {
+    width: 356px;
+    height: 330px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-row {
+    width: 356px;
+    height: 62px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key {
+    width: 80px;
+    height: 56px;
+    margin-left: 3px;
+    margin-right: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-solve {
+    width: 350px;
+    height: 56px;
+    border-radius: 28px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-num {
+    border-radius: 37px;
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 2px;
+    border-color: #888888;
+  }
+
+  .key-soft {
+    border-radius: 30px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-op {
+    border-radius: 30px;
+    background-color: rgba(147, 112, 219, 0.35);
+    border-width: 2px;
+    border-color: #9370db;
+  }
+
+  .key-equal {
+    border-radius: 30px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-sci {
+    border-radius: 30px;
+    background-color: rgba(255, 165, 0, 0.35);
+    border-width: 2px;
+    border-color: #ffa500;
+  }
+
+  .num-text {
+    color: #ffffff;
+    font-size: 35px;
+    font-weight: 700;
+  }
+
+  .num-dark {
+    color: #ffffff;
+    font-size: 35px;
+    font-weight: 700;
+  }
+
+  .func-text {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .solve-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 700;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  var LABELS = ['数字输入', '运算符号', '科学函数']
+  var TOTAL = 3
+  var HISTORY_KEY = 'calc_history_v2'
+
+  export default {
+    private: {
+      expression: '',
+      result: '等待输入',
+      keyPage: 0,
+      vibrationOn: true
+    },
+
+    computed: {
+      displayExpression() {
+        return this.expression || '输入方程，如 x^2+2x+1=0'
+      },
+      currentLabel() {
+        return LABELS[this.keyPage]
+      }
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    onBackPress() {
+      router.back()
+      return true
+    },
+
+    prevPage() {
+      this.doVibrate()
+      this.keyPage = this.keyPage > 0 ? this.keyPage - 1 : TOTAL - 1
+    },
+
+    nextPage() {
+      this.doVibrate()
+      this.keyPage = this.keyPage < TOTAL - 1 ? this.keyPage + 1 : 0
+    },
+
+    clearAll() {
+      this.doVibrate()
+      this.expression = ''
+      this.result = '等待输入'
+    },
+
+    deleteLast() {
+      this.doVibrate()
+      if (this.expression.length > 0) {
+        this.expression = this.expression.substring(0, this.expression.length - 1)
+      }
+      if (this.expression.length === 0) {
+        this.result = '等待输入'
+      }
+    },
+
+    pressChar(ch) {
+      this.doVibrate()
+      if (this.result !== '等待输入' && this.result !== '请输入方程') {
+        this.expression = ''
+        this.result = '等待输入'
+      }
+      this.expression += ch
+    },
+
+    solve() {
+      this.doVibrate()
+      var raw = this.expression.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-')
+      raw = raw.replace(/\s/g, '')
+      if (raw.length === 0) {
+        this.result = '请输入方程'
+        return
+      }
+
+      // 判断方程类型：含 ; 分隔符为二元方程组
+      if (raw.indexOf(';') !== -1) {
+        this.solveSystem(raw)
+      } else {
+        this.solveEquation(raw)
+      }
+    },
+
+    solveEquation(expr) {
+      var parts = expr.split('=')
+      if (parts.length !== 2) {
+        this.result = '格式错误，需包含='
+        return
+      }
+
+      // 超越方程（含三角函数、对数、π、e等）使用数值求解
+      if (this.hasTranscendental(parts[0]) || this.hasTranscendental(parts[1])) {
+        this.solveEquationNumerical(parts[0], parts[1])
+        return
+      }
+
+      try {
+        var left = this.parsePolynomial(parts[0])
+        var right = this.parsePolynomial(parts[1])
+
+        // 检查是否含有3次及以上项
+        var hasHighDegree = false
+        for (var k in left) {
+          if (left.hasOwnProperty(k) && k !== 'const') {
+            var deg = parseInt(k.substring(1))
+            if (deg >= 3) hasHighDegree = true
+          }
+        }
+        for (var k2 in right) {
+          if (right.hasOwnProperty(k2) && k2 !== 'const') {
+            var deg2 = parseInt(k2.substring(1))
+            if (deg2 >= 3) hasHighDegree = true
+          }
+        }
+        if (hasHighDegree) {
+          this.result = '仅支持一、二次方程'
+          return
+        }
+
+        // 合并左右两边：左边 - 右边 = 0
+        var a = (left.x2 || 0) - (right.x2 || 0)
+        var b = (left.x1 || 0) - (right.x1 || 0)
+        var c = (left.const || 0) - (right.const || 0)
+
+        // 如果同时有y变量，也尝试处理
+        var ay = (left.y1 || 0) - (right.y1 || 0)
+        var by = (left.y2 || 0) - (right.y2 || 0)
+
+        if (by !== 0 || ay !== 0) {
+          this.result = '含y变量请用方程组(;分隔)'
+          return
+        }
+
+        var eps = 1e-9
+        if (Math.abs(a) > eps) {
+          // 二次方程
+          var delta = b * b - 4 * a * c
+          if (delta > eps) {
+            var sqrtD = Math.sqrt(delta)
+            var x1 = (-b + sqrtD) / (2 * a)
+            var x2 = (-b - sqrtD) / (2 * a)
+            this.result = 'x1=' + this.formatNum(x1) + ', x2=' + this.formatNum(x2)
+          } else if (Math.abs(delta) <= eps) {
+            var x0 = -b / (2 * a)
+            this.result = 'x=' + this.formatNum(x0)
+          } else {
+            this.result = '无实数解'
+          }
+        } else if (Math.abs(b) > eps) {
+          // 一次方程
+          var x = -c / b
+          this.result = 'x=' + this.formatNum(x)
+        } else if (Math.abs(c) <= eps) {
+          this.result = 'x为任意值'
+        } else {
+          this.result = '无解'
+        }
+
+        if (this.result !== '无法解析' && this.result.indexOf('格式') === -1 && this.result.indexOf('仅支持') === -1) {
+          this.addHistory(this.expression, this.result)
+        }
+      } catch (e) {
+        this.result = '无法解析'
+      }
+    },
+
+    solveSystem(expr) {
+      var eqs = expr.split(';')
+      if (eqs.length < 2) {
+        this.result = '请用;分隔两个方程'
+        return
+      }
+
+      try {
+        var e1 = eqs[0].split('=')
+        var e2 = eqs[1].split('=')
+
+        if (e1.length !== 2 || e2.length !== 2) {
+          this.result = '格式错误'
+          return
+        }
+
+        var l1 = this.parseLinear(e1[0])
+        var r1 = this.parseLinear(e1[1])
+        var l2 = this.parseLinear(e2[0])
+        var r2 = this.parseLinear(e2[1])
+
+        var a1 = (l1.x || 0) - (r1.x || 0)
+        var b1 = (l1.y || 0) - (r1.y || 0)
+        var c1 = (r1.const || 0) - (l1.const || 0)
+        var a2 = (l2.x || 0) - (r2.x || 0)
+        var b2 = (l2.y || 0) - (r2.y || 0)
+        var c2 = (r2.const || 0) - (l2.const || 0)
+
+        var d = a1 * b2 - a2 * b1
+        if (Math.abs(d) < 0.000001) {
+          this.result = '无解或无穷多解'
+          return
+        }
+
+        var x = (c1 * b2 - c2 * b1) / d
+        var y = (a1 * c2 - a2 * c1) / d
+
+        this.result = 'x=' + this.formatNum(x) + ', y=' + this.formatNum(y)
+        this.addHistory(this.expression, this.result)
+      } catch (e) {
+        this.result = '无法解析'
+      }
+    },
+
+    hasTranscendental(s) {
+      return /sin\(|cos\(|tan\(|log\(|ln\(|lg\(|sqrt\(|abs\(|e\^|π|e/.test(s)
+    },
+
+    evalAtX(expr, xVal) {
+      var text = expr.replace(/ /g, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-')
+      text = text.replace(/π/g, '3.141592653589793')
+      text = text.replace(/e\^x/g, 'exp(x)')
+      text = text.replace(/e\^/g, 'exp(')
+      var openCount = 0
+      for (var i = 0; i < text.length; i++) {
+        if (text.charAt(i) === '(') openCount++
+        else if (text.charAt(i) === ')') openCount--
+      }
+      while (openCount > 0) { text += ')'; openCount-- }
+
+      text = text.replace(/([0-9.])x/g, '$1*x')
+      text = text.replace(/x([0-9.])/g, 'x*$1')
+      text = text.replace(/([0-9.])\(/g, '$1*(')
+      text = text.replace(/\)([0-9.])/g, ')*$1')
+      text = text.replace(/\)x/g, ')*x')
+      text = text.replace(/x\(/g, 'x*(')
+      text = text.replace(/([0-9.])(sin|cos|tan|log|ln|lg|exp|sqrt|abs)/g, '$1*$2')
+      text = text.replace(/\)(sin|cos|tan|log|ln|lg|exp|sqrt|abs)/g, ')*$1')
+
+      var index = 0
+      var selfText = text
+      function peek() { return selfText.charAt(index) }
+      function eat(ch) { if (peek() === ch) { index++; return true } return false }
+      function parse() { var v = parseAddSub(); return v }
+      function parseAddSub() { var v = parseMulDiv(); while (index < selfText.length) { if (eat('+')) v += parseMulDiv(); else if (eat('-')) v -= parseMulDiv(); else break } return v }
+      function parseMulDiv() { var v = parsePower(); while (index < selfText.length) { if (eat('*')) v *= parsePower(); else if (eat('/')) v /= parsePower(); else break } return v }
+      function parsePower() { var v = parseUnary(); if (eat('^')) v = Math.pow(v, parsePower()); return v }
+      function parseUnary() { if (eat('+')) return parseUnary(); if (eat('-')) return -parseUnary(); return parsePrimary() }
+      function parsePrimary() {
+        var ch = peek()
+        if (eat('(')) { var v = parseAddSub(); eat(')'); return v }
+        if (ch === 'x') { index++; return xVal }
+        if ((ch >= '0' && ch <= '9') || ch === '.') { var start = index; while (index < selfText.length && ((peek() >= '0' && peek() <= '9') || peek() === '.')) index++; return parseFloat(selfText.substring(start, index)) }
+        return parseName()
+      }
+      function parseName() {
+        var start = index
+        while (index < selfText.length && ((selfText.charAt(index) >= 'a' && selfText.charAt(index) <= 'z') || (selfText.charAt(index) >= 'A' && selfText.charAt(index) <= 'Z'))) index++
+        var name = selfText.substring(start, index)
+        if (name === '') return 0
+        if (name === 'e') return Math.E
+        if (name === 'pi') return Math.PI
+        eat('(')
+        var arg = parseAddSub()
+        eat(')')
+        if (name === 'sin') return Math.sin(arg)
+        if (name === 'cos') return Math.cos(arg)
+        if (name === 'tan') return Math.tan(arg)
+        if (name === 'log') return Math.log10(arg)
+        if (name === 'lg') return Math.log10(arg)
+        if (name === 'ln') return Math.log(arg)
+        if (name === 'exp') return Math.exp(arg)
+        if (name === 'sqrt') return Math.sqrt(arg)
+        if (name === 'abs') return Math.abs(arg)
+        return 0
+      }
+      return parse()
+    },
+
+    solveEquationNumerical(leftStr, rightStr) {
+      var self = this
+      var f = function(x) {
+        try { return self.evalAtX(leftStr, x) - self.evalAtX(rightStr, x) } catch(e) { return NaN }
+      }
+
+      var samples = []
+      for (var xi = -100; xi <= 100; xi++) {
+        var x = xi * 0.2
+        var y = f(x)
+        if (!isNaN(y) && isFinite(y)) samples.push({x: x, y: y})
+      }
+      if (samples.length === 0) {
+        this.result = '无法解析'
+        return
+      }
+
+      var roots = []
+      for (var i = 1; i < samples.length; i++) {
+        if (samples[i-1].y * samples[i].y < 0) {
+          var a = samples[i-1].x, b = samples[i].x
+          var fa = samples[i-1].y
+          for (var iter = 0; iter < 30; iter++) {
+            var m = (a + b) / 2
+            var fm = f(m)
+            if (Math.abs(fm) < 1e-9) { a = b = m; break }
+            if (fa * fm < 0) { b = m } else { a = m; fa = fm }
+          }
+          roots.push((a + b) / 2)
+        } else if (Math.abs(samples[i].y) < 1e-9) {
+          roots.push(samples[i].x)
+        }
+      }
+
+      roots.sort(function(a,b){return a-b})
+      var uniqueRoots = []
+      for (var i = 0; i < roots.length; i++) {
+        if (i === 0 || Math.abs(roots[i] - roots[i-1]) > 0.001) uniqueRoots.push(roots[i])
+      }
+
+      if (uniqueRoots.length === 0) {
+        this.result = '无实数解'
+      } else if (uniqueRoots.length === 1) {
+        this.result = 'x=' + this.formatNum(uniqueRoots[0])
+      } else {
+        var parts = []
+        for (var i = 0; i < uniqueRoots.length && i < 4; i++) {
+          parts.push('x' + (i+1) + '=' + this.formatNum(uniqueRoots[i]))
+        }
+        this.result = parts.join(', ')
+      }
+      if (this.result !== '无实数解' && this.result !== '无法解析') {
+        this.addHistory(this.expression, this.result)
+      }
+    },
+
+    // ===== 递归下降解析多项式 =====
+    parsePolynomial(s) {
+      var tokens = this.tokenize(s)
+      var result = this.parseExpr(tokens, 0)
+      return result.coeffs
+    },
+
+    parseExpr(tokens, pos) {
+      // expr = [+|-] term { (+|-) term }
+      var sign = 1
+      if (tokens[pos] === '-') {
+        sign = -1
+        pos++
+      } else if (tokens[pos] === '+') {
+        pos++
+      }
+      var res = this.parseTerm(tokens, pos)
+      var coeffs = res.coeffs
+      if (sign === -1) {
+        for (var key in coeffs) {
+          if (coeffs.hasOwnProperty(key)) {
+            coeffs[key] = -coeffs[key]
+          }
+        }
+      }
+      var i = res.pos
+      while (i < tokens.length && (tokens[i] === '+' || tokens[i] === '-')) {
+        var op = tokens[i]
+        var termRes = this.parseTerm(tokens, i + 1)
+        for (var key in termRes.coeffs) {
+          var val = termRes.coeffs[key]
+          if (op === '-') val = -val
+          coeffs[key] = (coeffs[key] || 0) + val
+        }
+        i = termRes.pos
+      }
+      return { coeffs: coeffs, pos: i }
+    },
+
+    parseTerm(tokens, pos) {
+      // term = factor { (*|/) factor } 或隐式乘法
+      var res = this.parseFactor(tokens, pos)
+      var coeffs = res.coeffs
+      var i = res.pos
+      while (i < tokens.length) {
+        if (tokens[i] === '*' || tokens[i] === '/') {
+          var op = tokens[i]
+          var factorRes = this.parseFactor(tokens, i + 1)
+          if (op === '*') {
+            coeffs = this.multiplyPoly(coeffs, factorRes.coeffs)
+          } else {
+            coeffs = this.dividePoly(coeffs, factorRes.coeffs)
+          }
+          i = factorRes.pos
+        } else if (tokens[i] === '(' || tokens[i] === 'x' || tokens[i] === 'y') {
+          // 隐式乘法：如 2(x+1)、(x+1)(x+2)、2x、x(x+1)
+          var factorRes = this.parseFactor(tokens, i)
+          coeffs = this.multiplyPoly(coeffs, factorRes.coeffs)
+          i = factorRes.pos
+        } else {
+          break
+        }
+      }
+      return { coeffs: coeffs, pos: i }
+    },
+
+    parseFactor(tokens, pos) {
+      // factor = number | variable | '(' expr ')' | number variable
+      if (pos >= tokens.length) return { coeffs: {}, pos: pos }
+      var t = tokens[pos]
+
+      if (t === '(') {
+        var exprRes = this.parseExpr(tokens, pos + 1)
+        var endPos = exprRes.pos
+        if (endPos < tokens.length && tokens[endPos] === ')') {
+          endPos++
+        }
+        return { coeffs: exprRes.coeffs, pos: endPos }
+      }
+
+      if (t === 'x' || t === 'y') {
+        var coeff = 1
+        if (pos + 1 < tokens.length && tokens[pos + 1] === '^') {
+          var power = parseInt(tokens[pos + 2])
+          if (!isNaN(power) && power >= 1) {
+            var key = t + power
+            var obj = {}
+            obj[key] = coeff
+            return { coeffs: obj, pos: pos + 3 }
+          }
+        }
+        var obj2 = {}
+        obj2[t + '1'] = coeff
+        return { coeffs: obj2, pos: pos + 1 }
+      }
+
+      var num = parseFloat(t)
+      if (!isNaN(num)) {
+        // 检查后面是否紧跟变量（如 2x）
+        if (pos + 1 < tokens.length && (tokens[pos + 1] === 'x' || tokens[pos + 1] === 'y')) {
+          var varToken = tokens[pos + 1]
+          var varCoeff = num
+          if (pos + 2 < tokens.length && tokens[pos + 2] === '^') {
+            var varPower = parseInt(tokens[pos + 3])
+            if (!isNaN(varPower) && varPower >= 1) {
+              var obj3 = {}
+              obj3[varToken + varPower] = varCoeff
+              return { coeffs: obj3, pos: pos + 4 }
+            }
+          }
+          var obj4 = {}
+          obj4[varToken + '1'] = varCoeff
+          return { coeffs: obj4, pos: pos + 2 }
+        }
+        return { coeffs: { const: num }, pos: pos + 1 }
+      }
+
+      return { coeffs: {}, pos: pos + 1 }
+    },
+
+    multiplyPoly(c1, c2) {
+      var result = {}
+      for (var k1 in c1) {
+        if (!c1.hasOwnProperty(k1)) continue
+        for (var k2 in c2) {
+          if (!c2.hasOwnProperty(k2)) continue
+          var v = c1[k1] * c2[k2]
+          var deg1 = k1 === 'const' ? 0 : parseInt(k1.substring(1))
+          var deg2 = k2 === 'const' ? 0 : parseInt(k2.substring(1))
+          var newDeg = deg1 + deg2
+          var newKey = newDeg === 0 ? 'const' : 'x' + newDeg
+          result[newKey] = (result[newKey] || 0) + v
+        }
+      }
+      return result
+    },
+
+    dividePoly(c1, c2) {
+      // 仅支持除以纯数字
+      var keys = Object.keys(c2)
+      if (keys.length === 1 && keys[0] === 'const') {
+        var divisor = c2.const
+        if (divisor === 0) return c1
+        var result = {}
+        for (var k in c1) {
+          if (c1.hasOwnProperty(k)) {
+            result[k] = c1[k] / divisor
+          }
+        }
+        return result
+      }
+      return c1
+    },
+
+    // ===== 线性表达式解析（用于方程组）=====
+    parseLinear(s) {
+      var tokens = this.tokenize(s)
+      var result = { x: 0, y: 0, const: 0 }
+      var i = 0
+      var sign = 1
+
+      while (i < tokens.length) {
+        var t = tokens[i]
+        if (t === '+') {
+          sign = 1
+          i++
+        } else if (t === '-') {
+          sign = -1
+          i++
+        } else if (t === '*' || t === '/' || t === '(' || t === ')' || t === '^') {
+          i++
+        } else if (t === 'x' || t === 'y') {
+          var coeff = sign
+          if (i > 0) {
+            var prev = tokens[i - 1]
+            if (prev !== '+' && prev !== '-' && prev !== '*' && prev !== '/' && prev !== '(') {
+              var num = parseFloat(prev)
+              if (!isNaN(num)) {
+                coeff = sign * num
+              }
+            }
+          }
+          result[t] = (result[t] || 0) + coeff
+          sign = 1
+          i++
+        } else {
+          var val = parseFloat(t)
+          if (!isNaN(val)) {
+            var nextT = tokens[i + 1]
+            if (nextT === 'x' || nextT === 'y') {
+              i++
+              continue
+            }
+            result.const = (result.const || 0) + sign * val
+          }
+          sign = 1
+          i++
+        }
+      }
+      return result
+    },
+
+    tokenize(s) {
+      var tokens = []
+      var i = 0
+      while (i < s.length) {
+        var ch = s.charAt(i)
+        if (ch === '+' || ch === '-' || ch === '*' || ch === '/' || ch === '(' || ch === ')') {
+          if (ch === '-' && (tokens.length === 0 || tokens[tokens.length - 1] === '(' || tokens[tokens.length - 1] === '+' || tokens[tokens.length - 1] === '-' || tokens[tokens.length - 1] === '*' || tokens[tokens.length - 1] === '/')) {
+            var num = '-'
+            i++
+            while (i < s.length && ((s.charAt(i) >= '0' && s.charAt(i) <= '9') || s.charAt(i) === '.')) {
+              num += s.charAt(i)
+              i++
+            }
+            tokens.push(num)
+            continue
+          }
+          tokens.push(ch)
+          i++
+        } else if (ch === '^') {
+          tokens.push(ch)
+          i++
+        } else if ((ch >= '0' && ch <= '9') || ch === '.') {
+          var num2 = ''
+          while (i < s.length && ((s.charAt(i) >= '0' && s.charAt(i) <= '9') || s.charAt(i) === '.')) {
+            num2 += s.charAt(i)
+            i++
+          }
+          tokens.push(num2)
+        } else if (ch === 'x' || ch === 'y') {
+          tokens.push(ch)
+          i++
+        } else {
+          i++
+        }
+      }
+      return tokens
+    },
+
+    formatNum(n) {
+      var rounded = Math.round(n * 100000) / 100000
+      if (Math.abs(rounded - Math.round(rounded)) < 0.000001) {
+        return String(Math.round(rounded))
+      }
+      var str = String(rounded)
+      if (str.length > 10) {
+        str = rounded.toExponential(4)
+      }
+      return str
+    },
+
+    addHistory(expr, result) {
+      var type = '解方程'
+      if (expr.indexOf(';') !== -1) type = '解方程组'
+      storage.get({
+        key: HISTORY_KEY,
+        success: function(data) {
+          var list = []
+          if (data) {
+            try { list = JSON.parse(data) } catch (e) { list = [] }
+          }
+          list.push({ type: type, expr: expr, result: result })
+          if (list.length > 30) list = list.slice(1)
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify(list) })
+        },
+        fail: function() {
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify([{ type: type, expr: expr, result: result }]) })
+        }
+      })
+    }
+  }
+</script>

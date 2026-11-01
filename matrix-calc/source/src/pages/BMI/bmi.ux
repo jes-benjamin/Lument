@@ -1,0 +1,329 @@
+<template>
+  <div class="page">
+    <text class="title-text">BMI计算</text>
+
+    <div class="input-row">
+      <div class="field-btn" onclick="selectField('height')">
+        <text class="field-label">身高cm</text>
+        <text class="field-value">{{heightText}}</text>
+      </div>
+      <div class="field-btn" onclick="selectField('weight')">
+        <text class="field-label">体重kg</text>
+        <text class="field-value">{{weightText}}</text>
+      </div>
+    </div>
+
+    <div class="result-card">
+      <text class="result-main">{{bmiValue}}</text>
+      <text class="result-desc">{{bmiLevel}}</text>
+    </div>
+
+    <div class="keyboard">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('7')"><text class="key-text">7</text></div>
+        <div class="key key-num" onclick="pressKey('8')"><text class="key-text">8</text></div>
+        <div class="key key-num" onclick="pressKey('9')"><text class="key-text">9</text></div>
+        <div class="key key-func" onclick="deleteInput"><text class="key-small">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('4')"><text class="key-text">4</text></div>
+        <div class="key key-num" onclick="pressKey('5')"><text class="key-text">5</text></div>
+        <div class="key key-num" onclick="pressKey('6')"><text class="key-text">6</text></div>
+        <div class="key key-func" onclick="clearInput"><text class="key-text">C</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('1')"><text class="key-text">1</text></div>
+        <div class="key key-num" onclick="pressKey('2')"><text class="key-text">2</text></div>
+        <div class="key key-num" onclick="pressKey('3')"><text class="key-text">3</text></div>
+        <div class="key key-num" onclick="pressKey('0')"><text class="key-text">0</text></div>
+      </div>
+      <div class="key-row">
+        <div class="wide-key key-func" onclick="pressKey('.')"><text class="key-text">.</text></div>
+        <div class="wide-key key-ok" onclick="switchField"><text class="key-small">下一项</text></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 466px;
+    height: 466px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .title-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+    margin-top: 10px;
+  }
+
+  .input-row {
+    width: 380px;
+    height: 82px;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .field-btn {
+    width: 180px;
+    height: 78px;
+    border-radius: 28px;
+    background-color: #1a1a1a;
+    margin-left: 5px;
+    margin-right: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .field-label {
+    color: #888888;
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .field-value {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 800;
+    margin-top: 2px;
+  }
+
+  .result-card {
+    width: 380px;
+    height: 74px;
+    border-radius: 28px;
+    background-color: #2a2a2a;
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .result-main {
+    color: #9370db;
+    font-size: 30px;
+    font-weight: 800;
+  }
+
+  .result-desc {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 800;
+    margin-top: 2px;
+  }
+
+  .keyboard {
+    width: 360px;
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .key-row {
+    width: 360px;
+    height: 54px;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .key {
+    width: 78px;
+    height: 48px;
+    border-radius: 24px;
+    margin-left: 4px;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .wide-key {
+    width: 164px;
+    height: 48px;
+    border-radius: 24px;
+    margin-left: 4px;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-num {
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 2px;
+    border-color: #888888;
+  }
+
+  .key-func {
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-ok {
+    background-color: rgba(147, 112, 219, 0.35);
+    border-width: 2px;
+    border-color: #9370db;
+  }
+
+  .key-text {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 800;
+  }
+
+  .key-small {
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 800;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  var HISTORY_KEY = 'calc_history_v2'
+
+  export default {
+    private: {
+      currentField: 'height',
+      heightValue: '',
+      weightValue: '',
+      vibrationOn: true
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    computed: {
+      heightText() {
+        return this.heightValue || '0'
+      },
+
+      weightText() {
+        return this.weightValue || '0'
+      },
+
+      bmiValue() {
+        var h = parseFloat(this.heightValue)
+        var w = parseFloat(this.weightValue)
+        if (!h || !w) return '请输入'
+        var m = h / 100
+        var bmi = w / (m * m)
+        return String(parseFloat(bmi.toFixed(1)))
+      },
+
+      bmiLevel() {
+        var h = parseFloat(this.heightValue)
+        var w = parseFloat(this.weightValue)
+        if (!h || !w) return '身高和体重'
+        var m = h / 100
+        var bmi = w / (m * m)
+        if (bmi < 18.5) return '偏瘦'
+        if (bmi < 24) return '正常'
+        if (bmi < 28) return '超重'
+        return '肥胖'
+      }
+    },
+
+    onBackPress() {
+      this.saveHistory()
+      router.back()
+      return true
+    },
+
+    selectField(name) {
+      this.doVibrate()
+      this.currentField = name
+    },
+
+    switchField() {
+      this.doVibrate()
+      this.currentField = this.currentField === 'height' ? 'weight' : 'height'
+    },
+
+    getCurrentValue() {
+      return this.currentField === 'height' ? this.heightValue : this.weightValue
+    },
+
+    setCurrentValue(value) {
+      if (this.currentField === 'height') this.heightValue = value
+      else this.weightValue = value
+    },
+
+    pressKey(key) {
+      this.doVibrate()
+      var value = this.getCurrentValue()
+      if (key === '.' && value.indexOf('.') !== -1) return
+      if (value.length > 6) return
+      this.setCurrentValue(value + key)
+    },
+
+    deleteInput() {
+      this.doVibrate()
+      var value = this.getCurrentValue()
+      this.setCurrentValue(value.substring(0, value.length - 1))
+    },
+
+    clearInput() {
+      this.doVibrate()
+      this.setCurrentValue('')
+    },
+
+    saveHistory() {
+      var h = parseFloat(this.heightValue)
+      var w = parseFloat(this.weightValue)
+      if (!h || !w) return
+      var m = h / 100
+      var bmi = w / (m * m)
+      var result = 'BMI ' + String(parseFloat(bmi.toFixed(1))) + ' ' + this.bmiLevel
+      var expr = '身高' + this.heightValue + 'cm 体重' + this.weightValue + 'kg'
+      this.addHistory('BMI计算', expr, result)
+    },
+
+    addHistory(type, expr, result) {
+      storage.get({
+        key: HISTORY_KEY,
+        success: function(data) {
+          var list = []
+          if (data) {
+            try { list = JSON.parse(data) } catch (e) { list = [] }
+          }
+          list.push({ type: type, expr: expr, result: result })
+          if (list.length > 30) list = list.slice(1)
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify(list) })
+        },
+        fail: function() {
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify([{ type: type, expr: expr, result: result }]) })
+        }
+      })
+    }
+  }
+</script>

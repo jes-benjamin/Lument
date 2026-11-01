@@ -1,0 +1,1303 @@
+<template>
+  <div class="page">
+    <div class="display-box">
+      <text class="expr-text">{{displayExpression}}</text>
+      <text class="result-text">{{result}}</text>
+    </div>
+
+    <div class="kb-wrapper">
+      <div class="nav-side" onclick="prevPage"><text class="nav-side-text">‹</text></div>
+      <!-- 第0页：常见元素1 -->
+      <div class="keyboard" if="{{keyPage === 0}}">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('H')"><text class="elem-text">H</text></div>
+        <div class="key key-num" onclick="pressKey('C')"><text class="elem-text">C</text></div>
+        <div class="key key-num" onclick="pressKey('O')"><text class="elem-text">O</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('N')"><text class="elem-text">N</text></div>
+        <div class="key key-num" onclick="pressKey('S')"><text class="elem-text">S</text></div>
+        <div class="key key-num" onclick="pressKey('P')"><text class="elem-text">P</text></div>
+        <div class="key key-op" onclick="pressPlus"><text class="num-text">+</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('Cl')"><text class="elem-text">Cl</text></div>
+        <div class="key key-num" onclick="pressKey('Na')"><text class="elem-text">Na</text></div>
+        <div class="key key-num" onclick="pressKey('K')"><text class="elem-text">K</text></div>
+        <div class="key key-equal" onclick="pressEqual"><text class="num-dark">=</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key-more" onclick="openMore"><text class="func-text">更多</text></div>
+        <div class="key-ac-half" onclick="clearAll"><text class="func-text">AC</text></div>
+      </div>
+    </div>
+
+    <!-- 第1页：常见元素2 -->
+    <div class="keyboard" if="{{keyPage === 1}}">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('Fe')"><text class="elem-text">Fe</text></div>
+        <div class="key key-num" onclick="pressKey('Cu')"><text class="elem-text">Cu</text></div>
+        <div class="key key-num" onclick="pressKey('Zn')"><text class="elem-text">Zn</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('Al')"><text class="elem-text">Al</text></div>
+        <div class="key key-num" onclick="pressKey('Ca')"><text class="elem-text">Ca</text></div>
+        <div class="key key-num" onclick="pressKey('Mg')"><text class="elem-text">Mg</text></div>
+        <div class="key key-op" onclick="pressPlus"><text class="num-text">+</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('Ag')"><text class="elem-text">Ag</text></div>
+        <div class="key key-num" onclick="pressKey('Au')"><text class="elem-text">Au</text></div>
+        <div class="key key-num" onclick="pressKey('Ba')"><text class="elem-text">Ba</text></div>
+        <div class="key key-equal" onclick="pressEqual"><text class="num-dark">=</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key-more" onclick="openMore"><text class="func-text">更多</text></div>
+        <div class="key-ac-half" onclick="clearAll"><text class="func-text">AC</text></div>
+      </div>
+    </div>
+
+    <!-- 第2页：数字符号 -->
+    <div class="keyboard" if="{{keyPage === 2}}">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('0')"><text class="num-text">0</text></div>
+        <div class="key key-num" onclick="pressKey('1')"><text class="num-text">1</text></div>
+        <div class="key key-num" onclick="pressKey('2')"><text class="num-text">2</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('3')"><text class="num-text">3</text></div>
+        <div class="key key-num" onclick="pressKey('4')"><text class="num-text">4</text></div>
+        <div class="key key-num" onclick="pressKey('5')"><text class="num-text">5</text></div>
+        <div class="key key-op" onclick="pressPlus"><text class="num-text">+</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('6')"><text class="num-text">6</text></div>
+        <div class="key key-num" onclick="pressKey('7')"><text class="num-text">7</text></div>
+        <div class="key key-num" onclick="pressKey('8')"><text class="num-text">8</text></div>
+        <div class="key key-equal" onclick="pressEqual"><text class="num-dark">=</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key-more" onclick="openMore"><text class="func-text">更多</text></div>
+        <div class="key-ac-half" onclick="clearAll"><text class="func-text">AC</text></div>
+      </div>
+    </div>
+
+    <!-- 第3页：其他元素 -->
+    <div class="keyboard" if="{{keyPage === 3}}">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('Si')"><text class="elem-text">Si</text></div>
+        <div class="key key-num" onclick="pressKey('Mn')"><text class="elem-text">Mn</text></div>
+        <div class="key key-num" onclick="pressKey('Cr')"><text class="elem-text">Cr</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('Li')"><text class="elem-text">Li</text></div>
+        <div class="key key-num" onclick="pressKey('F')"><text class="elem-text">F</text></div>
+        <div class="key key-num" onclick="pressKey('Br')"><text class="elem-text">Br</text></div>
+        <div class="key key-op" onclick="pressPlus"><text class="num-text">+</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('I')"><text class="elem-text">I</text></div>
+        <div class="key key-num" onclick="pressKey('(')"><text class="elem-text">(</text></div>
+        <div class="key key-num" onclick="pressKey(')')"><text class="elem-text">)</text></div>
+        <div class="key key-equal" onclick="pressEqual"><text class="num-dark">=</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key-more" onclick="openMore"><text class="func-text">更多</text></div>
+        <div class="key-ac-half" onclick="clearAll"><text class="func-text">AC</text></div>
+      </div>
+    </div>
+
+    <!-- 第4页：更多元素 -->
+    <div class="keyboard" if="{{keyPage === 4}}">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('Pb')"><text class="elem-text">Pb</text></div>
+        <div class="key key-num" onclick="pressKey('Sn')"><text class="elem-text">Sn</text></div>
+        <div class="key key-num" onclick="pressKey('Co')"><text class="elem-text">Co</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('Ni')"><text class="elem-text">Ni</text></div>
+        <div class="key key-num" onclick="pressKey('Ti')"><text class="elem-text">Ti</text></div>
+        <div class="key key-num" onclick="pressKey('W')"><text class="elem-text">W</text></div>
+        <div class="key key-op" onclick="pressPlus"><text class="num-text">+</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('Pt')"><text class="elem-text">Pt</text></div>
+        <div class="key key-num" onclick="pressKey('Hg')"><text class="elem-text">Hg</text></div>
+        <div class="key key-num" onclick="pressKey('Bi')"><text class="elem-text">Bi</text></div>
+        <div class="key key-equal" onclick="pressEqual"><text class="num-dark">=</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key-more" onclick="openMore"><text class="func-text">更多</text></div>
+        <div class="key-ac-half" onclick="clearAll"><text class="func-text">AC</text></div>
+      </div>
+    </div>
+      <div class="nav-side" onclick="nextPage"><text class="nav-side-text">›</text></div>
+    </div>
+    <text class="page-label-bottom">{{currentLabel}}</text>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 466px;
+    height: 466px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .display-box {
+    width: 300px;
+    height: 84px;
+    border-radius: 22px;
+    background-color: #1a1a1a;
+    margin-top: 28px;
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .expr-text {
+    width: 272px;
+    height: 22px;
+    color: #888888;
+    font-size: 15px;
+    text-align: right;
+  }
+
+  .result-text {
+    width: 272px;
+    height: 48px;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .kb-wrapper {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-side {
+    width: 43px;
+    height: 43px;
+    border-radius: 21.5px;
+    background-color: #2a2a2a;
+    margin-left: 4px;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-side-text {
+    color: #ffffff;
+    font-size: 31px;
+    font-weight: 700;
+  }
+
+  .page-label-bottom {
+    color: #888888;
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: 6px;
+    text-align: center;
+  }
+
+  .keyboard {
+    width: 356px;
+    height: 300px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-row {
+    width: 356px;
+    height: 72px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key {
+    width: 80px;
+    height: 66px;
+    margin-left: 3px;
+    margin-right: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-ac {
+    width: 350px;
+    height: 66px;
+    border-radius: 33px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-more {
+    width: 170px;
+    height: 66px;
+    border-radius: 33px;
+    background-color: rgba(255, 165, 0, 0.35);
+    border-width: 2px;
+    border-color: #ffa500;
+    margin-right: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-ac-half {
+    width: 170px;
+    height: 66px;
+    border-radius: 33px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+    margin-left: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-num {
+    border-radius: 37px;
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 2px;
+    border-color: #888888;
+  }
+
+  .key-soft {
+    border-radius: 30px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-op {
+    border-radius: 30px;
+    background-color: rgba(147, 112, 219, 0.35);
+    border-width: 2px;
+    border-color: #9370db;
+  }
+
+  .key-equal {
+    border-radius: 30px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .num-text {
+    color: #ffffff;
+    font-size: 35px;
+    font-weight: 700;
+  }
+
+  .elem-text {
+    color: #ffffff;
+    font-size: 30px;
+    font-weight: 700;
+  }
+
+  .num-dark {
+    color: #ffffff;
+    font-size: 35px;
+    font-weight: 700;
+  }
+
+  .func-text {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 700;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  // ===== 常见化学反应数据库 =====
+  // key: 反应物化学式按字母排序后用+连接（不含系数）
+  // value: 生成物字符串
+  var REACTION_DB = {
+    // 燃烧反应
+    "H2+O2": "H2O",
+    "C+O2": "CO2",
+    "CH4+O2": "CO2+H2O",
+    "C2H6+O2": "CO2+H2O",
+    "C3H8+O2": "CO2+H2O",
+    "C2H4+O2": "CO2+H2O",
+    "C2H2+O2": "CO2+H2O",
+    "CO+O2": "CO2",
+
+    // 分解反应
+    "H2O": "H2+O2",
+    "H2O2": "H2O+O2",
+    "CaCO3": "CaO+CO2",
+    "KClO3": "KCl+O2",
+    "KMnO4": "K2MnO4+MnO2+O2",
+    "NH4HCO3": "NH3+CO2+H2O",
+    "H2CO3": "H2O+CO2",
+    "H2SO3": "H2O+SO2",
+    "Cu(OH)2": "CuO+H2O",
+    "Fe(OH)3": "Fe2O3+H2O",
+    "Al(OH)3": "Al2O3+H2O",
+    "MgCO3": "MgO+CO2",
+    "NaHCO3": "Na2CO3+H2O+CO2",
+
+    // 化合反应
+    "H2+Cl2": "HCl",
+    "N2+H2": "NH3",
+    "N2+O2": "NO",
+    "Fe+S": "FeS",
+    "C+CO2": "CO",
+    "CO2+H2O": "H2CO3",
+    "SO2+H2O": "H2SO3",
+    "SO3+H2O": "H2SO4",
+    "Na2O+H2O": "NaOH",
+    "K2O+H2O": "KOH",
+    "CaO+H2O": "Ca(OH)2",
+    "BaO+H2O": "Ba(OH)2",
+    "SO2+O2": "SO3",
+    "NO+O2": "NO2",
+
+    // 置换反应
+    "Fe+CuSO4": "Cu+FeSO4",
+    "Zn+HCl": "H2+ZnCl2",
+    "Zn+H2SO4": "H2+ZnSO4",
+    "Fe+HCl": "H2+FeCl2",
+    "Fe+H2SO4": "H2+FeSO4",
+    "Mg+HCl": "H2+MgCl2",
+    "Al+HCl": "H2+AlCl3",
+    "Na+H2O": "H2+NaOH",
+    "K+H2O": "H2+KOH",
+    "Ca+H2O": "H2+Ca(OH)2",
+    "Zn+CuSO4": "Cu+ZnSO4",
+    "Zn+FeSO4": "Fe+ZnSO4",
+    "Zn+AgNO3": "Ag+Zn(NO3)2",
+    "Cu+AgNO3": "Ag+Cu(NO3)2",
+    "Fe+AgNO3": "Ag+Fe(NO3)2",
+    "Cu+Hg(NO3)2": "Hg+Cu(NO3)2",
+    "Cl2+NaBr": "NaCl+Br2",
+    "Cl2+NaI": "NaCl+I2",
+    "Cl2+KI": "KCl+I2",
+    "Br2+KI": "KBr+I2",
+    "F2+H2O": "HF+O2",
+
+    // 复分解反应
+    "NaOH+HCl": "NaCl+H2O",
+    "NaOH+H2SO4": "Na2SO4+H2O",
+    "KOH+HCl": "KCl+H2O",
+    "KOH+H2SO4": "K2SO4+H2O",
+    "NaCl+AgNO3": "AgCl+NaNO3",
+    "KCl+AgNO3": "AgCl+KNO3",
+    "BaCl2+H2SO4": "BaSO4+HCl",
+    "BaCl2+Na2SO4": "BaSO4+NaCl",
+    "CaCl2+Na2CO3": "CaCO3+NaCl",
+    "NaOH+CO2": "Na2CO3+H2O",
+    "CaCO3+HCl": "CaCl2+H2O+CO2",
+    "Na2CO3+HCl": "NaCl+H2O+CO2",
+    "K2CO3+HCl": "KCl+H2O+CO2",
+    "MgCO3+HCl": "MgCl2+H2O+CO2",
+    "BaCO3+HCl": "BaCl2+H2O+CO2",
+    "NaHCO3+HCl": "NaCl+H2O+CO2",
+    "NaOH+CuSO4": "Cu(OH)2+Na2SO4",
+    "NaOH+FeCl3": "Fe(OH)3+NaCl",
+    "NaOH+FeCl2": "Fe(OH)2+NaCl",
+    "NaOH+MgCl2": "Mg(OH)2+NaCl",
+    "NaOH+AlCl3": "Al(OH)3+NaCl",
+    "KOH+CuSO4": "Cu(OH)2+K2SO4",
+    "NH4Cl+NaOH": "NaCl+NH3+H2O",
+    "NH4NO3+NaOH": "NaNO3+NH3+H2O",
+    "(NH4)2SO4+NaOH": "Na2SO4+NH3+H2O",
+    "CuSO4+BaCl2": "BaSO4+CuCl2",
+    "AgNO3+NaCl": "AgCl+NaNO3",
+    "H2SO4+BaCl2": "BaSO4+HCl",
+
+    // 氧化还原反应
+    "Cu+H2SO4": "CuSO4+SO2+H2O",
+    "Cu+HNO3": "Cu(NO3)2+NO+H2O",
+    "Ag+HNO3": "AgNO3+NO+H2O",
+    "Fe+HNO3": "Fe(NO3)3+NO+H2O",
+    "C+H2SO4": "CO2+SO2+H2O",
+    "C+HNO3": "CO2+NO2+H2O",
+    "Cu+FeCl3": "CuCl2+FeCl2",
+    "Fe+CuCl2": "FeCl2+Cu",
+    "Cl2+FeCl2": "FeCl3",
+    "Cl2+H2S": "HCl+S",
+    "Cl2+SO2+H2O": "HCl+H2SO4",
+    "MnO2+HCl": "MnCl2+Cl2+H2O",
+    "KMnO4+HCl": "KCl+MnCl2+Cl2+H2O",
+    "K2Cr2O7+HCl": "KCl+CrCl3+Cl2+H2O",
+    "CuO+H2": "Cu+H2O",
+    "Fe2O3+H2": "Fe+H2O",
+    "Fe2O3+CO": "Fe+CO2",
+    "Fe3O4+CO": "Fe+CO2",
+    "CuO+CO": "Cu+CO2",
+    "WO3+H2": "W+H2O",
+    "Zn+HNO3": "Zn(NO3)2+NH4NO3+H2O",
+    "Mg+HNO3": "Mg(NO3)2+NH4NO3+H2O",
+    "C+CuO": "Cu+CO2",
+    "C+Fe2O3": "Fe+CO2",
+    "S+HNO3": "H2SO4+NO",
+    "P+O2": "P2O5",
+    "NO2+H2O": "HNO3+NO",
+    "Cu+O2": "CuO",
+    "Fe+O2": "Fe3O4",
+    "Al+O2": "Al2O3",
+    "Mg+O2": "MgO",
+    "Na2O2+H2O": "NaOH+O2",
+    "Na2O2+CO2": "Na2CO3+O2",
+
+    // 其他常见反应
+    "Al+NaOH+H2O": "NaAlO2+H2",
+    "Al+H2SO4": "Al2(SO4)3+H2",
+    "Al+CuSO4": "Al2(SO4)3+Cu",
+    "FeCl3+NaOH": "Fe(OH)3+NaCl",
+    "Ca(OH)2+CO2": "CaCO3+H2O",
+    "Ca(OH)2+Na2CO3": "CaCO3+NaOH",
+    "CaO+CO2": "CaCO3",
+    "NaOH+SO2": "Na2SO3+H2O",
+    "NaOH+SO3": "Na2SO4+H2O",
+    "CuSO4+H2O": "CuSO4(H2O)5",
+    "NH3+HCl": "NH4Cl",
+    "NH3+H2O": "NH3(H2O)",
+    "Na2O+CO2": "Na2CO3",
+    "K2O+CO2": "K2CO3",
+    "Ca(OH)2+HCl": "CaCl2+H2O",
+    "Ba(OH)2+H2SO4": "BaSO4+H2O",
+    "Ba(OH)2+HCl": "BaCl2+H2O",
+    "FeCl3+KSCN": "Fe(SCN)3+KCl",
+    "I2+Na2S2O3": "NaI+Na2S4O6",
+    "Cu+CuO": "Cu2O",
+    "H2S+SO2": "S+H2O",
+    "H2S+Cl2": "S+HCl",
+    "Fe(OH)2+O2+H2O": "Fe(OH)3",
+    "Na+O2": "Na2O2",
+    "K+O2": "KO2",
+    "Li+O2": "Li2O",
+    "CaC2+H2O": "Ca(OH)2+C2H2",
+    "CaO+SiO2": "CaSiO3",
+    "Na2CO3+Ca(OH)2": "CaCO3+NaOH",
+    "Na2SiO3+HCl": "NaCl+H2SiO3",
+    "Fe+S+O2": "Fe2O3+SO2",
+
+    // 更多氧化还原反应
+    "FeCl2+Cl2": "FeCl3",
+    "H2S+O2": "H2O+SO2",
+    "H2S+SO2": "S+H2O",
+    "SO2+H2S": "S+H2O",
+    "NO+NO2": "N2O3",
+    "NO2+O2+H2O": "HNO3",
+    "NH3+O2": "N2+H2O",
+    "NH3+Cl2": "NH4Cl+N2",
+    "HCl+MnO2": "MnCl2+Cl2+H2O",
+    "HCl+KMnO4": "KCl+MnCl2+Cl2+H2O",
+    "HCl+K2Cr2O7": "KCl+CrCl3+Cl2+H2O",
+    "Cu+H2SO4": "CuSO4+SO2+H2O",
+    "C+H2SO4": "CO2+SO2+H2O",
+    "Cu+HNO3": "Cu(NO3)2+NO+H2O",
+    "C+HNO3": "CO2+NO2+H2O",
+    "Ag+HNO3": "AgNO3+NO+H2O",
+    "Fe+HNO3": "Fe(NO3)3+NO+H2O",
+    "Zn+HNO3": "Zn(NO3)2+NH4NO3+H2O",
+    "Mg+HNO3": "Mg(NO3)2+NH4NO3+H2O",
+    "FeS2+O2": "Fe2O3+SO2",
+    "Cu2S+O2": "Cu2O+SO2",
+    "CuFeS2+O2": "Cu2O+Fe2O3+SO2",
+    "PbS+O2": "PbO+SO2",
+    "ZnS+O2": "ZnO+SO2",
+    "FeO+O2": "Fe2O3",
+    "Fe3O4+O2": "Fe2O3",
+    "Fe2O3+O2": "Fe2O3",
+    "FeO+CO": "Fe+CO2",
+    "Fe3O4+H2": "Fe+H2O",
+    "Cu2O+O2": "CuO",
+    "HgO": "Hg+O2",
+    "Ag2O": "Ag+O2",
+    "HgS+O2": "Hg+SO2",
+    "S+O2": "SO2",
+    "S+HNO3": "H2SO4+NO",
+    "S+NaOH": "Na2S+Na2SO3+H2O",
+    "Cl2+H2O": "HCl+HClO",
+    "Cl2+NaOH": "NaCl+NaClO+H2O",
+    "Cl2+Ca(OH)2": "CaCl2+Ca(ClO)2+H2O",
+    "Br2+H2O": "HBr+HBrO",
+    "I2+H2O": "HI+HIO",
+    "O3": "O2",
+    "HClO": "HCl+O2",
+    "H2O2+H2S": "S+H2O",
+    "H2O2+FeCl2+HCl": "FeCl3+H2O",
+    "H2O2+KI": "I2+KOH",
+    "H2O2+MnO2": "H2O+O2",
+    "KMnO4+H2O2+H2SO4": "K2SO4+MnSO4+O2+H2O",
+    "KMnO4+H2C2O4+H2SO4": "K2SO4+MnSO4+CO2+H2O",
+    "K2Cr2O7+H2S+H2SO4": "Cr2(SO4)3+S+K2SO4+H2O",
+    "K2Cr2O7+FeSO4+H2SO4": "Cr2(SO4)3+Fe2(SO4)3+K2SO4+H2O",
+    "KMnO4+FeSO4+H2SO4": "K2SO4+MnSO4+Fe2(SO4)3+H2O",
+    "Cu+FeCl3": "CuCl2+FeCl2",
+    "Fe+CuCl2": "FeCl2+Cu",
+    "FeCl2+KMnO4+HCl": "FeCl3+KCl+MnCl2+H2O",
+    "H2C2O4": "H2O+CO2+CO",
+    "KClO3+HCl": "KCl+Cl2+H2O",
+    "KClO3": "KCl+O2",
+    "KClO4": "KCl+O2",
+    "NaClO+HCl": "NaCl+Cl2+H2O",
+    "NaClO3+HCl": "NaCl+Cl2+H2O",
+    "Ca(ClO)2+HCl": "CaCl2+Cl2+H2O",
+    "N2+O2": "NO",
+    "N2+H2": "NH3",
+    "NH4Cl": "NH3+HCl",
+    "NH4HCO3": "NH3+CO2+H2O",
+    "Ca(HCO3)2": "CaCO3+CO2+H2O",
+    "Mg(HCO3)2": "MgCO3+CO2+H2O",
+    "P+Cl2": "PCl3",
+    "P+Cl2": "PCl5",
+    "Fe+Cl2": "FeCl3",
+    "Cu+Cl2": "CuCl2",
+    "Na+Cl2": "NaCl",
+    "Mg+Cl2": "MgCl2",
+    "Al+Cl2": "AlCl3",
+    "Ca+Cl2": "CaCl2",
+    "Ba+Cl2": "BaCl2",
+    "Zn+Cl2": "ZnCl2",
+    "Fe+S": "FeS",
+    "Fe+S2": "FeS2",
+    "Cu+S": "Cu2S",
+    "Cu+S": "CuS",
+    "Zn+S": "ZnS",
+    "Hg+S": "HgS",
+    "Na2O+H2O": "NaOH",
+    "CaO+H2O": "Ca(OH)2",
+    "BaO+H2O": "Ba(OH)2",
+    "Li2O+H2O": "LiOH",
+    "K2O+H2O": "KOH",
+    "NaOH+CO2": "Na2CO3+H2O",
+    "NaOH+SO2": "Na2SO3+H2O",
+    "NaOH+SO3": "Na2SO4+H2O",
+    "KOH+CO2": "K2CO3+H2O",
+    "KOH+SO2": "K2SO3+H2O",
+    "KOH+SO3": "K2SO4+H2O",
+    "Ca(OH)2+SO2": "CaSO3+H2O",
+    "Ca(OH)2+SO3": "CaSO4+H2O",
+    "Na2CO3+CO2+H2O": "NaHCO3",
+    "NaHCO3+NaOH": "Na2CO3+H2O",
+    "CaCO3+CO2+H2O": "Ca(HCO3)2",
+    "MgCO3+CO2+H2O": "Mg(HCO3)2",
+    "FeCl3+Cu": "FeCl2+CuCl2",
+    "FeCl3+Zn": "FeCl2+ZnCl2",
+    "Fe2(SO4)3+Cu": "FeSO4+CuSO4",
+    "Fe2(SO4)3+Fe": "FeSO4",
+    "FeCl3+Fe": "FeCl2",
+    "Hg+HNO3": "Hg(NO3)2+NO2+H2O",
+    "Cu+AgNO3": "Cu(NO3)2+Ag",
+    "H2S+FeCl3": "S+FeCl2+HCl",
+    "H2S+KMnO4+H2SO4": "S+MnSO4+K2SO4+H2O",
+    "SO2+KMnO4+H2O": "K2SO4+MnSO4+H2SO4",
+    "SO2+K2Cr2O7+H2SO4": "Cr2(SO4)3+K2SO4+H2O",
+    "NO2+KMnO4+H2O": "KNO3+Mn(NO3)2+HNO3",
+    "Al+Fe2O3": "Al2O3+Fe",
+    "Al+Fe3O4": "Al2O3+Fe",
+    "Al+Cr2O3": "Al2O3+Cr",
+    "Mg+CO2": "MgO+C",
+    "Mg+N2": "Mg3N2",
+    "Al+N2": "AlN",
+    "Li+N2": "Li3N",
+    "Ca+N2": "Ca3N2",
+    "B+O2": "B2O3",
+    "Si+O2": "SiO2",
+    "Si+Cl2": "SiCl4",
+    "Si+HF": "SiF4+H2",
+    "SiO2+HF": "SiF4+H2O",
+    "SiO2+C": "Si+CO",
+    "SiO2+NaOH": "Na2SiO3+H2O",
+    "SiO2+CaO": "CaSiO3",
+    "SiO2+Na2CO3": "Na2SiO3+CO2",
+    "SiO2+CaCO3": "CaSiO3+CO2",
+    "Na2SiO3+CO2+H2O": "H2SiO3+Na2CO3",
+    "H2SiO3": "SiO2+H2O",
+    "Ca3(PO4)2+SiO2+C": "CaSiO3+P4+CO",
+    "Ca3(PO4)2+H2SO4": "CaSO4+H3PO4",
+    "Ca(H2PO4)2+NaOH": "Ca3(PO4)2+Na3PO4+H2O",
+    "P2O5+H2O": "H3PO4",
+    "P2O5+H2O": "HPO3",
+    "P2O5+NaOH": "Na3PO4+H2O",
+    "H3PO4+NaOH": "Na3PO4+H2O",
+    "H3PO4+Ca(OH)2": "Ca3(PO4)2+H2O",
+    "NH3+H2O": "NH3(H2O)",
+    "NH3+HCl": "NH4Cl",
+    "NH3+H2SO4": "(NH4)2SO4",
+    "NH3+HNO3": "NH4NO3",
+    "NH3+CO2+H2O": "NH4HCO3",
+    "NH4Cl+NaOH": "NaCl+NH3+H2O",
+    "NH4NO3+NaOH": "NaNO3+NH3+H2O",
+    "(NH4)2SO4+NaOH": "Na2SO4+NH3+H2O",
+    "NH4Cl+Ca(OH)2": "CaCl2+NH3+H2O",
+    "Fe+HCl": "FeCl2+H2",
+    "Fe+H2SO4": "FeSO4+H2",
+    "Al+HCl": "AlCl3+H2",
+    "Al+H2SO4": "Al2(SO4)3+H2",
+    "Mg+H2SO4": "MgSO4+H2",
+    "Zn+H2SO4": "ZnSO4+H2",
+    "Zn+HCl": "ZnCl2+H2",
+    "Fe+CuSO4": "FeSO4+Cu",
+    "Zn+CuSO4": "ZnSO4+Cu",
+    "Zn+FeSO4": "Fe+ZnSO4",
+    "Cu+AgNO3": "Ag+Cu(NO3)2",
+    "Fe+AgNO3": "Ag+Fe(NO3)2",
+    "Zn+AgNO3": "Ag+Zn(NO3)2",
+    "FeCl2+Cl2": "FeCl3",
+    "HBr+Cl2": "Br2+HCl",
+    "HI+Cl2": "I2+HCl",
+    "NaBr+Cl2": "NaCl+Br2",
+    "NaI+Cl2": "NaCl+I2",
+    "KI+Cl2": "KCl+I2",
+    "KI+Br2": "KBr+I2",
+    "Na2S+I2": "S+NaI",
+    "H2S+Br2": "S+HBr",
+    "H2S+I2": "S+HI",
+    "Na2S2O3+I2": "NaI+Na2S4O6",
+    "Fe+O2": "Fe3O4",
+    "Fe2O3+CO": "Fe+CO2",
+    "CuO+H2": "Cu+H2O",
+    "CuO+CO": "Cu+CO2",
+    "WO3+H2": "W+H2O",
+    "WO3+CO": "W+CO2",
+    "Fe3O4+CO": "Fe+CO2",
+    "Fe2O3+C": "Fe+CO",
+    "Fe3O4+C": "Fe+CO",
+    "CuO+C": "Cu+CO2",
+    "ZnO+C": "Zn+CO",
+    "SnO2+C": "Sn+CO",
+    "PbO+C": "Pb+CO",
+    "Fe2O3+Al": "Fe+Al2O3",
+    "Cr2O3+Al": "Cr+Al2O3",
+    "MnO2+Al": "Mn+Al2O3",
+    "CuCl+Cl2": "CuCl2",
+    "HgCl2+SnCl2": "Hg2Cl2+SnCl4",
+    "K2Cr2O7+FeSO4+H2SO4": "Cr2(SO4)3+Fe2(SO4)3+K2SO4+H2O",
+    "MnO2+HCl": "MnCl2+Cl2+H2O",
+    "PbO2+HCl": "PbCl2+Cl2+H2O",
+    "Pb3O4+HCl": "PbCl2+Cl2+H2O",
+    "Ce(SO4)2+FeSO4": "Ce2(SO4)3+Fe2(SO4)3",
+    "NaBiO3+MnSO4+HNO3": "NaNO3+Bi(NO3)3+HMnO4+Na2SO4+H2O"
+  }
+
+  // ===== 规范化数据库key（按字母排序，确保任意输入顺序都能匹配）=====
+  var SORTED_REACTION_DB = {}
+  for (var rawKey in REACTION_DB) {
+    if (REACTION_DB.hasOwnProperty(rawKey)) {
+      var keyParts = rawKey.split('+')
+      var keySorted = keyParts.slice().sort()
+      var normKey = keySorted.join('+')
+      SORTED_REACTION_DB[normKey] = REACTION_DB[rawKey]
+    }
+  }
+
+  // ===== 常见气体与沉淀标记 =====
+  var GAS_SYMBOLS = {
+    'H2': '\u2191', 'O2': '\u2191', 'N2': '\u2191', 'CO2': '\u2191', 'CO': '\u2191',
+    'SO2': '\u2191', 'SO3': '\u2191', 'NO': '\u2191', 'NO2': '\u2191', 'NH3': '\u2191',
+    'H2S': '\u2191', 'Cl2': '\u2191', 'F2': '\u2191', 'O3': '\u2191',
+    'CH4': '\u2191', 'C2H6': '\u2191', 'C3H8': '\u2191', 'C2H4': '\u2191', 'C2H2': '\u2191',
+    'HF': '\u2191', 'HBr': '\u2191', 'HI': '\u2191', 'HCl': '\u2191'
+  }
+  var PRECIP_SYMBOLS = {
+    'AgCl': '\u2193', 'BaSO4': '\u2193', 'CaCO3': '\u2193', 'BaCO3': '\u2193',
+    'Cu(OH)2': '\u2193', 'Fe(OH)2': '\u2193', 'Fe(OH)3': '\u2193', 'Al(OH)3': '\u2193',
+    'Mg(OH)2': '\u2193', 'CaSO4': '\u2193', 'BaSO3': '\u2193', 'CaSO3': '\u2193',
+    'FeS': '\u2193', 'CuS': '\u2193', 'ZnS': '\u2193', 'PbS': '\u2193',
+    'HgS': '\u2193', 'Ag2S': '\u2193', 'CaSiO3': '\u2193', 'H2SiO3': '\u2193',
+    'S': '\u2193'
+  }
+
+  // ===== 分数运算 =====
+  function gcdN(a, b) {
+    a = Math.abs(a)
+    b = Math.abs(b)
+    while (b) {
+      var t = b
+      b = a % b
+      a = t
+    }
+    return a || 1
+  }
+
+  function lcmN(a, b) {
+    return Math.abs(a * b) / gcdN(a, b)
+  }
+
+  function F(num, den) {
+    if (den === undefined) den = 1
+    if (den === 0) den = 1
+    if (den < 0) { num = -num; den = -den }
+    var g = gcdN(num, den)
+    return [num / g, den / g]
+  }
+  function Fadd(a, b) { return F(a[0] * b[1] + b[0] * a[1], a[1] * b[1]) }
+  function Fsub(a, b) { return F(a[0] * b[1] - b[0] * a[1], a[1] * b[1]) }
+  function Fmul(a, b) { return F(a[0] * b[0], a[1] * b[1]) }
+  function Fdiv(a, b) { return F(a[0] * b[1], b[0] * a[1]) }
+  function FisZero(a) { return a[0] === 0 }
+
+  var LABELS = ['常见元素1', '常见元素2', '数字符号', '其他元素', '更多元素']
+  var TOTAL = 5
+  var CHEM_EXPR_KEY = 'chem_expr_v2'
+  var HISTORY_KEY = 'calc_history_v2'
+
+  export default {
+    private: {
+      expression: '',
+      result: '等待输入',
+      keyPage: 0,
+      vibrationOn: true,
+      autoCalcOn: true
+    },
+
+    computed: {
+      displayExpression() {
+        return this.expression === '' ? '化学方程式' : this.expression
+      },
+      currentLabel() {
+        return LABELS[this.keyPage]
+      }
+    },
+
+    onBackPress() {
+      router.back()
+      return true
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+      storage.get({
+        key: 'setting_autocalc',
+        success: function(data) {
+          self.autoCalcOn = data !== 'false'
+        }
+      })
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    prevPage() {
+      this.doVibrate()
+      this.keyPage = this.keyPage > 0 ? this.keyPage - 1 : TOTAL - 1
+    },
+
+    nextPage() {
+      this.doVibrate()
+      this.keyPage = this.keyPage < TOTAL - 1 ? this.keyPage + 1 : 0
+    },
+
+    pressKey(key) {
+      this.doVibrate()
+      this.expression += key
+      this.refresh()
+    },
+
+    pressPlus() {
+      this.doVibrate()
+      if (this.expression === '') return
+      var last = this.expression.charAt(this.expression.length - 1)
+      if (last === '+' || last === '=') return
+      this.expression += '+'
+      this.refresh()
+    },
+
+    pressEqual() {
+      this.doVibrate()
+      if (this.expression === '') return
+      if (this.expression.indexOf('=') !== -1) {
+        this.refresh()
+        this.saveHistoryIfBalanced()
+        return
+      }
+      var last = this.expression.charAt(this.expression.length - 1)
+      if (last === '+') return
+      if (this.autoCalcOn) {
+        var predicted = this.predictProducts(this.expression)
+        if (predicted) {
+          this.expression += '=' + predicted
+        } else {
+          this.expression += '='
+        }
+      } else {
+        this.expression += '='
+      }
+      this.refresh()
+      this.saveHistoryIfBalanced()
+    },
+
+    deleteLast() {
+      this.doVibrate()
+      if (this.expression.length > 0) {
+        this.expression = this.expression.substring(0, this.expression.length - 1)
+      }
+      this.refresh()
+    },
+
+    clearAll() {
+      this.doVibrate()
+      this.expression = ''
+      this.result = '等待输入'
+    },
+
+    openMore() {
+      this.doVibrate()
+      var expr = this.expression || ''
+      storage.set({
+        key: CHEM_EXPR_KEY,
+        value: expr,
+        success: function() {
+          router.push({ uri: '/pages/ChemicalAnalysis' })
+        },
+        fail: function() {
+          router.push({ uri: '/pages/ChemicalAnalysis' })
+        }
+      })
+    },
+
+    refresh() {
+      if (this.expression === '') {
+        this.result = '等待输入'
+        return
+      }
+      if (this.expression.indexOf('=') === -1) {
+        if (this.autoCalcOn) {
+          var predicted = this.predictProducts(this.expression)
+          if (predicted) {
+            this.result = '\u2192 ' + predicted
+          } else {
+            this.result = '输入 = 配平'
+          }
+        } else {
+          this.result = '输入 = 配平'
+        }
+        return
+      }
+      var eqParts = this.expression.split('=')
+      if (eqParts.length === 2 && eqParts[1] === '') {
+        if (this.autoCalcOn) {
+          var predicted2 = this.predictProducts(eqParts[0])
+          if (predicted2) {
+            this.expression = eqParts[0] + '=' + predicted2
+            var balanced = this.balanceEquation(this.expression)
+            if (balanced) {
+              this.result = balanced
+            } else {
+              this.result = '无法配平'
+            }
+          } else {
+            this.result = '请输入生成物'
+          }
+        } else {
+          this.result = '请输入生成物'
+        }
+        return
+      }
+      var balanced = this.balanceEquation(this.expression)
+      if (balanced) {
+        this.result = balanced
+      } else {
+        this.result = '无法配平'
+      }
+    },
+
+    parseFormula(formula) {
+      var result = this._parseFormulaRecursive(formula, 0)
+      return result.counts
+    },
+
+    _parseFormulaRecursive(formula, start) {
+      var counts = {}
+      var i = start
+      var n = formula.length
+      while (i < n) {
+        var ch = formula.charAt(i)
+        if (ch === '(') {
+          var sub = this._parseFormulaRecursive(formula, i + 1)
+          i = sub.endIndex
+          var mulStr = ''
+          while (i < n) {
+            var d2 = formula.charAt(i)
+            if (d2 >= '0' && d2 <= '9') {
+              mulStr += d2
+              i++
+            } else {
+              break
+            }
+          }
+          var multiplier = mulStr === '' ? 1 : parseInt(mulStr, 10)
+          if (isNaN(multiplier)) multiplier = 1
+          for (var elem in sub.counts) {
+            if (sub.counts.hasOwnProperty(elem)) {
+              counts[elem] = (counts[elem] || 0) + sub.counts[elem] * multiplier
+            }
+          }
+        } else if (ch === ')') {
+          return { counts: counts, endIndex: i + 1 }
+        } else if (ch >= 'A' && ch <= 'Z') {
+          var elem2 = ch
+          i++
+          if (i < n) {
+            var nx = formula.charAt(i)
+            if (nx >= 'a' && nx <= 'z') {
+              elem2 += nx
+              i++
+            }
+          }
+          var numStr = ''
+          while (i < n) {
+            var d3 = formula.charAt(i)
+            if (d3 >= '0' && d3 <= '9') {
+              numStr += d3
+              i++
+            } else {
+              break
+            }
+          }
+          var count = numStr === '' ? 1 : parseInt(numStr, 10)
+          if (isNaN(count)) count = 1
+          counts[elem2] = (counts[elem2] || 0) + count
+        } else {
+          i++
+        }
+      }
+      return { counts: counts, endIndex: i }
+    },
+
+    _stripCoeff(formula) {
+      var k = 0
+      while (k < formula.length && formula.charAt(k) >= '0' && formula.charAt(k) <= '9') k++
+      return formula.substring(k)
+    },
+
+    predictProducts(reactantsStr) {
+      if (!reactantsStr || reactantsStr === '') return null
+      var parts = reactantsStr.split('+')
+      var stripped = []
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i] === '') return null
+        stripped.push(this._stripCoeff(parts[i]))
+      }
+      var unique = []
+      var seen = {}
+      for (var j = 0; j < stripped.length; j++) {
+        if (!seen[stripped[j]]) {
+          seen[stripped[j]] = true
+          unique.push(stripped[j])
+        }
+      }
+      var sorted = unique.slice().sort()
+      var key = sorted.join('+')
+      if (SORTED_REACTION_DB.hasOwnProperty(key)) {
+        return SORTED_REACTION_DB[key]
+      }
+      return null
+    },
+
+    parseEquation(expr) {
+      var eq = expr.replace(/->/g, '=').replace(/\u2192/g, '=').replace(/\s/g, '')
+      var parts = eq.split('=')
+      if (parts.length !== 2) return null
+      var leftStr = parts[0]
+      var rightStr = parts[1]
+      if (leftStr === '' || rightStr === '') return null
+
+      var self = this
+      var parseSide = function(sideStr) {
+        var formulas = sideStr.split('+')
+        var res = []
+        for (var i = 0; i < formulas.length; i++) {
+          var f = formulas[i]
+          if (f === '') return null
+          var body = self._stripCoeff(f)
+          if (body === '') return null
+          var bodyClean = body.replace(/\(H2O\)/g, '').replace(/\(H2O\)\d*/g, '')
+          if (bodyClean === '') bodyClean = body
+          res.push({ formula: body, counts: self.parseFormula(body) })
+        }
+        return res
+      }
+
+      var reactants = parseSide(leftStr)
+      var products = parseSide(rightStr)
+      if (!reactants || !products) return null
+      return { reactants: reactants, products: products }
+    },
+
+    balanceEquation(expr) {
+      var parsed = this.parseEquation(expr)
+      if (!parsed) return null
+
+      var reactants = parsed.reactants
+      var products = parsed.products
+      var molecules = reactants.concat(products)
+      var nMol = molecules.length
+
+      var elemSet = {}
+      var elemList = []
+      for (var i = 0; i < nMol; i++) {
+        var cs = molecules[i].counts
+        for (var e in cs) {
+          if (cs.hasOwnProperty(e) && !elemSet[e]) {
+            elemSet[e] = true
+            elemList.push(e)
+          }
+        }
+      }
+      var nElem = elemList.length
+
+      var M = []
+      for (var r = 0; r < nElem; r++) {
+        var row = []
+        for (var c = 0; c < nMol; c++) {
+          var cnt = molecules[c].counts[elemList[r]] || 0
+          var sign = c < reactants.length ? 1 : -1
+          row.push(F(sign * cnt, 1))
+        }
+        M.push(row)
+      }
+
+      var pivotRow = []
+      for (var c = 0; c < nMol; c++) pivotRow[c] = -1
+      var pr = 0
+      for (var c2 = 0; c2 < nMol && pr < nElem; c2++) {
+        var piv = -1
+        for (var i2 = pr; i2 < nElem; i2++) {
+          if (!FisZero(M[i2][c2])) { piv = i2; break }
+        }
+        if (piv === -1) continue
+        var tmp = M[pr]; M[pr] = M[piv]; M[piv] = tmp
+        var pv = M[pr][c2]
+        for (var j = 0; j < nMol; j++) M[pr][j] = Fdiv(M[pr][j], pv)
+        for (var i3 = 0; i3 < nElem; i3++) {
+          if (i3 !== pr && !FisZero(M[i3][c2])) {
+            var factor = M[i3][c2]
+            for (var j2 = 0; j2 < nMol; j2++) {
+              M[i3][j2] = Fsub(M[i3][j2], Fmul(factor, M[pr][j2]))
+            }
+          }
+        }
+        pivotRow[c2] = pr
+        pr++
+      }
+
+      var freeVars = []
+      for (var c3 = 0; c3 < nMol; c3++) {
+        if (pivotRow[c3] === -1) freeVars.push(c3)
+      }
+
+      if (freeVars.length === 0) return null
+
+      var bestSol = null
+      var bestMax = Infinity
+      var nFree = freeVars.length
+
+      // 尝试一组自由变量取值，计算完整解并验证
+      function tryCombo(freeVals) {
+        var sol = []
+        for (var c4 = 0; c4 < nMol; c4++) sol.push(F(0, 1))
+        for (var fv2 = 0; fv2 < nFree; fv2++) {
+          sol[freeVars[fv2]] = F(freeVals[fv2], 1)
+        }
+        for (var c5 = 0; c5 < nMol; c5++) {
+          if (pivotRow[c5] !== -1) {
+            var rr = pivotRow[c5]
+            var sum = F(0, 1)
+            for (var j3 = 0; j3 < nMol; j3++) {
+              if (pivotRow[j3] === -1) {
+                sum = Fadd(sum, Fmul(M[rr][j3], sol[j3]))
+              }
+            }
+            sol[c5] = Fmul(sum, F(-1, 1))
+          }
+        }
+
+        var anyNonZero = false
+        for (var c6 = 0; c6 < nMol; c6++) {
+          if (!FisZero(sol[c6])) { anyNonZero = true; break }
+        }
+        if (!anyNonZero) return
+
+        var denLcm = 1
+        for (var c7 = 0; c7 < nMol; c7++) {
+          denLcm = lcmN(denLcm, sol[c7][1])
+        }
+        var ints = []
+        for (var c8 = 0; c8 < nMol; c8++) {
+          ints.push(sol[c8][0] * (denLcm / sol[c8][1]))
+        }
+        var g = 0
+        for (var c9 = 0; c9 < nMol; c9++) g = gcdN(g, Math.abs(ints[c9]))
+        if (g === 0) g = 1
+        for (var c10 = 0; c10 < nMol; c10++) ints[c10] = ints[c10] / g
+
+        var negCount = 0
+        for (var c11 = 0; c11 < nMol; c11++) if (ints[c11] < 0) negCount++
+        if (negCount === nMol) {
+          for (var c12 = 0; c12 < nMol; c12++) ints[c12] = -ints[c12]
+        } else if (negCount > 0) {
+          return
+        }
+
+        var hasZero = false
+        for (var c13 = 0; c13 < nMol; c13++) {
+          if (ints[c13] === 0) { hasZero = true; break }
+        }
+        if (hasZero) return
+
+        var maxVal = 0
+        for (var c14 = 0; c14 < nMol; c14++) {
+          if (Math.abs(ints[c14]) > maxVal) maxVal = Math.abs(ints[c14])
+        }
+        if (maxVal < bestMax) {
+          bestMax = maxVal
+          bestSol = ints
+        }
+      }
+
+      // 递归枚举所有自由变量的小整数组合（1~8）
+      var maxVal = nFree <= 2 ? 12 : (nFree <= 3 ? 6 : 4)
+      function searchIdx(idx, freeVals) {
+        if (idx === nFree) {
+          tryCombo(freeVals)
+          return
+        }
+        for (var v = 1; v <= maxVal; v++) {
+          freeVals[idx] = v
+          searchIdx(idx + 1, freeVals)
+        }
+      }
+
+      if (nFree <= 4) {
+        searchIdx(0, [])
+      } else {
+        // 自由变量过多时回退到单变量尝试
+        for (var fv = 0; fv < nFree; fv++) {
+          var fvArr = []
+          for (var fv3 = 0; fv3 < nFree; fv3++) {
+            fvArr.push(fv === fv3 ? 1 : 0)
+          }
+          tryCombo(fvArr)
+        }
+      }
+
+      if (!bestSol) return null
+
+      if (!this.verifyBalance(reactants, products, bestSol)) return null
+
+      return this.formatEquation(reactants, products, bestSol)
+    },
+
+    verifyBalance(reactants, products, coefs) {
+      var elemSet = {}
+      for (var i = 0; i < reactants.length; i++) {
+        var cs = reactants[i].counts
+        for (var e in cs) {
+          if (cs.hasOwnProperty(e)) elemSet[e] = true
+        }
+      }
+      for (var j = 0; j < products.length; j++) {
+        var cs2 = products[j].counts
+        for (var e2 in cs2) {
+          if (cs2.hasOwnProperty(e2)) elemSet[e2] = true
+        }
+      }
+
+      for (var elem in elemSet) {
+        if (!elemSet.hasOwnProperty(elem)) continue
+        var leftCount = 0
+        for (var k = 0; k < reactants.length; k++) {
+          leftCount += (reactants[k].counts[elem] || 0) * coefs[k]
+        }
+        var rightCount = 0
+        for (var m = 0; m < products.length; m++) {
+          rightCount += (products[m].counts[elem] || 0) * coefs[reactants.length + m]
+        }
+        if (leftCount !== rightCount) return false
+      }
+      return true
+    },
+
+    formatEquation(reactants, products, coefs) {
+      var nR = reactants.length
+      var leftParts = []
+      for (var i = 0; i < nR; i++) {
+        var co = coefs[i]
+        leftParts.push((co === 1 ? '' : String(co)) + reactants[i].formula)
+      }
+      var rightParts = []
+      for (var j = 0; j < products.length; j++) {
+        var co2 = coefs[nR + j]
+        var formula = products[j].formula
+        var sym = ''
+        if (GAS_SYMBOLS[formula]) sym = GAS_SYMBOLS[formula]
+        else if (PRECIP_SYMBOLS[formula]) sym = PRECIP_SYMBOLS[formula]
+        rightParts.push((co2 === 1 ? '' : String(co2)) + formula + sym)
+      }
+      return leftParts.join('+') + '=' + rightParts.join('+')
+    },
+
+    saveHistoryIfBalanced() {
+      if (this.expression === '' || this.expression.indexOf('=') === -1) return
+      if (this.result === '等待输入' || this.result === '无法配平' || this.result === '请输入生成物') return
+      if (this.result.indexOf('\u2192') !== -1) return
+      this.addHistory(this.expression, this.result)
+    },
+
+    addHistory(expr, result) {
+      storage.get({
+        key: HISTORY_KEY,
+        success: function(data) {
+          var list = []
+          if (data) {
+            try { list = JSON.parse(data) } catch (e) { list = [] }
+          }
+          list.push({ type: '化学方程式', expr: expr, result: result })
+          if (list.length > 30) list = list.slice(1)
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify(list) })
+        },
+        fail: function() {
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify([{ type: '化学方程式', expr: expr, result: result }]) })
+        }
+      })
+    }
+  }
+</script>
