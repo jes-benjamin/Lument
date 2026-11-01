@@ -1,0 +1,765 @@
+<template>
+  <div class="page">
+    <div class="title-bar">
+      <text class="title-text">方程式分析</text>
+    </div>
+    <div class="eq-box">
+      <text class="eq-text">{{equation}}</text>
+    </div>
+    <list class="result-list">
+      <list-item class="result-item" type="result" for="{{analysisLines}}">
+        <text class="result-text">{{$item}}</text>
+      </list-item>
+      <list-item class="spacer-item" type="spacer">
+        <text></text>
+      </list-item>
+    </list>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 336px;
+    height: 480px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .title-bar {
+    width: 320px;
+    height: 36px;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .title-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .eq-box {
+    width: 320px;
+    height: 52px;
+    border-radius: 16px;
+    background-color: #1a1a1a;
+    margin-top: 6px;
+    padding-left: 12px;
+    padding-right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .eq-text {
+    color: #ffa500;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .result-list {
+    width: 320px;
+    height: 360px;
+    margin-top: 8px;
+  }
+
+  .result-item {
+    width: 320px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .result-text {
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .spacer-item {
+    width: 320px;
+    height: 40px;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+
+  var CHEM_EXPR_KEY = 'chem_expr_v2'
+
+  // 常见元素常见化合价（单质为0）
+  var COMMON_VALENCE = {
+    'H': [1, -1], 'Li': [1], 'Na': [1], 'K': [1],
+    'Be': [2], 'Mg': [2], 'Ca': [2], 'Ba': [2], 'Sr': [2],
+    'B': [3], 'Al': [3],
+    'C': [4, 2, -4], 'Si': [4],
+    'N': [5, 4, 3, 2, 1, -3], 'P': [5, 3, -3],
+    'O': [-2, -1], 'S': [6, 4, 2, -2], 'F': [-1],
+    'Cl': [-1, 1, 3, 5, 7], 'Br': [-1, 1, 5], 'I': [-1, 1, 5, 7],
+    'Fe': [3, 2], 'Cu': [2, 1], 'Ag': [1], 'Au': [3, 1],
+    'Zn': [2], 'Hg': [2, 1], 'Pb': [2, 4], 'Sn': [4, 2],
+    'Mn': [4, 2, 7, 6], 'Cr': [3, 6], 'Co': [2, 3],
+    'Ni': [2, 3], 'Ti': [4], 'W': [6],
+    'Pt': [4, 2], 'Bi': [3]
+  }
+
+  // 常见离子/原子团化合价
+  var POLY_VALENCE = {
+    'OH': -1, 'NO3': -1, 'ClO3': -1, 'MnO4': -1, 'CN': -1,
+    'NH4': 1, 'HCO3': -1, 'HSO4': -1,
+    'SO4': -2, 'CO3': -2, 'SO3': -2, 'SiO3': -2, 'CrO4': -2, 'Cr2O7': -2,
+    'PO4': -3, 'BO3': -3, 'AsO4': -3
+  }
+
+  export default {
+    private: {
+      equation: '',
+      analysisLines: []
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: CHEM_EXPR_KEY,
+        success: function(data) {
+          self.equation = data || ''
+          self.analyze()
+        },
+        fail: function() {
+          self.equation = ''
+          self.analyze()
+        }
+      })
+    },
+
+    onBackPress() {
+      router.back()
+      return true
+    },
+
+    analyze() {
+      var eq = this.equation.replace(/\s/g, '')
+      if (eq === '' || eq.indexOf('=') === -1) {
+        this.analysisLines = ['请输入完整方程式']
+        return
+      }
+
+      var parts = eq.split('=')
+      if (parts.length !== 2) {
+        this.analysisLines = ['方程式格式错误']
+        return
+      }
+
+      var leftStr = parts[0]
+      var rightStr = parts[1]
+
+      var leftMols = this.parseSide(leftStr)
+      var rightMols = this.parseSide(rightStr)
+
+      if (leftMols.length === 0 || rightMols.length === 0) {
+        this.analysisLines = ['无法解析方程式']
+        return
+      }
+
+      var lines = []
+
+      // 1. 反应类型判断
+      var rxnType = this.judgeReactionType(leftMols, rightMols)
+      lines.push('反应类型: ' + rxnType)
+
+      // 2. 化合价分析
+      var valenceChanges = this.analyzeValence(leftMols, rightMols)
+
+      // 3. 氧化还原判断
+      var hasRedox = valenceChanges.length > 0
+      if (hasRedox) {
+        lines.push('该反应为氧化还原反应')
+        var redoxInfo = this.judgeRedox(leftMols, rightMols, valenceChanges)
+        lines.push('氧化剂: ' + redoxInfo.oxidizer)
+        lines.push('还原剂: ' + redoxInfo.reducer)
+        lines.push('氧化产物: ' + redoxInfo.oxProduct)
+        lines.push('还原产物: ' + redoxInfo.redProduct)
+        lines.push('---化合价变化---')
+        for (var i = 0; i < valenceChanges.length; i++) {
+          var v = valenceChanges[i]
+          lines.push(v.elem + ': ' + v.from + ' → ' + v.to)
+        }
+      } else {
+        lines.push('该反应为非氧化还原反应')
+      }
+
+      this.analysisLines = lines
+    },
+
+    parseSide(sideStr) {
+      var result = []
+      var items = sideStr.split('+')
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i].trim()
+        if (item === '') continue
+        var coeff = 1
+        var formula = item
+        var numMatch = ''
+        for (var k = 0; k < item.length; k++) {
+          var ch = item.charAt(k)
+          if (ch >= '0' && ch <= '9') {
+            numMatch += ch
+          } else {
+            break
+          }
+        }
+        if (numMatch.length > 0) {
+          coeff = parseInt(numMatch, 10)
+          formula = item.substring(numMatch.length)
+        }
+        result.push({ coeff: coeff, formula: formula })
+      }
+      return result
+    },
+
+    judgeReactionType(leftMols, rightMols) {
+      var leftIsElement = []
+      var rightIsElement = []
+      for (var i = 0; i < leftMols.length; i++) {
+        leftIsElement.push(this.isElement(leftMols[i].formula))
+      }
+      for (var j = 0; j < rightMols.length; j++) {
+        rightIsElement.push(this.isElement(rightMols[j].formula))
+      }
+
+      if (leftMols.length === 1 && rightMols.length >= 2) return '分解反应'
+      if (leftMols.length >= 2 && rightMols.length === 1) return '化合反应'
+
+      var leftHasElement = false
+      var rightHasElement = false
+      for (var a = 0; a < leftIsElement.length; a++) if (leftIsElement[a]) leftHasElement = true
+      for (var b = 0; b < rightIsElement.length; b++) if (rightIsElement[b]) rightHasElement = true
+
+      if (leftHasElement && rightHasElement) return '置换反应'
+      if (!leftHasElement && !rightHasElement) return '复分解反应'
+      return '氧化还原反应/其他'
+    },
+
+    isElement(formula) {
+      // 单质：只有一个元素符号，无括号，无下标或下标为1
+      var s = formula
+      var i = 0
+      if (i < s.length && s.charAt(i) >= 'A' && s.charAt(i) <= 'Z') {
+        i++
+        if (i < s.length && s.charAt(i) >= 'a' && s.charAt(i) <= 'z') i++
+        var numStr = ''
+        while (i < s.length && s.charAt(i) >= '0' && s.charAt(i) <= '9') {
+          numStr += s.charAt(i)
+          i++
+        }
+        if (i === s.length) return true
+      }
+      return false
+    },
+
+    analyzeValence(leftMols, rightMols) {
+      var self = this
+      var changes = []
+
+      // 获取每个分子中各元素的总化合价信息
+      var leftValence = []
+      var rightValence = []
+      for (var i = 0; i < leftMols.length; i++) {
+        leftValence.push(this.getValenceMap(leftMols[i].formula))
+      }
+      for (var j = 0; j < rightMols.length; j++) {
+        rightValence.push(this.getValenceMap(rightMols[j].formula))
+      }
+
+      // 汇总反应前后各元素的总"原子数×化合价"
+      var leftElemVal = {}
+      var rightElemVal = {}
+
+      for (var li = 0; li < leftMols.length; li++) {
+        var vm = leftValence[li]
+        var co = leftMols[li].coeff
+        for (var e in vm) {
+          if (vm.hasOwnProperty(e)) {
+            var key = e
+            if (!leftElemVal[key]) leftElemVal[key] = { count: 0, valSum: 0 }
+            leftElemVal[key].count += vm[e].count * co
+            leftElemVal[key].valSum += vm[e].valence * vm[e].count * co
+          }
+        }
+      }
+
+      for (var ri = 0; ri < rightMols.length; ri++) {
+        var vm2 = rightValence[ri]
+        var co2 = rightMols[ri].coeff
+        for (var e2 in vm2) {
+          if (vm2.hasOwnProperty(e2)) {
+            var key2 = e2
+            if (!rightElemVal[key2]) rightElemVal[key2] = { count: 0, valSum: 0 }
+            rightElemVal[key2].count += vm2[e2].count * co2
+            rightElemVal[key2].valSum += vm2[e2].valence * vm2[e2].count * co2
+          }
+        }
+      }
+
+      // 计算平均化合价变化
+      for (var elem in leftElemVal) {
+        if (!leftElemVal.hasOwnProperty(elem)) continue
+        if (!rightElemVal[elem]) continue
+        var lAvg = leftElemVal[elem].count > 0 ? leftElemVal[elem].valSum / leftElemVal[elem].count : 0
+        var rAvg = rightElemVal[elem].count > 0 ? rightElemVal[elem].valSum / rightElemVal[elem].count : 0
+        if (Math.abs(lAvg - rAvg) > 0.1) {
+          changes.push({ elem: elem, from: this.formatVal(lAvg), to: this.formatVal(rAvg) })
+        }
+      }
+
+      return changes
+    },
+
+    formatVal(v) {
+      var rounded = Math.round(v * 10) / 10
+      if (Math.abs(rounded - Math.round(rounded)) < 0.05) return String(Math.round(rounded))
+      return String(rounded)
+    },
+
+    getValenceMap(formula) {
+      var self = this
+      var counts = self.parseFormulaCounts(formula)
+      var result = {}
+
+      // 尝试推断各元素化合价
+      var elems = []
+      for (var e in counts) {
+        if (counts.hasOwnProperty(e)) elems.push(e)
+      }
+
+      // 如果只有1个元素，是单质，化合价为0
+      if (elems.length === 1) {
+        result[elems[0]] = { count: counts[elems[0]], valence: 0 }
+        return result
+      }
+
+      // 特殊常见物质化合价推断
+      var special = self.inferSpecialValence(formula, counts)
+      if (special) return special
+
+      // 通用推断：根据常见化合价和总电荷为0原则
+      var assigned = {}
+      var unknown = []
+      for (var i = 0; i < elems.length; i++) {
+        var el = elems[i]
+        if (el === 'O') {
+          assigned[el] = -2
+        } else if (el === 'H') {
+          assigned[el] = 1
+        } else if (el === 'F') {
+          assigned[el] = -1
+        } else {
+          unknown.push(el)
+        }
+      }
+
+      // 如果有1个未知，根据总电荷为0计算
+      if (unknown.length === 1) {
+        var unknownElem = unknown[0]
+        var sumKnown = 0
+        for (var k in assigned) {
+          if (assigned.hasOwnProperty(k)) {
+            sumKnown += assigned[k] * counts[k]
+          }
+        }
+        var remain = -sumKnown
+        var uCount = counts[unknownElem]
+        if (uCount > 0) {
+          assigned[unknownElem] = remain / uCount
+        }
+      } else if (unknown.length === 2) {
+        // 尝试常见化合价组合
+        assigned = self.tryCommonValences(counts, assigned, unknown)
+      } else {
+        // 全部按常见最高正价
+        for (var u = 0; u < unknown.length; u++) {
+          var ue = unknown[u]
+          var vals = COMMON_VALENCE[ue]
+          if (vals && vals.length > 0) {
+            assigned[ue] = vals[0]
+          } else {
+            assigned[ue] = 0
+          }
+        }
+      }
+
+      for (var e2 in counts) {
+        if (counts.hasOwnProperty(e2)) {
+          result[e2] = { count: counts[e2], valence: assigned[e2] !== undefined ? assigned[e2] : 0 }
+        }
+      }
+      return result
+    },
+
+    inferSpecialValence(formula, counts) {
+      var specials = {
+        'H2O2': { 'H': 1, 'O': -1 },
+        'O2': { 'O': 0 },
+        'O3': { 'O': 0 },
+        'H2': { 'H': 0 },
+        'N2': { 'N': 0 },
+        'Cl2': { 'Cl': 0 },
+        'Br2': { 'Br': 0 },
+        'I2': { 'I': 0 },
+        'F2': { 'F': 0 },
+        'S': { 'S': 0 },
+        'P': { 'P': 0 },
+        'C': { 'C': 0 },
+        'Fe': { 'Fe': 0 },
+        'Cu': { 'Cu': 0 },
+        'Zn': { 'Zn': 0 },
+        'Al': { 'Al': 0 },
+        'Mg': { 'Mg': 0 },
+        'Na': { 'Na': 0 },
+        'K': { 'K': 0 },
+        'Ca': { 'Ca': 0 },
+        'Ag': { 'Ag': 0 },
+        'Au': { 'Au': 0 },
+        'Hg': { 'Hg': 0 },
+        'Pb': { 'Pb': 0 },
+        'Sn': { 'Sn': 0 },
+        'Mn': { 'Mn': 0 },
+        'Cr': { 'Cr': 0 },
+        'Ni': { 'Ni': 0 },
+        'Pt': { 'Pt': 0 },
+        'CO': { 'C': 2, 'O': -2 },
+        'CO2': { 'C': 4, 'O': -2 },
+        'SO2': { 'S': 4, 'O': -2 },
+        'SO3': { 'S': 6, 'O': -2 },
+        'NO': { 'N': 2, 'O': -2 },
+        'NO2': { 'N': 4, 'O': -2 },
+        'N2O': { 'N': 1, 'O': -2 },
+        'N2O3': { 'N': 3, 'O': -2 },
+        'N2O4': { 'N': 4, 'O': -2 },
+        'N2O5': { 'N': 5, 'O': -2 },
+        'NH3': { 'N': -3, 'H': 1 },
+        'CH4': { 'C': -4, 'H': 1 },
+        'H2S': { 'H': 1, 'S': -2 },
+        'HCl': { 'H': 1, 'Cl': -1 },
+        'HBr': { 'H': 1, 'Br': -1 },
+        'HI': { 'H': 1, 'I': -1 },
+        'HF': { 'H': 1, 'F': -1 },
+        'H2SO4': { 'H': 1, 'S': 6, 'O': -2 },
+        'HNO3': { 'H': 1, 'N': 5, 'O': -2 },
+        'H3PO4': { 'H': 1, 'P': 5, 'O': -2 },
+        'H2CO3': { 'H': 1, 'C': 4, 'O': -2 },
+        'HClO': { 'H': 1, 'Cl': 1, 'O': -2 },
+        'HClO3': { 'H': 1, 'Cl': 5, 'O': -2 },
+        'HClO4': { 'H': 1, 'Cl': 7, 'O': -2 },
+        'NaOH': { 'Na': 1, 'O': -2, 'H': 1 },
+        'KOH': { 'K': 1, 'O': -2, 'H': 1 },
+        'Ca(OH)2': { 'Ca': 2, 'O': -2, 'H': 1 },
+        'Ba(OH)2': { 'Ba': 2, 'O': -2, 'H': 1 },
+        'Cu(OH)2': { 'Cu': 2, 'O': -2, 'H': 1 },
+        'Fe(OH)2': { 'Fe': 2, 'O': -2, 'H': 1 },
+        'Fe(OH)3': { 'Fe': 3, 'O': -2, 'H': 1 },
+        'Al(OH)3': { 'Al': 3, 'O': -2, 'H': 1 },
+        'Mg(OH)2': { 'Mg': 2, 'O': -2, 'H': 1 },
+        'NaCl': { 'Na': 1, 'Cl': -1 },
+        'KCl': { 'K': 1, 'Cl': -1 },
+        'NaBr': { 'Na': 1, 'Br': -1 },
+        'KBr': { 'K': 1, 'Br': -1 },
+        'NaI': { 'Na': 1, 'I': -1 },
+        'KI': { 'K': 1, 'I': -1 },
+        'NaF': { 'Na': 1, 'F': -1 },
+        'KF': { 'K': 1, 'F': -1 },
+        'AgCl': { 'Ag': 1, 'Cl': -1 },
+        'AgBr': { 'Ag': 1, 'Br': -1 },
+        'AgI': { 'Ag': 1, 'I': -1 },
+        'CuO': { 'Cu': 2, 'O': -2 },
+        'Cu2O': { 'Cu': 1, 'O': -2 },
+        'FeO': { 'Fe': 2, 'O': -2 },
+        'Fe2O3': { 'Fe': 3, 'O': -2 },
+        'Fe3O4': { 'Fe': [2, 3], 'O': -2 },
+        'Al2O3': { 'Al': 3, 'O': -2 },
+        'MgO': { 'Mg': 2, 'O': -2 },
+        'CaO': { 'Ca': 2, 'O': -2 },
+        'BaO': { 'Ba': 2, 'O': -2 },
+        'ZnO': { 'Zn': 2, 'O': -2 },
+        'HgO': { 'Hg': 2, 'O': -2 },
+        'PbO': { 'Pb': 2, 'O': -2 },
+        'PbO2': { 'Pb': 4, 'O': -2 },
+        'SnO': { 'Sn': 2, 'O': -2 },
+        'SnO2': { 'Sn': 4, 'O': -2 },
+        'MnO': { 'Mn': 2, 'O': -2 },
+        'MnO2': { 'Mn': 4, 'O': -2 },
+        'Mn2O7': { 'Mn': 7, 'O': -2 },
+        'CrO3': { 'Cr': 6, 'O': -2 },
+        'Cr2O3': { 'Cr': 3, 'O': -2 },
+        'NiO': { 'Ni': 2, 'O': -2 },
+        'TiO2': { 'Ti': 4, 'O': -2 },
+        'WO3': { 'W': 6, 'O': -2 },
+        'CO3': { 'C': 4, 'O': -2 },
+        'SO4': { 'S': 6, 'O': -2 },
+        'NO3': { 'N': 5, 'O': -2 },
+        'PO4': { 'P': 5, 'O': -2 },
+        'NH4': { 'N': -3, 'H': 1 },
+        'OH': { 'O': -2, 'H': 1 },
+        'Na2O': { 'Na': 1, 'O': -2 },
+        'K2O': { 'K': 1, 'O': -2 },
+        'Na2O2': { 'Na': 1, 'O': -1 },
+        'KO2': { 'K': 1, 'O': -0.5 },
+        'CaC2': { 'Ca': 2, 'C': -1 },
+        'FeS': { 'Fe': 2, 'S': -2 },
+        'FeS2': { 'Fe': 2, 'S': -1 },
+        'CuS': { 'Cu': 2, 'S': -2 },
+        'Cu2S': { 'Cu': 1, 'S': -2 },
+        'ZnS': { 'Zn': 2, 'S': -2 },
+        'PbS': { 'Pb': 2, 'S': -2 },
+        'HgS': { 'Hg': 2, 'S': -2 },
+        'Ag2S': { 'Ag': 1, 'S': -2 },
+        'MnS': { 'Mn': 2, 'S': -2 },
+        'CaCO3': { 'Ca': 2, 'C': 4, 'O': -2 },
+        'Na2CO3': { 'Na': 1, 'C': 4, 'O': -2 },
+        'K2CO3': { 'K': 1, 'C': 4, 'O': -2 },
+        'MgCO3': { 'Mg': 2, 'C': 4, 'O': -2 },
+        'BaCO3': { 'Ba': 2, 'C': 4, 'O': -2 },
+        'ZnCO3': { 'Zn': 2, 'C': 4, 'O': -2 },
+        'NaHCO3': { 'Na': 1, 'H': 1, 'C': 4, 'O': -2 },
+        'CaSO4': { 'Ca': 2, 'S': 6, 'O': -2 },
+        'Na2SO4': { 'Na': 1, 'S': 6, 'O': -2 },
+        'K2SO4': { 'K': 1, 'S': 6, 'O': -2 },
+        'BaSO4': { 'Ba': 2, 'S': 6, 'O': -2 },
+        'MgSO4': { 'Mg': 2, 'S': 6, 'O': -2 },
+        'ZnSO4': { 'Zn': 2, 'S': 6, 'O': -2 },
+        'CuSO4': { 'Cu': 2, 'S': 6, 'O': -2 },
+        'FeSO4': { 'Fe': 2, 'S': 6, 'O': -2 },
+        'Fe2(SO4)3': { 'Fe': 3, 'S': 6, 'O': -2 },
+        'Al2(SO4)3': { 'Al': 3, 'S': 6, 'O': -2 },
+        'NaNO3': { 'Na': 1, 'N': 5, 'O': -2 },
+        'KNO3': { 'K': 1, 'N': 5, 'O': -2 },
+        'AgNO3': { 'Ag': 1, 'N': 5, 'O': -2 },
+        'NH4NO3': { 'N': [-3, 5], 'H': 1, 'O': -2 },
+        'Ca(NO3)2': { 'Ca': 2, 'N': 5, 'O': -2 },
+        'Cu(NO3)2': { 'Cu': 2, 'N': 5, 'O': -2 },
+        'Fe(NO3)2': { 'Fe': 2, 'N': 5, 'O': -2 },
+        'Fe(NO3)3': { 'Fe': 3, 'N': 5, 'O': -2 },
+        'Zn(NO3)2': { 'Zn': 2, 'N': 5, 'O': -2 },
+        'Mg(NO3)2': { 'Mg': 2, 'N': 5, 'O': -2 },
+        'Na3PO4': { 'Na': 1, 'P': 5, 'O': -2 },
+        'Ca3(PO4)2': { 'Ca': 2, 'P': 5, 'O': -2 },
+        'KMnO4': { 'K': 1, 'Mn': 7, 'O': -2 },
+        'K2MnO4': { 'K': 1, 'Mn': 6, 'O': -2 },
+        'MnSO4': { 'Mn': 2, 'S': 6, 'O': -2 },
+        'MnCl2': { 'Mn': 2, 'Cl': -1 },
+        'K2CrO4': { 'K': 1, 'Cr': 6, 'O': -2 },
+        'K2Cr2O7': { 'K': 1, 'Cr': 6, 'O': -2 },
+        'Cr2(SO4)3': { 'Cr': 3, 'S': 6, 'O': -2 },
+        'CrCl3': { 'Cr': 3, 'Cl': -1 },
+        'NaClO': { 'Na': 1, 'Cl': 1, 'O': -2 },
+        'Ca(ClO)2': { 'Ca': 2, 'Cl': 1, 'O': -2 },
+        'NaClO3': { 'Na': 1, 'Cl': 5, 'O': -2 },
+        'KClO3': { 'K': 1, 'Cl': 5, 'O': -2 },
+        'KClO4': { 'K': 1, 'Cl': 7, 'O': -2 },
+        'Na2S': { 'Na': 1, 'S': -2 },
+        'Na2SO3': { 'Na': 1, 'S': 4, 'O': -2 },
+        'Na2S2O3': { 'Na': 1, 'S': 2, 'O': -2 },
+        'Na2S4O6': { 'Na': 1, 'S': 2.5, 'O': -2 },
+        'SiO2': { 'Si': 4, 'O': -2 },
+        'SiF4': { 'Si': 4, 'F': -1 },
+        'CaSiO3': { 'Ca': 2, 'Si': 4, 'O': -2 },
+        'Na2SiO3': { 'Na': 1, 'Si': 4, 'O': -2 },
+        'H2SiO3': { 'H': 1, 'Si': 4, 'O': -2 },
+        'CaCl2': { 'Ca': 2, 'Cl': -1 },
+        'MgCl2': { 'Mg': 2, 'Cl': -1 },
+        'BaCl2': { 'Ba': 2, 'Cl': -1 },
+        'ZnCl2': { 'Zn': 2, 'Cl': -1 },
+        'CuCl2': { 'Cu': 2, 'Cl': -1 },
+        'CuCl': { 'Cu': 1, 'Cl': -1 },
+        'FeCl2': { 'Fe': 2, 'Cl': -1 },
+        'FeCl3': { 'Fe': 3, 'Cl': -1 },
+        'AlCl3': { 'Al': 3, 'Cl': -1 },
+        'AgCl': { 'Ag': 1, 'Cl': -1 },
+        'Hg2Cl2': { 'Hg': 1, 'Cl': -1 },
+        'HgCl2': { 'Hg': 2, 'Cl': -1 },
+        'PbCl2': { 'Pb': 2, 'Cl': -1 },
+        'SnCl2': { 'Sn': 2, 'Cl': -1 },
+        'SnCl4': { 'Sn': 4, 'Cl': -1 },
+        'TiCl4': { 'Ti': 4, 'Cl': -1 },
+        'SiCl4': { 'Si': 4, 'Cl': -1 },
+        'KCl': { 'K': 1, 'Cl': -1 },
+        'NH4Cl': { 'N': -3, 'H': 1, 'Cl': -1 },
+        'CaF2': { 'Ca': 2, 'F': -1 },
+        'MgF2': { 'Mg': 2, 'F': -1 },
+        'Na2O': { 'Na': 1, 'O': -2 },
+        'CaC2': { 'Ca': 2, 'C': -1 },
+        'AlN': { 'Al': 3, 'N': -3 },
+        'Mg3N2': { 'Mg': 2, 'N': -3 },
+        'Li3N': { 'Li': 1, 'N': -3 },
+        'Ca3N2': { 'Ca': 2, 'N': -3 },
+        'Fe(SCN)3': { 'Fe': 3, 'S': -2, 'C': 4, 'N': -3 },
+        'Ce2(SO4)3': { 'Ce': 3, 'S': 6, 'O': -2 },
+        'Ce(SO4)2': { 'Ce': 4, 'S': 6, 'O': -2 },
+        'HMnO4': { 'H': 1, 'Mn': 7, 'O': -2 },
+        'HBrO': { 'H': 1, 'Br': 1, 'O': -2 },
+        'HIO': { 'H': 1, 'I': 1, 'O': -2 }
+      }
+
+      if (specials[formula]) {
+        var map = specials[formula]
+        var r = {}
+        for (var e in map) {
+          if (map.hasOwnProperty(e)) {
+            var v = map[e]
+            if (typeof v === 'number') {
+              r[e] = { count: counts[e] || 1, valence: v }
+            } else if (Array.isArray(v)) {
+              r[e] = { count: counts[e] || 1, valence: v[0] }
+            }
+          }
+        }
+        return r
+      }
+      return null
+    },
+
+    tryCommonValences(counts, assigned, unknown) {
+      var best = null
+      var bestDiff = Infinity
+      var u1 = unknown[0]
+      var u2 = unknown[1]
+      var vals1 = COMMON_VALENCE[u1] || [0]
+      var vals2 = COMMON_VALENCE[u2] || [0]
+
+      for (var i = 0; i < vals1.length; i++) {
+        for (var j = 0; j < vals2.length; j++) {
+          assigned[u1] = vals1[i]
+          assigned[u2] = vals2[j]
+          var sum = 0
+          for (var e in assigned) {
+            if (assigned.hasOwnProperty(e) && counts[e]) {
+              sum += assigned[e] * counts[e]
+            }
+          }
+          var diff = Math.abs(sum)
+          if (diff < bestDiff) {
+            bestDiff = diff
+            best = { u1: vals1[i], u2: vals2[j] }
+          }
+        }
+      }
+      if (best) {
+        assigned[u1] = best.u1
+        assigned[u2] = best.u2
+      }
+      return assigned
+    },
+
+    parseFormulaCounts(formula) {
+      var counts = {}
+      var i = 0
+      var n = formula.length
+      while (i < n) {
+        var ch = formula.charAt(i)
+        if (ch === '(') {
+          var j = i + 1
+          var depth = 1
+          while (j < n && depth > 0) {
+            if (formula.charAt(j) === '(') depth++
+            if (formula.charAt(j) === ')') depth--
+            j++
+          }
+          var subFormula = formula.substring(i + 1, j - 1)
+          var mulStr = ''
+          while (j < n && formula.charAt(j) >= '0' && formula.charAt(j) <= '9') {
+            mulStr += formula.charAt(j)
+            j++
+          }
+          var mul = mulStr === '' ? 1 : parseInt(mulStr, 10)
+          var subCounts = this.parseFormulaCounts(subFormula)
+          for (var e in subCounts) {
+            if (subCounts.hasOwnProperty(e)) {
+              counts[e] = (counts[e] || 0) + subCounts[e] * mul
+            }
+          }
+          i = j
+        } else if (ch >= 'A' && ch <= 'Z') {
+          var elem = ch
+          i++
+          if (i < n && formula.charAt(i) >= 'a' && formula.charAt(i) <= 'z') {
+            elem += formula.charAt(i)
+            i++
+          }
+          var numStr = ''
+          while (i < n && formula.charAt(i) >= '0' && formula.charAt(i) <= '9') {
+            numStr += formula.charAt(i)
+            i++
+          }
+          var cnt = numStr === '' ? 1 : parseInt(numStr, 10)
+          counts[elem] = (counts[elem] || 0) + cnt
+        } else {
+          i++
+        }
+      }
+      return counts
+    },
+
+    judgeRedox(leftMols, rightMols, valenceChanges) {
+      var result = { oxidizer: '未知', reducer: '未知', oxProduct: '未知', redProduct: '未知' }
+
+      // 找化合价降低的元素 -> 氧化剂
+      // 找化合价升高的元素 -> 还原剂
+      var loweredElems = []
+      var raisedElems = []
+      for (var i = 0; i < valenceChanges.length; i++) {
+        var v = valenceChanges[i]
+        var from = parseFloat(v.from)
+        var to = parseFloat(v.to)
+        if (to < from) loweredElems.push(v.elem)
+        if (to > from) raisedElems.push(v.elem)
+      }
+
+      // 找包含这些元素的物质
+      var self = this
+      var leftContains = function(mols, elems) {
+        var names = []
+        for (var i = 0; i < mols.length; i++) {
+          var counts = self.parseFormulaCounts(mols[i].formula)
+          for (var j = 0; j < elems.length; j++) {
+            if (counts[elems[j]]) {
+              names.push(mols[i].formula)
+              break
+            }
+          }
+        }
+        return names.join(',')
+      }
+
+      var rightContains = function(mols, elems) {
+        var names = []
+        for (var i = 0; i < mols.length; i++) {
+          var counts = self.parseFormulaCounts(mols[i].formula)
+          for (var j = 0; j < elems.length; j++) {
+            if (counts[elems[j]]) {
+              names.push(mols[i].formula)
+              break
+            }
+          }
+        }
+        return names.join(',')
+      }
+      if (loweredElems.length > 0) {
+        result.oxidizer = leftContains(leftMols, loweredElems) || '未知'
+        result.redProduct = rightContains(rightMols, loweredElems) || '未知'
+      }
+      if (raisedElems.length > 0) {
+        result.reducer = leftContains(leftMols, raisedElems) || '未知'
+        result.oxProduct = rightContains(rightMols, raisedElems) || '未知'
+      }
+
+      return result
+    }
+  }
+</script>

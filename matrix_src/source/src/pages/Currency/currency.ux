@@ -1,0 +1,342 @@
+<template>
+  <div class="page">
+    <text class="title-text">货币换算</text>
+
+    <div class="currency-row">
+      <div class="currency-btn" onclick="nextFrom"><text class="currency-text">{{fromCurrency}}</text></div>
+      <div class="swap-btn" onclick="swapCurrency"><text class="swap-text">⇄</text></div>
+      <div class="currency-btn" onclick="nextTo"><text class="currency-text">{{toCurrency}}</text></div>
+    </div>
+
+    <div class="input-box">
+      <text class="input-value">{{inputText}}</text>
+      <text class="unit-label">{{fromCurrency}}</text>
+    </div>
+
+    <div class="result-box">
+      <text class="result-value">{{outputValue}}</text>
+      <text class="unit-label">{{toCurrency}}</text>
+    </div>
+
+    <div class="keyboard">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('7')"><text class="key-text">7</text></div>
+        <div class="key key-num" onclick="pressKey('8')"><text class="key-text">8</text></div>
+        <div class="key key-num" onclick="pressKey('9')"><text class="key-text">9</text></div>
+        <div class="key key-func" onclick="deleteInput"><text class="key-small">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('4')"><text class="key-text">4</text></div>
+        <div class="key key-num" onclick="pressKey('5')"><text class="key-text">5</text></div>
+        <div class="key key-num" onclick="pressKey('6')"><text class="key-text">6</text></div>
+        <div class="key key-func" onclick="clearInput"><text class="key-text">C</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('1')"><text class="key-text">1</text></div>
+        <div class="key key-num" onclick="pressKey('2')"><text class="key-text">2</text></div>
+        <div class="key key-num" onclick="pressKey('3')"><text class="key-text">3</text></div>
+        <div class="key key-num" onclick="pressKey('0')"><text class="key-text">0</text></div>
+      </div>
+      <div class="key-row">
+        <div class="wide-key key-func" onclick="pressKey('.')"><text class="key-text">.</text></div>
+        <div class="wide-key key-func" onclick="pressKey('00')"><text class="key-text">00</text></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 336px;
+    height: 480px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .title-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+    margin-top: 14px;
+  }
+
+  .currency-row {
+    width: 320px;
+    height: 54px;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .currency-btn {
+    width: 118px;
+    height: 48px;
+    border-radius: 24px;
+    background-color: #555555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .swap-btn {
+    width: 64px;
+    height: 48px;
+    border-radius: 24px;
+    background-color: #9370db;
+    margin-left: 8px;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .currency-text {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  .swap-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .input-box {
+    width: 320px;
+    height: 58px;
+    border-radius: 22px;
+    background-color: #1a1a1a;
+    margin-top: 8px;
+    padding-left: 16px;
+    padding-right: 16px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .result-box {
+    width: 320px;
+    height: 58px;
+    border-radius: 22px;
+    background-color: #1a1a1a;
+    margin-top: 6px;
+    padding-left: 16px;
+    padding-right: 16px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .input-value {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 800;
+  }
+
+  .result-value {
+    color: #9370db;
+    font-size: 28px;
+    font-weight: 800;
+  }
+
+  .unit-label {
+    color: #888888;
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .keyboard {
+    width: 320px;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .key-row {
+    width: 320px;
+    height: 54px;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .key {
+    width: 74px;
+    height: 48px;
+    border-radius: 22px;
+    margin-left: 3px;
+    margin-right: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .wide-key {
+    width: 154px;
+    height: 48px;
+    border-radius: 22px;
+    margin-left: 3px;
+    margin-right: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-num {
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 2px;
+    border-color: #888888;
+  }
+
+  .key-func {
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-text {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 800;
+  }
+
+  .key-small {
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 800;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  var HISTORY_KEY = 'calc_history_v2'
+
+  var CURRENCIES = ['CNY', 'USD', 'EUR', 'JPY', 'HKD']
+  var RATES = {
+    CNY: 1,
+    USD: 7.25,
+    EUR: 7.85,
+    JPY: 0.049,
+    HKD: 0.93
+  }
+
+  export default {
+    private: {
+      fromIndex: 0,
+      toIndex: 1,
+      inputValue: '',
+      vibrationOn: true
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    computed: {
+      fromCurrency() {
+        return CURRENCIES[this.fromIndex]
+      },
+
+      toCurrency() {
+        return CURRENCIES[this.toIndex]
+      },
+
+      inputText() {
+        return this.inputValue || '0'
+      },
+
+      outputValue() {
+        var value = parseFloat(this.inputValue)
+        if (!value) return '0'
+        var cny = value * RATES[this.fromCurrency]
+        var target = cny / RATES[this.toCurrency]
+        return String(parseFloat(target.toFixed(2)))
+      }
+    },
+
+    onBackPress() {
+      this.saveHistory()
+      router.back()
+      return true
+    },
+
+    nextFrom() {
+      this.doVibrate()
+      this.fromIndex = (this.fromIndex + 1) % CURRENCIES.length
+    },
+
+    nextTo() {
+      this.doVibrate()
+      this.toIndex = (this.toIndex + 1) % CURRENCIES.length
+    },
+
+    swapCurrency() {
+      this.doVibrate()
+      var temp = this.fromIndex
+      this.fromIndex = this.toIndex
+      this.toIndex = temp
+    },
+
+    pressKey(key) {
+      this.doVibrate()
+      if (key === '.' && this.inputValue.indexOf('.') !== -1) return
+      if (this.inputValue.length > 10) return
+      this.inputValue += key
+    },
+
+    deleteInput() {
+      this.doVibrate()
+      this.inputValue = this.inputValue.substring(0, this.inputValue.length - 1)
+    },
+
+    clearInput() {
+      this.doVibrate()
+      this.inputValue = ''
+    },
+
+    saveHistory() {
+      if (!this.inputValue) return
+      var out = this.outputValue
+      if (out === '0') return
+      var expr = this.inputValue + ' ' + CURRENCIES[this.fromIndex]
+      var result = out + ' ' + CURRENCIES[this.toIndex]
+      storage.get({
+        key: HISTORY_KEY,
+        success: function(data) {
+          var list = []
+          if (data) {
+            try { list = JSON.parse(data) } catch (e) { list = [] }
+          }
+          list.push({ type: '货币换算', expr: expr, result: result })
+          if (list.length > 30) list = list.slice(1)
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify(list) })
+        },
+        fail: function() {
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify([{ type: '货币换算', expr: expr, result: result }]) })
+        }
+      })
+    }
+  }
+</script>

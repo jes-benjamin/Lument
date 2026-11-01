@@ -1,0 +1,370 @@
+<template>
+  <div class="page">
+    <div class="display-box">
+      <text class="expr-text">{{displayExpression}}</text>
+      <text class="result-text">{{result}}</text>
+    </div>
+
+    <list class="kb-list">
+      <list-item class="kb-section" type="section">
+        <text class="kb-section-text">数字输入</text>
+      </list-item>
+      <list-item class="key-row" type="row">
+        <div class="key key-num" onclick="pressChar('7')"><text class="num-text">7</text></div>
+        <div class="key key-num" onclick="pressChar('8')"><text class="num-text">8</text></div>
+        <div class="key key-num" onclick="pressChar('9')"><text class="num-text">9</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+      </list-item>
+      <list-item class="key-row" type="row">
+        <div class="key key-num" onclick="pressChar('4')"><text class="num-text">4</text></div>
+        <div class="key key-num" onclick="pressChar('5')"><text class="num-text">5</text></div>
+        <div class="key key-num" onclick="pressChar('6')"><text class="num-text">6</text></div>
+        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
+      </list-item>
+      <list-item class="key-row" type="row">
+        <div class="key key-num" onclick="pressChar('1')"><text class="num-text">1</text></div>
+        <div class="key key-num" onclick="pressChar('2')"><text class="num-text">2</text></div>
+        <div class="key key-num" onclick="pressChar('3')"><text class="num-text">3</text></div>
+        <div class="key key-equal" onclick="pressChar('=')"><text class="num-dark">=</text></div>
+      </list-item>
+      <list-item class="key-row" type="row">
+        <div class="key key-num" onclick="pressChar('.')"><text class="num-text">.</text></div>
+        <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
+        <div class="key key-op" onclick="pressChar('-')"><text class="num-text">&#8722;</text></div>
+        <div class="key-solve" onclick="solve"><text class="solve-text">计算</text></div>
+      </list-item>
+
+      <list-item class="kb-section" type="section">
+        <text class="kb-section-text">分隔符号</text>
+      </list-item>
+      <list-item class="key-row" type="row">
+        <div class="key key-op" onclick="pressChar(';')"><text class="num-text">;</text></div>
+        <div class="key key-op" onclick="pressChar(',')"><text class="num-text">,</text></div>
+        <div class="key key-num" onclick="pressChar('.')"><text class="num-text">.</text></div>
+        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+      </list-item>
+      <list-item class="key-row" type="row">
+        <div class="key key-equal" onclick="pressChar('=')"><text class="num-dark">=</text></div>
+        <div class="key key-op" onclick="pressChar('-')"><text class="num-text">&#8722;</text></div>
+        <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
+        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
+      </list-item>
+      <list-item class="key-row" type="row">
+        <div class="key-solve" onclick="solve"><text class="solve-text">计算</text></div>
+      </list-item>
+    </list>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 336px;
+    height: 480px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .display-box {
+    width: 300px;
+    height: 76px;
+    border-radius: 18px;
+    background-color: #1a1a1a;
+    margin-top: 8px;
+    padding: 6px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .expr-text {
+    width: 272px;
+    height: 20px;
+    color: #888888;
+    font-size: 14px;
+    text-align: right;
+  }
+
+  .result-text {
+    width: 272px;
+    height: 44px;
+    color: #ffffff;
+    font-size: 32px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .kb-list {
+    width: 336px;
+    height: 396px;
+    margin-top: 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .kb-section {
+    width: 320px;
+    height: 22px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .kb-section-text {
+    color: #888888;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .key-row {
+    width: 320px;
+    height: 58px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key {
+    width: 74px;
+    height: 52px;
+    margin-left: 3px;
+    margin-right: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-solve {
+    width: 74px;
+    height: 52px;
+    margin-left: 3px;
+    margin-right: 3px;
+    border-radius: 24px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-num {
+    border-radius: 26px;
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 2px;
+    border-color: #888888;
+  }
+
+  .key-soft {
+    border-radius: 24px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-op {
+    border-radius: 24px;
+    background-color: rgba(147, 112, 219, 0.35);
+    border-width: 2px;
+    border-color: #9370db;
+  }
+
+  .key-equal {
+    border-radius: 24px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .num-text {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 700;
+  }
+
+  .num-dark {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 700;
+  }
+
+  .func-text {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .solve-text {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 700;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  var HISTORY_KEY = 'calc_history_v2'
+
+  export default {
+    private: {
+      expression: '',
+      result: '等待输入',
+      vibrationOn: true
+    },
+
+    computed: {
+      displayExpression() {
+        return this.expression || '输入数据如: 1,2;2,3;3,5'
+      }
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    onBackPress() {
+      router.back()
+      return true
+    },
+
+    clearAll() {
+      this.doVibrate()
+      this.expression = ''
+      this.result = '等待输入'
+    },
+
+    deleteLast() {
+      this.doVibrate()
+      if (this.expression.length > 0) {
+        this.expression = this.expression.substring(0, this.expression.length - 1)
+      }
+      if (this.expression.length === 0) {
+        this.result = '等待输入'
+      }
+    },
+
+    pressChar(ch) {
+      this.doVibrate()
+      if (this.result !== '等待输入' && this.result !== '请输入数据') {
+        this.expression = ''
+        this.result = '等待输入'
+      }
+      this.expression += ch
+    },
+
+    solve() {
+      this.doVibrate()
+      var raw = this.expression.trim()
+      if (raw.length === 0) {
+        this.result = '请输入数据'
+        return
+      }
+
+      var points = []
+      var pairs = raw.split(';')
+      for (var i = 0; i < pairs.length; i++) {
+        var pair = pairs[i].trim()
+        if (!pair) continue
+        var nums = pair.split(',')
+        if (nums.length !== 2) {
+          this.result = '格式错误，用x,y;x,y格式'
+          return
+        }
+        var x = parseFloat(nums[0].trim())
+        var y = parseFloat(nums[1].trim())
+        if (isNaN(x) || isNaN(y)) {
+          this.result = '数据格式错误'
+          return
+        }
+        points.push({ x: x, y: y })
+      }
+
+      if (points.length < 2) {
+        this.result = '至少需要2组数据'
+        return
+      }
+
+      var n = points.length
+      var sumX = 0
+      var sumY = 0
+      var sumXY = 0
+      var sumX2 = 0
+      var sumY2 = 0
+      for (var i = 0; i < n; i++) {
+        sumX += points[i].x
+        sumY += points[i].y
+        sumXY += points[i].x * points[i].y
+        sumX2 += points[i].x * points[i].x
+        sumY2 += points[i].y * points[i].y
+      }
+
+      var denom = n * sumX2 - sumX * sumX
+      if (Math.abs(denom) < 1e-9) {
+        this.result = 'x值相同，无法计算'
+        return
+      }
+
+      var a = (n * sumXY - sumX * sumY) / denom
+      var b = (sumY - a * sumX) / n
+
+      var rNum = n * sumXY - sumX * sumY
+      var rDen = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY))
+      var r = rDen < 1e-9 ? 0 : rNum / rDen
+
+      this.result = 'a=' + this.formatNum(a) + ', b=' + this.formatNum(b) + ', r=' + this.formatNum(r)
+      this.addHistory(this.expression, this.result)
+    },
+
+    formatNum(n) {
+      var rounded = Math.round(n * 100000) / 100000
+      if (Math.abs(rounded - Math.round(rounded)) < 0.000001) {
+        return String(Math.round(rounded))
+      }
+      var str = String(rounded)
+      if (str.length > 10) {
+        str = rounded.toExponential(4)
+      }
+      return str
+    },
+
+    addHistory(expr, result) {
+      var type = '线性回归'
+      storage.get({
+        key: HISTORY_KEY,
+        success: function(data) {
+          var list = []
+          if (data) {
+            try { list = JSON.parse(data) } catch (e) { list = [] }
+          }
+          list.push({ type: type, expr: expr, result: result })
+          if (list.length > 30) list = list.slice(1)
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify(list) })
+        },
+        fail: function() {
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify([{ type: type, expr: expr, result: result }]) })
+        }
+      })
+    }
+  }
+</script>

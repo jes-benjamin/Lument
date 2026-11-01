@@ -1,0 +1,529 @@
+<template>
+  <div class="page">
+    <!-- 公式类型选择 -->
+    <div class="view" if="{{!showList}}">
+      <div class="back-btn" onclick="goBack">
+        <text class="back-text">‹ 返回</text>
+      </div>
+      <text class="page-title">公式大全</text>
+      <list class="cat-list">
+        <list-item class="cat-item" type="cat" for="{{catNames}}" onclick="selectCat($item)">
+          <text class="cat-text">{{$item}}</text>
+        </list-item>
+        <list-item class="bottom-spacer" type="spacer">
+          <text class="spacer-text"></text>
+        </list-item>
+      </list>
+    </div>
+
+    <!-- 类别内公式列表 -->
+    <div class="view" if="{{showList}}">
+      <div class="back-btn" onclick="backToCats">
+        <text class="back-text">‹ 类型</text>
+      </div>
+      <text class="page-title">{{currentName}}</text>
+      <list class="formula-list">
+        <list-item class="formula-card" type="formula" for="{{formulaList}}" style="height:{{$item.h}}px">
+          <text class="formula-title">{{$item.title}}</text>
+          <text class="formula-content" style="height:{{$item.ch}}px">{{$item.content}}</text>
+        </list-item>
+        <list-item class="bottom-spacer" type="spacer">
+          <text class="spacer-text"></text>
+        </list-item>
+      </list>
+    </div>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 336px;
+    height: 480px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .view {
+    width: 336px;
+    height: 480px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .back-btn {
+    width: 110px;
+    height: 40px;
+    border-radius: 20px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+  }
+
+  .back-text {
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .page-title {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+    margin-top: 5px;
+    height: 32px;
+    text-align: center;
+  }
+
+  .cat-list {
+    width: 320px;
+    height: 389px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .cat-item {
+    width: 320px;
+    height: 54px;
+    border-radius: 27px;
+    background-color: rgba(147, 112, 219, 0.35);
+    border-width: 3px;
+    border-color: #9370db;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cat-text {
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .formula-list {
+    width: 320px;
+    height: 389px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .formula-card {
+    width: 320px;
+    background-color: #1a1a1a;
+    border-radius: 14px;
+    margin-top: 6px;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .formula-title {
+    color: #9370db;
+    font-size: 18px;
+    font-weight: 800;
+    height: 24px;
+  }
+
+  .formula-content {
+    width: 296px;
+    color: #ffffff;
+    font-size: 18px;
+    line-height: 24px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+
+  .bottom-spacer {
+    width: 320px;
+    height: 30px;
+  }
+
+  .spacer-text {
+    font-size: 1px;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+
+  var CATEGORIES = [
+    {
+      name: '乘法公式与因式分解',
+      list: [
+        { title: '平方差公式', content: '(a+b)(a-b) = a²-b²' },
+        { title: '完全平方和', content: '(a+b)² = a²+2ab+b²' },
+        { title: '完全平方差', content: '(a-b)² = a²-2ab+b²' },
+        { title: '立方和公式', content: 'a³+b³ = (a+b)(a²-ab+b²)' },
+        { title: '立方差公式', content: 'a³-b³ = (a-b)(a²+ab+b²)' },
+        { title: '三项平方公式', content: '(a+b+c)² = a²+b²+c²+2ab+2bc+2ca' },
+        { title: '立方和推广', content: 'a³+b³+c³-3abc = (a+b+c)(a²+b²+c²-ab-bc-ca)' },
+        { title: '配方法', content: 'ax²+bx+c = a(x+b/(2a))² + (4ac-b²)/(4a)' },
+        { title: '因式分解方法', content: '提公因式法、公式法、十字相乘法、分组分解法' },
+        { title: '裂项相消', content: '1/(n(n+1)) = 1/n - 1/(n+1)' }
+      ]
+    },
+    {
+      name: '方程与不等式',
+      list: [
+        { title: '一元二次方程求根', content: 'x = (-b±√(b²-4ac))/(2a)' },
+        { title: '判别式', content: 'Δ = b²-4ac；Δ>0两实根，Δ=0两等根，Δ<0无实根' },
+        { title: '韦达定理', content: 'x₁+x₂ = -b/a，x₁·x₂ = c/a' },
+        { title: '不等式性质', content: '两边同乘正数不变号；同乘负数不等号反向' },
+        { title: '基本不等式', content: 'a+b ≥ 2√(ab)（a,b>0），ab ≤ ((a+b)/2)²' },
+        { title: '平均值不等式链', content: '(a+b)/2 ≥ √(ab) ≥ 2ab/(a+b)（a,b>0）' },
+        { title: '绝对值不等式', content: '|a+b| ≤ |a|+|b|，|a-b| ≥ ||a|-|b||' },
+        { title: '柯西不等式', content: '(a²+b²)(c²+d²) ≥ (ac+bd)²' },
+        { title: '分式方程解法', content: '先去分母化为整式方程，最后必须验根' },
+        { title: '一元二次不等式', content: 'ax²+bx+c>0 解集由抛物线图像与x轴交点确定' }
+      ]
+    },
+    {
+      name: '集合与逻辑',
+      list: [
+        { title: '交并补', content: 'A∩B（公共部分）、A∪B（全部合并）、∁ᵤA（补集）' },
+        { title: '德摩根律', content: '∁(A∪B) = (∁A)∩(∁B)，∁(A∩B) = (∁A)∪(∁B)' },
+        { title: '子集个数', content: '含 n 个元素的集合有 2ⁿ 个子集，2ⁿ-1 个真子集' },
+        { title: '充分必要条件', content: 'p⇒q 则 p 充分 q 必要；p⟺q 则互为充要' },
+        { title: '四种命题', content: '原命题、逆命题、否命题、逆否命题；互为逆否同真假' },
+        { title: '包含关系', content: 'A⊆B ⟺ A∩B = A ⟺ A∪B = B' },
+        { title: '空集性质', content: '∅ 是任何集合的子集，∅ 不是任何非空集合的真子集' }
+      ]
+    },
+    {
+      name: '函数',
+      list: [
+        { title: '定义域常见限制', content: '分母≠0，偶次根号内≥0，对数真数>0' },
+        { title: '一次函数', content: 'y = kx+b；k>0 递增，k<0 递减，过定点 (0,b)' },
+        { title: '二次函数顶点式', content: 'y = a(x-h)²+k，顶点 (h,k)，对称轴 x=h' },
+        { title: '二次函数一般式', content: 'y = ax²+bx+c，对称轴 x=-b/(2a)，顶点纵坐标 (4ac-b²)/(4a)' },
+        { title: '二次函数交点式', content: 'y = a(x-x₁)(x-x₂)，x₁、x₂ 为与x轴交点横坐标' },
+        { title: '反比例函数', content: 'y = k/x，双曲线，k>0 在一三象限，图像关于原点对称' },
+        { title: '奇偶性', content: 'f(-x)=f(x) 偶函数（关于y轴）；f(-x)=-f(x) 奇函数（关于原点）' },
+        { title: '奇函数结论', content: '奇函数若在 x=0 处有定义，则 f(0)=0' },
+        { title: '图像平移', content: '左加右减（对x），上加下减（对y）' },
+        { title: '求值域方法', content: '配方法、判别式法、换元法、单调性法、分离常数法' }
+      ]
+    },
+    {
+      name: '指数与对数',
+      list: [
+        { title: '指数运算法则', content: 'aᵐ·aⁿ=aᵐ⁺ⁿ，(aᵐ)ⁿ=aᵐⁿ，aᵐ÷aⁿ=aᵐ⁻ⁿ，(ab)ᵐ=aᵐbᵐ' },
+        { title: '分数与负指数', content: 'a^(m/n) = ⁿ√(aᵐ)，a⁻ⁿ = 1/aⁿ（a>0）' },
+        { title: '对数定义', content: 'a^b=N ⟺ logₐN=b（a>0 且 a≠1）' },
+        { title: '对数运算法则', content: 'logₐ(MN)=logₐM+logₐN，logₐ(M/N)=logₐM-logₐN，logₐMⁿ=n·logₐM' },
+        { title: '换底公式', content: 'logₐb = logc b ÷ logc a' },
+        { title: '常用结论', content: 'lg2+lg5=1，lg1=0，logₐa=1，lne=1' },
+        { title: '指数函数', content: 'y=aˣ 过 (0,1)，a>1 增，0<a<1 减，值域 (0,+∞)' },
+        { title: '对数函数', content: 'y=logₐx 过 (1,0)，a>1 增，0<a<1 减，定义域 (0,+∞)' }
+      ]
+    },
+    {
+      name: '三角函数',
+      list: [
+        { title: '锐角三角函数定义', content: 'sinA=对边/斜边，cosA=邻边/斜边，tanA=对边/邻边' },
+        { title: '同角基本关系', content: 'sin²α+cos²α = 1，tanα = sinα/cosα' },
+        { title: '诱导公式口诀', content: '奇变偶不变，符号看象限；sin(π/2-α)=cosα 等' },
+        { title: '和角公式', content: 'sin(α±β)=sinαcosβ±cosαsinβ；cos(α±β)=cosαcosβ∓sinαsinβ' },
+        { title: '和角正切', content: 'tan(α±β) = (tanα±tanβ)/(1∓tanαtanβ)' },
+        { title: '二倍角公式', content: 'sin2α=2sinαcosα；cos2α=cos²α-sin²α=2cos²α-1=1-2sin²α' },
+        { title: '二倍角正切', content: 'tan2α = 2tanα/(1-tan²α)' },
+        { title: '半角公式', content: 'sin(α/2)=±√((1-cosα)/2)，cos(α/2)=±√((1+cosα)/2)' },
+        { title: '和差化积', content: 'sinA+sinB=2sin((A+B)/2)cos((A-B)/2)；cosA+cosB=2cos((A+B)/2)cos((A-B)/2)' },
+        { title: '积化和差', content: 'sinAcosB=(sin(A+B)+sin(A-B))/2；cosAcosB=(cos(A+B)+cos(A-B))/2' },
+        { title: '辅助角公式', content: 'asinx+bcosx = √(a²+b²)·sin(x+φ)' },
+        { title: '特殊角三角值', content: 'sin30°=1/2，sin45°=√2/2，sin60°=√3/2；tan30°=√3/3，tan60°=√3' },
+        { title: '正弦定理', content: 'a/sinA = b/sinB = c/sinC = 2R（R 外接圆半径）' },
+        { title: '余弦定理', content: 'c² = a²+b²-2ab·cosC' },
+        { title: '三角形面积', content: 'S = (1/2)ab·sinC' },
+        { title: '函数性质', content: 'y=sinx 周期2π、值域[-1,1]；y=tanx 周期π、x≠π/2+kπ' }
+      ]
+    },
+    {
+      name: '数列',
+      list: [
+        { title: '等差数列通项', content: 'aₙ = a₁ + (n-1)d' },
+        { title: '等差数列求和', content: 'Sₙ = n(a₁+aₙ)/2 = na₁ + n(n-1)d/2' },
+        { title: '等差中项', content: '2b = a+c（a、b、c 成等差数列）' },
+        { title: '等差数列性质', content: 'aₘ+aₙ = aₚ+a_q（m+n=p+q）' },
+        { title: '等比数列通项', content: 'aₙ = a₁·q^(n-1)' },
+        { title: '等比数列求和', content: 'q=1 时 Sₙ=na₁；q≠1 时 Sₙ = a₁(1-qⁿ)/(1-q)' },
+        { title: '等比中项', content: 'b² = a·c（a、b、c 成等比数列，a、c 同号）' },
+        { title: '通项与前n项和', content: 'aₙ = S₁（n=1）；aₙ = Sₙ-Sₙ₋₁（n≥2）' },
+        { title: '常用求和公式', content: '1+2+…+n = n(n+1)/2；1²+2²+…+n² = n(n+1)(2n+1)/6' },
+        { title: '裂项求和', content: '1/(n(n+1)) = 1/n - 1/(n+1)' }
+      ]
+    },
+    {
+      name: '平面向量',
+      list: [
+        { title: '加减法则', content: '三角形法则（首尾相接）、平行四边形法则' },
+        { title: '数量积', content: 'a·b = |a||b|cosθ = x₁x₂+y₁y₂' },
+        { title: '垂直条件', content: 'a⊥b ⟺ a·b = 0 ⟺ x₁x₂+y₁y₂ = 0' },
+        { title: '夹角公式', content: 'cosθ = (x₁x₂+y₁y₂)/(√(x₁²+y₁²)·√(x₂²+y₂²))' },
+        { title: '模长公式', content: '|a|² = a·a = x²+y²，|a| = √(x²+y²)' },
+        { title: '坐标运算', content: 'a+b = (x₁+x₂, y₁+y₂)，λa = (λx, λy)' },
+        { title: '投影', content: 'b 在 a 方向的投影 = |b|cosθ' },
+        { title: '中点坐标', content: '((x₁+x₂)/2, (y₁+y₂)/2)' },
+        { title: '共线条件', content: 'a∥b ⟺ x₁y₂-x₂y₁ = 0' }
+      ]
+    },
+    {
+      name: '解析几何',
+      list: [
+        { title: '斜率公式', content: 'k = (y₂-y₁)/(x₂-x₁) = tanα（α 倾斜角）' },
+        { title: '点斜式', content: 'y - y₀ = k(x - x₀)' },
+        { title: '斜截式', content: 'y = kx + b' },
+        { title: '两点式', content: '(y-y₁)/(y₂-y₁) = (x-x₁)/(x₂-x₁)' },
+        { title: '截距式', content: 'x/a + y/b = 1（a、b 为横纵截距）' },
+        { title: '一般式', content: 'Ax + By + C = 0（A、B 不同时为 0）' },
+        { title: '平行与垂直', content: 'k₁=k₂ 且不重合则平行；k₁·k₂=-1 则垂直' },
+        { title: '两点间距离', content: '|AB| = √((x₂-x₁)² + (y₂-y₁)²)' },
+        { title: '点到直线距离', content: 'd = |Ax₀+By₀+C|/√(A²+B²)' },
+        { title: '圆的方程', content: '(x-a)² + (y-b)² = r²；一般式 x²+y²+Dx+Ey+F=0' },
+        { title: '椭圆标准方程', content: 'x²/a² + y²/b² = 1（a>b>0），a² = b²+c²，e = c/a' },
+        { title: '椭圆焦半径', content: '|PF₁| = a+ex₀，|PF₂| = a-ex₀（左焦点、右焦点）' },
+        { title: '双曲线标准方程', content: 'x²/a² - y²/b² = 1，c² = a²+b²，渐近线 y = ±(b/a)x' },
+        { title: '抛物线标准方程', content: 'y² = 2px（p>0），焦点 (p/2, 0)，准线 x = -p/2' },
+        { title: '通径（焦点弦最短）', content: '椭圆与双曲线 2b²/a；抛物线 2p' },
+        { title: '抛物线焦点弦', content: '过焦点弦长 = x₁+x₂+p' }
+      ]
+    },
+    {
+      name: '立体几何',
+      list: [
+        { title: '柱体体积', content: 'V = Sh（S 底面积，h 高）' },
+        { title: '锥体体积', content: 'V = Sh/3' },
+        { title: '台体体积', content: 'V = h(S₁+√(S₁S₂)+S₂)/3' },
+        { title: '球的体积', content: 'V = 4πr³/3' },
+        { title: '球的表面积', content: 'S = 4πr²' },
+        { title: '侧面积公式', content: '圆柱侧面积 S=2πrh；圆锥侧面积 S=πrl' },
+        { title: '长方体对角线', content: 'd = √(a²+b²+c²)' },
+        { title: '等体积法', content: '三棱锥可变换顶点，V = (1/3)Sh，用于求高' },
+        { title: '异面直线所成角', content: 'cosθ = |cos⟨m,n⟩|（取方向向量夹角的绝对值）' },
+        { title: '二面角', content: 'cosθ = (n₁·n₂)/(|n₁||n₂|)（两法向量夹角）' },
+        { title: '线面角', content: 'sinθ = |cos⟨方向向量, 平面法向量⟩|' }
+      ]
+    },
+    {
+      name: '概率与统计',
+      list: [
+        { title: '古典概型', content: 'P(A) = A 包含的基本事件数 ÷ 基本事件总数' },
+        { title: '对立事件', content: 'P(A) = 1 - P(非A)' },
+        { title: '独立事件', content: 'P(AB) = P(A)·P(B)' },
+        { title: '条件概率', content: 'P(A|B) = P(AB)/P(B)' },
+        { title: '互斥事件', content: 'P(A∪B) = P(A) + P(B)' },
+        { title: '数学期望', content: 'E(X) = Σ xᵢpᵢ' },
+        { title: '方差', content: 'D(X) = Σ(xᵢ-E(X))²pᵢ = E(X²) - (E(X))²' },
+        { title: '期望方差性质', content: 'E(aX+b) = aE(X)+b；D(aX+b) = a²D(X)' },
+        { title: '二项分布', content: 'X~B(n,p)，E(X)=np，D(X)=np(1-p)' },
+        { title: '回归直线', content: 'ŷ = bx+a，b = Σ(xᵢ-x̄)(yᵢ-ȳ)/Σ(xᵢ-x̄)²，必过 (x̄, ȳ)' },
+        { title: '平均数中位数众数', content: '平均数=总和÷个数；中位数排序居中；众数出现次数最多' },
+        { title: '方差意义', content: '方差越小，数据波动越小越稳定' }
+      ]
+    },
+    {
+      name: '排列组合与二项式',
+      list: [
+        { title: '排列数公式', content: 'A(n,m) = n!/(n-m)! = n(n-1)…(n-m+1)' },
+        { title: '组合数公式', content: 'C(n,m) = n!/(m!(n-m)!)' },
+        { title: '组合数性质', content: 'C(n,m) = C(n,n-m)；C(n,m) = C(n-1,m-1) + C(n-1,m)' },
+        { title: '全排列', content: 'P(n) = n!（n 个元素全部排列）' },
+        { title: '二项式定理', content: '(a+b)ⁿ = Σ C(n,k)·a^(n-k)·b^k（k 从 0 到 n）' },
+        { title: '通项公式', content: 'T(r+1) = C(n,r)·a^(n-r)·b^r' },
+        { title: '二项式系数和', content: 'C(n,0)+C(n,1)+…+C(n,n) = 2ⁿ' },
+        { title: '系数最值', content: 'n 为偶数时中间一项系数最大；n 为奇数时中间两项相等且最大' },
+        { title: '分组分配', content: '先分组后分配；平均分组要除以组数的阶乘' },
+        { title: '特殊元素优先', content: '相邻用捆绑法，不相邻用插空法，至少至多用间接法' }
+      ]
+    },
+    {
+      name: '导数与积分',
+      list: [
+        { title: '基本导数', content: "C'=0，(xⁿ)' = nxⁿ⁻¹，(√x)' = 1/(2√x)" },
+        { title: '三角函数导数', content: "(sinx)' = cosx，(cosx)' = -sinx" },
+        { title: '指数对数导数', content: "(eˣ)' = eˣ，(aˣ)' = aˣlna，(lnx)' = 1/x" },
+        { title: '四则运算法则', content: "(u±v)' = u'±v'，(uv)' = u'v+uv'，(u/v)' = (u'v-uv')/v²" },
+        { title: '复合函数求导', content: "(f(g(x)))' = f'(g(x))·g'(x)（链式法则，从外到内）" },
+        { title: '可导与连续', content: '可导必连续，连续不一定可导' },
+        { title: '极值点条件', content: "f'(x₀)=0 且在 x₀ 两侧导数变号" },
+        { title: '平均变化率', content: 'Δy/Δx = (f(x₂)-f(x₁))/(x₂-x₁)' },
+        { title: '定积分', content: '∫[a,b] f(x)dx = F(b) - F(a)（牛顿-莱布尼茨公式）' },
+        { title: '定积分几何意义', content: '曲线与x轴、直线x=a、x=b 围成的面积（x轴上方为正）' }
+      ]
+    },
+    {
+      name: '复数',
+      list: [
+        { title: '虚数单位', content: 'i² = -1，i⁴ = 1，i 的幂以 4 为周期' },
+        { title: '代数形式', content: 'z = a + bi（a 为实部，b 为虚部）' },
+        { title: '加减法', content: '(a+bi)+(c+di) = (a+c)+(b+d)i' },
+        { title: '乘法', content: '(a+bi)(c+di) = (ac-bd)+(ad+bc)i' },
+        { title: '除法', content: '(a+bi)/(c+di) = ((a+bi)(c-di))/(c²+d²)' },
+        { title: '共轭复数', content: 'z=a+bi 的共轭为 a-bi，z×共轭 = a²+b² = |z|²' },
+        { title: '模', content: '|z| = √(a²+b²)' },
+        { title: '实部与虚部', content: '实部 = (z+共轭)/2，虚部 = (z-共轭)/(2i)' },
+        { title: '三角形式', content: 'z = r(cosθ+isinθ)，棣莫弗：zⁿ = rⁿ(cosnθ+isinnθ)' }
+      ]
+    },
+    {
+      name: '平面几何（初中）',
+      list: [
+        { title: '勾股定理', content: '直角三角形 a²+b² = c²（c 为斜边）；反之成立' },
+        { title: '三角形内角和', content: '任意三角形内角和 = 180°' },
+        { title: '多边形内角和', content: '(n-2)×180°；正n边形每角 = (n-2)×180°/n' },
+        { title: '三角形面积', content: 'S = (1/2)×底×高' },
+        { title: '平行四边形面积', content: 'S = 底×高' },
+        { title: '梯形面积', content: 'S = (上底+下底)×高÷2' },
+        { title: '菱形面积', content: 'S = 对角线₁×对角线₂÷2' },
+        { title: '扇形面积与弧长', content: 'S = nπr²/360 = (1/2)lr；l = nπr/180' },
+        { title: '全等判定', content: 'SSS、SAS、ASA、AAS、HL（直角三角形）' },
+        { title: '相似性质', content: '对应边成比例；面积比 = 相似比²，体积比 = 相似比³' },
+        { title: '圆周角定理', content: '同弧所对圆心角 = 2×圆周角；直径所对圆周角 = 90°' },
+        { title: '切线性质', content: '切线垂直于过切点的半径；从圆外一点引两条切线长相等' },
+        { title: '垂径定理', content: '垂直于弦的直径平分弦，并且平分弦所对的两条弧' },
+        { title: '点与圆位置', content: '圆心距 d>r 相离，d=r 相切，d<r 相交' }
+      ]
+    },
+    {
+      name: '数与式（初中）',
+      list: [
+        { title: '乘方符号规则', content: '正数任何次幂为正；负数奇次幂为负，偶次幂为正' },
+        { title: '科学记数法', content: 'a×10ⁿ，其中 1≤|a|<10' },
+        { title: '绝对值', content: '|a| = a（a≥0）；|a| = -a（a<0）' },
+        { title: '比例性质', content: 'a/b = c/d ⟹ ad = bc；a/b = c/b ⟹ a=c' },
+        { title: '平方根', content: '(√a)² = a（a≥0）；√(a²) = |a|' },
+        { title: '实数分类', content: '实数分有理数（整数、分数）和无理数（无限不循环小数）' },
+        { title: '加权平均数', content: '各组数据×权重之和 ÷ 权重之和' },
+        { title: '方差（初中）', content: 's² = [(x₁-x̄)²+(x₂-x̄)²+…+(xₙ-x̄)²]/n' },
+        { title: '一元一次方程', content: 'ax+b=0（a≠0）的解为 x = -b/a' },
+        { title: '不等式基本性质', content: 'a>b ⟹ a+c>b+c；a>b 且 c>0 ⟹ ac>bc；c<0 时反向' }
+      ]
+    },
+    {
+      name: '物理公式（初高中）',
+      list: [
+        { title: '速度', content: 'v = s/t（单位 m/s）' },
+        { title: '加速度', content: 'a = (v - v₀)/t（m/s²）' },
+        { title: '匀变速直线运动', content: 'v = v₀+at；s = v₀t+at²/2；v²-v₀² = 2as' },
+        { title: '牛顿第二定律', content: 'F = ma（N）' },
+        { title: '重力', content: 'G = mg（g ≈ 9.8 N/kg）' },
+        { title: '密度', content: 'ρ = m/V（kg/m³）' },
+        { title: '压强', content: 'p = F/S（Pa）；液体内部 p = ρgh' },
+        { title: '阿基米德原理', content: 'F浮 = ρ液·g·V排' },
+        { title: '功与功率', content: 'W = Fs（J）；P = W/t = Fv（W）' },
+        { title: '机械能', content: '动能 Ek = mv²/2；重力势能 Ep = mgh；守恒时总和不变' },
+        { title: '杠杆平衡', content: 'F₁·l₁ = F₂·l₂' },
+        { title: '热量计算', content: 'Q = cmΔt（c 比热容）；燃料燃烧 Q = mq' },
+        { title: '欧姆定律', content: 'I = U/R（A、V、Ω）' },
+        { title: '电功与电功率', content: 'W = UIt；P = UI = I²R = U²/R' },
+        { title: '焦耳定律', content: 'Q = I²Rt' },
+        { title: '串联电路', content: 'R = R₁+R₂，U = U₁+U₂，电流处处相等' },
+        { title: '并联电路', content: '1/R = 1/R₁+1/R₂，U 相同，I = I₁+I₂' },
+        { title: '万有引力', content: 'F = GMm/r²' },
+        { title: '动量', content: 'p = mv；碰撞前后动量守恒 Σp 前 = Σp 后' },
+        { title: '安培力', content: 'F = BIL（B 磁感应强度，I 电流，L 导线长度）' }
+      ]
+    },
+    {
+      name: '化学常用计算',
+      list: [
+        { title: '物质的量', content: 'n = m/M（m 质量 g，M 摩尔质量 g/mol）' },
+        { title: '粒子数', content: 'N = n × 6.02×10²³（阿伏加德罗常数）' },
+        { title: '气体摩尔体积', content: 'V = n × 22.4 L/mol（标准状况下）' },
+        { title: '物质的量浓度', content: 'c = n/V（V 为溶液体积，单位 L）' },
+        { title: '质量分数', content: 'w = m溶质/m溶液 × 100%' },
+        { title: '稀释定律', content: 'c₁V₁ = c₂V₂（稀释前后溶质的物质的量不变）' },
+        { title: '浓度换算', content: 'c = 1000ρw/M（ρ 单位 g/mL，w 为质量分数）' },
+        { title: '质量守恒定律', content: '参加反应的各物质质量总和 = 生成物质量总和' },
+        { title: '化学反应速率', content: 'v = Δc/Δt（单位 mol/(L·s)）' },
+        { title: 'pH 值', content: 'pH = -lg[H⁺]，[H⁺] 越大 pH 越小' },
+        { title: '溶解度', content: 'S = m溶质/m溶剂 × 100g（一定温度下）' },
+        { title: '化学方程式配平', content: '依据原子种类和数目不变，最小公倍数法' }
+      ]
+    }
+  ]
+
+  export default {
+    private: {
+      showList: false,
+      catNames: [],
+      currentName: '',
+      formulaList: []
+    },
+
+    onInit() {
+      var names = []
+      for (var i = 0; i < CATEGORIES.length; i++) {
+        names.push(CATEGORIES[i].name)
+      }
+      this.catNames = names
+    },
+
+    onBackPress() {
+      if (this.showList) {
+        this.backToCats()
+        return true
+      }
+      router.back()
+      return true
+    },
+
+    goBack() {
+      router.back()
+    },
+
+    backToCats() {
+      this.showList = false
+      this.formulaList = []
+    },
+
+    selectCat(name) {
+      var cat = null
+      for (var i = 0; i < CATEGORIES.length; i++) {
+        if (CATEGORIES[i].name === name) {
+          cat = CATEGORIES[i]
+          break
+        }
+      }
+      if (!cat) return
+      this.currentName = cat.name
+      var arr = []
+      for (var j = 0; j < cat.list.length; j++) {
+        var f = cat.list[j]
+        var lines = this.calcLines(f.content, 18, 296)
+        var ch = lines * 24 + 4
+        arr.push({ title: f.title, content: f.content, ch: ch, h: 44 + ch })
+      }
+      this.formulaList = arr
+      this.showList = true
+    },
+
+    calcLines(str, fontSize, maxWidth) {
+      if (!str) return 1
+      var w = 0
+      for (var i = 0; i < str.length; i++) {
+        var code = str.charCodeAt(i)
+        if (code > 0x2E7F) {
+          w += fontSize
+        } else {
+          w += fontSize * 0.65
+        }
+      }
+      return Math.min(8, Math.max(1, Math.ceil(w / maxWidth)))
+    }
+  }
+</script>

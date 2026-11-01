@@ -1,0 +1,332 @@
+<template>
+  <div class="page">
+    <div class="header-bar">
+      <text class="header-title">历史记录</text>
+    </div>
+
+    <div class="clear-btn" onclick="showConfirmDialog">
+      <text class="clear-btn-text">清空历史</text>
+    </div>
+
+    <list class="history-list">
+      <list-item class="history-card" type="card" for="{{historyList}}" style="height: {{$item.cardH}}px" onclick="useHistory($item)">
+        <text class="history-type">{{$item.type}}</text>
+        <text class="history-expr" style="height: {{$item.exprH}}px">{{$item.expr}}</text>
+        <text class="history-result" style="height: {{$item.resH}}px">{{$item.result}}</text>
+      </list-item>
+      <list-item class="bottom-spacer" type="spacer" if="{{historyList.length > 0}}">
+        <text class="spacer-text"></text>
+      </list-item>
+      <list-item class="empty-cell" type="empty" if="{{historyList.length === 0}}">
+        <text class="empty-text">暂无历史记录</text>
+      </list-item>
+    </list>
+
+    <!-- 删除确认弹窗 -->
+    <div class="confirm-overlay" if="{{showConfirm}}">
+      <div class="confirm-top-btn" onclick="cancelDelete">
+        <text class="cancel-icon">✕</text>
+      </div>
+      <text class="confirm-text">是否确定删除？</text>
+      <div class="confirm-bottom-btn" onclick="confirmDelete">
+        <text class="ok-icon">✓</text>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 336px;
+    height: 480px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .header-bar {
+    width: 320px;
+    height: 40px;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .header-title {
+    color: #ffffff;
+    font-size: 30px;
+    font-weight: 800;
+  }
+
+  .clear-btn {
+    width: 240px;
+    height: 64px;
+    border-radius: 32px;
+    background-color: rgba(211, 47, 47, 0.35);
+    border-width: 3px;
+    border-color: #d32f2f;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .clear-btn-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .history-list {
+    width: 320px;
+    height: 350px;
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .history-card {
+    width: 320px;
+    border-radius: 16px;
+    background-color: #1a1a1a;
+    margin-top: 6px;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .history-type {
+    color: #9370db;
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .history-expr {
+    color: #888888;
+    font-size: 24px;
+    line-height: 30px;
+    margin-top: 4px;
+  }
+
+  .history-result {
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 36px;
+    margin-top: 4px;
+  }
+
+  .bottom-spacer {
+    width: 320px;
+    height: 30px;
+  }
+
+  .spacer-text {
+    font-size: 1px;
+  }
+
+  .empty-cell {
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .empty-text {
+    color: #555555;
+    font-size: 24px;
+    text-align: center;
+    margin-top: 40px;
+  }
+
+  /* ===== 删除确认弹窗 ===== */
+  .confirm-overlay {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 336px;
+    height: 480px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .confirm-top-btn {
+    width: 336px;
+    height: 100px;
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 3px;
+    border-color: #6495ed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .confirm-text {
+    color: #ffffff;
+    font-size: 32px;
+    font-weight: 800;
+  }
+
+  .confirm-bottom-btn {
+    width: 336px;
+    height: 100px;
+    background-color: rgba(211, 47, 47, 0.35);
+    border-width: 3px;
+    border-color: #d32f2f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cancel-icon {
+    color: #ffffff;
+    font-size: 40px;
+    font-weight: 800;
+  }
+
+  .ok-icon {
+    color: #ffffff;
+    font-size: 40px;
+    font-weight: 800;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  var HISTORY_KEY = 'calc_history_v2'
+
+  export default {
+    private: {
+      historyList: [],
+      showConfirm: false,
+      vibrationOn: true
+    },
+
+    onBackPress() {
+      if (this.showConfirm) {
+        this.showConfirm = false
+        return true
+      }
+      router.back()
+      return true
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+      this.loadHistory()
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    loadHistory() {
+      var self = this
+      storage.get({
+        key: HISTORY_KEY,
+        success: function(data) {
+          if (data) {
+            try {
+              var list = JSON.parse(data)
+              for (var i = 0; i < list.length; i++) {
+                if (!list[i].type) list[i].type = '计算器'
+              }
+              self.historyList = self.decorateList(list.slice().reverse())
+            } catch (e) {
+              self.historyList = []
+            }
+          }
+        },
+        fail: function() {
+          self.historyList = []
+        }
+      })
+    },
+
+    decorateList(list) {
+      for (var i = 0; i < list.length; i++) {
+        var eLines = this.calcLines(list[i].expr || '', 24, 296, 4)
+        var rLines = this.calcLines(list[i].result || '', 28, 296, 5)
+        list[i].exprH = eLines * 30
+        list[i].resH = rLines * 36
+        list[i].cardH = 46 + list[i].exprH + list[i].resH
+      }
+      return list
+    },
+
+    calcLines(str, fontSize, maxWidth, maxLines) {
+      if (!str) return 1
+      var w = 0
+      for (var i = 0; i < str.length; i++) {
+        var code = str.charCodeAt(i)
+        if (code > 0x2E7F) {
+          w += fontSize
+        } else {
+          w += fontSize * 0.55
+        }
+      }
+      return Math.min(maxLines, Math.max(1, Math.ceil(w / maxWidth)))
+    },
+
+    useHistory(item) {
+      this.doVibrate()
+      var shareInfo = {
+        expr: item.expr || '',
+        result: item.result || '',
+        type: item.type || ''
+      }
+      storage.set({
+        key: 'history_share_v1',
+        value: JSON.stringify(shareInfo),
+        success: function() {
+          router.push({ uri: '/pages/HistoryShare' })
+        },
+        fail: function() {
+          router.push({ uri: '/pages/HistoryShare' })
+        }
+      })
+    },
+
+    showConfirmDialog() {
+      this.doVibrate()
+      this.showConfirm = true
+    },
+
+    cancelDelete() {
+      this.doVibrate()
+      this.showConfirm = false
+    },
+
+    confirmDelete() {
+      this.doVibrate()
+      this.historyList = []
+      this.showConfirm = false
+      storage.delete({
+        key: HISTORY_KEY
+      })
+    }
+  }
+</script>

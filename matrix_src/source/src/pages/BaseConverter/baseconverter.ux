@@ -1,0 +1,400 @@
+<template>
+  <div class="page">
+    <div class="title-bar">
+      <text class="title-text">进制转换</text>
+    </div>
+
+    <div class="base-nav">
+      <div class="base-btn" onclick="prevFromBase"><text class="base-nav-text">‹</text></div>
+      <text class="base-label">{{fromBaseName}}</text>
+      <div class="base-btn" onclick="nextFromBase"><text class="base-nav-text">›</text></div>
+    </div>
+
+    <div class="input-box">
+      <text class="input-value">{{inputText}}</text>
+    </div>
+
+    <div class="convert-arrow"><text class="arrow-text">↓</text></div>
+
+    <div class="result-box">
+      <text class="result-label">{{toBaseName}}:</text>
+      <text class="result-value">{{outputValue}}</text>
+    </div>
+
+    <div class="to-base-nav">
+      <div class="small-btn" onclick="prevToBase"><text class="small-text">‹</text></div>
+      <text class="to-base-label">输出: {{toBaseName}}</text>
+      <div class="small-btn" onclick="nextToBase"><text class="small-text">›</text></div>
+    </div>
+
+    <div class="keyboard">
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('7')"><text class="key-text">7</text></div>
+        <div class="key key-num" onclick="pressKey('8')"><text class="key-text">8</text></div>
+        <div class="key key-num" onclick="pressKey('9')"><text class="key-text">9</text></div>
+        <div class="key key-func" onclick="deleteInput"><text class="key-small">DEL</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('4')"><text class="key-text">4</text></div>
+        <div class="key key-num" onclick="pressKey('5')"><text class="key-text">5</text></div>
+        <div class="key key-num" onclick="pressKey('6')"><text class="key-text">6</text></div>
+        <div class="key key-func" onclick="clearInput"><text class="key-text">C</text></div>
+      </div>
+      <div class="key-row">
+        <div class="key key-num" onclick="pressKey('1')"><text class="key-text">1</text></div>
+        <div class="key key-num" onclick="pressKey('2')"><text class="key-text">2</text></div>
+        <div class="key key-num" onclick="pressKey('3')"><text class="key-text">3</text></div>
+        <div class="key key-num" onclick="pressKey('0')"><text class="key-text">0</text></div>
+      </div>
+      <div class="key-row" if="{{fromBase === 16}}">
+        <div class="key key-num" onclick="pressKey('A')"><text class="key-text">A</text></div>
+        <div class="key key-num" onclick="pressKey('B')"><text class="key-text">B</text></div>
+        <div class="key key-num" onclick="pressKey('C')"><text class="key-text">C</text></div>
+        <div class="key key-num" onclick="pressKey('D')"><text class="key-text">D</text></div>
+      </div>
+      <div class="key-row" if="{{fromBase === 16}}">
+        <div class="key key-num" onclick="pressKey('E')"><text class="key-text">E</text></div>
+        <div class="key key-num" onclick="pressKey('F')"><text class="key-text">F</text></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+  .page {
+    width: 336px;
+    height: 480px;
+    background-color: #000000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .title-bar {
+    width: 320px;
+    height: 32px;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .title-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .base-nav {
+    width: 320px;
+    height: 38px;
+    margin-top: 6px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .base-btn {
+    width: 48px;
+    height: 34px;
+    border-radius: 17px;
+    background-color: #2a2a2a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .base-nav-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .base-label {
+    width: 150px;
+    height: 34px;
+    color: #9370db;
+    font-size: 20px;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .input-box {
+    width: 320px;
+    height: 44px;
+    border-radius: 16px;
+    background-color: #1a1a1a;
+    margin-top: 4px;
+    padding-left: 14px;
+    padding-right: 14px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .input-value {
+    width: 292px;
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .convert-arrow {
+    width: 320px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .arrow-text {
+    color: #888888;
+    font-size: 20px;
+  }
+
+  .result-box {
+    width: 320px;
+    height: 44px;
+    border-radius: 16px;
+    background-color: #1a1a1a;
+    margin-top: 2px;
+    padding-left: 14px;
+    padding-right: 14px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .result-label {
+    width: 72px;
+    color: #888888;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .result-value {
+    width: 220px;
+    color: #9370db;
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  .to-base-nav {
+    width: 320px;
+    height: 34px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .small-btn {
+    width: 44px;
+    height: 30px;
+    border-radius: 15px;
+    background-color: #2a2a2a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .small-text {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  .to-base-label {
+    width: 170px;
+    height: 30px;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .keyboard {
+    width: 320px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .key-row {
+    width: 320px;
+    height: 46px;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .key {
+    width: 74px;
+    height: 40px;
+    border-radius: 20px;
+    margin-left: 3px;
+    margin-right: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .key-num {
+    background-color: rgba(128, 128, 128, 0.35);
+    border-width: 2px;
+    border-color: #888888;
+  }
+
+  .key-func {
+    background-color: rgba(100, 149, 237, 0.35);
+    border-width: 2px;
+    border-color: #6495ed;
+  }
+
+  .key-text {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .key-small {
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+  }
+</style>
+
+<script>
+  import router from '@system.router'
+  import storage from '@system.storage'
+  import vibrator from '@system.vibrator'
+
+  var BASES = [2, 8, 10, 16]
+  var BASE_NAMES = { 2: '二进制', 8: '八进制', 10: '十进制', 16: '十六进制' }
+  var HISTORY_KEY = 'calc_history_v2'
+
+  export default {
+    private: {
+      fromBaseIndex: 2,
+      toBaseIndex: 0,
+      inputValue: '',
+      vibrationOn: true
+    },
+
+    onInit() {
+      var self = this
+      storage.get({
+        key: 'setting_vibration',
+        success: function(data) {
+          self.vibrationOn = data !== 'false'
+        }
+      })
+    },
+
+    doVibrate() {
+      if (this.vibrationOn) {
+        vibrator.vibrate({ mode: 'short' })
+      }
+    },
+
+    computed: {
+      fromBase() {
+        return BASES[this.fromBaseIndex]
+      },
+      fromBaseName() {
+        return BASE_NAMES[this.fromBase]
+      },
+      toBaseName() {
+        return BASE_NAMES[BASES[this.toBaseIndex]]
+      },
+      inputText() {
+        return this.inputValue || '0'
+      },
+      outputValue() {
+        if (!this.inputValue) return '0'
+        var dec = parseInt(this.inputValue, this.fromBase)
+        if (isNaN(dec)) return '错误'
+        return dec.toString(BASES[this.toBaseIndex]).toUpperCase()
+      }
+    },
+
+    onBackPress() {
+      this.saveHistory()
+      router.back()
+      return true
+    },
+
+    prevFromBase() {
+      this.doVibrate()
+      this.fromBaseIndex = this.fromBaseIndex > 0 ? this.fromBaseIndex - 1 : BASES.length - 1
+      this.inputValue = ''
+    },
+
+    nextFromBase() {
+      this.doVibrate()
+      this.fromBaseIndex = this.fromBaseIndex < BASES.length - 1 ? this.fromBaseIndex + 1 : 0
+      this.inputValue = ''
+    },
+
+    prevToBase() {
+      this.doVibrate()
+      this.toBaseIndex = this.toBaseIndex > 0 ? this.toBaseIndex - 1 : BASES.length - 1
+    },
+
+    nextToBase() {
+      this.doVibrate()
+      this.toBaseIndex = this.toBaseIndex < BASES.length - 1 ? this.toBaseIndex + 1 : 0
+    },
+
+    pressKey(key) {
+      this.doVibrate()
+      var valid = this.getValidChars()
+      if (valid.indexOf(key) === -1) return
+      if (this.inputValue.length > 12) return
+      this.inputValue += key
+    },
+
+    getValidChars() {
+      var base = this.fromBase
+      var chars = '0123456789ABCDEF'
+      return chars.substring(0, base)
+    },
+
+    deleteInput() {
+      this.doVibrate()
+      this.inputValue = this.inputValue.substring(0, this.inputValue.length - 1)
+    },
+
+    clearInput() {
+      this.doVibrate()
+      this.inputValue = ''
+    },
+
+    saveHistory() {
+      if (!this.inputValue) return
+      var expr = this.inputValue + '(' + BASE_NAMES[this.fromBase] + ')'
+      var result = this.outputValue
+      if (result === '错误' || result === '0') return
+      result = result + '(' + BASE_NAMES[BASES[this.toBaseIndex]] + ')'
+      var self = this
+      storage.get({
+        key: HISTORY_KEY,
+        success: function(data) {
+          var list = []
+          if (data) {
+            try { list = JSON.parse(data) } catch (e) { list = [] }
+          }
+          list.push({ type: '进制转换', expr: expr, result: result })
+          if (list.length > 30) list = list.slice(1)
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify(list) })
+        },
+        fail: function() {
+          storage.set({ key: HISTORY_KEY, value: JSON.stringify([{ type: '进制转换', expr: expr, result: result }]) })
+        }
+      })
+    }
+  }
+</script>

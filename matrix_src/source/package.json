@@ -1,0 +1,12 @@
+{
+  "name": "matrix-calculator",
+  "version": "5.2.1",
+  "description": "适配 小米手环9 Pro / 手环10 Pro（336×480 矩形屏）的 VelaOS 矩阵计算器",
+  "scripts": {
+    "build": "aiot build",
+    "release": "aiot release"
+  },
+  "devDependencies": {
+    "aiot-toolkit": "^2.0.5"
+  }
+}
