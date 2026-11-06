@@ -57,7 +57,7 @@
       </div>
 
       <list class="result-list">
-        <list-item class="tri-item">
+        <list-item class="tri-item" type="tri">
           <div class="tri-box">
             <div class="tri-dot" for="{{triDots}}" style="left:{{$item.l}}px;top:{{$item.t}}px"></div>
             <text class="vertex-tag" style="left:{{vA.l}}px;top:{{vA.t}}px">A</text>
@@ -66,7 +66,7 @@
           </div>
         </list-item>
 
-        <list-item class="angle-item" for="{{angles}}">
+        <list-item class="angle-item" type="angle" for="{{angles}}">
           <div class="angle-head">
             <text class="angle-name">{{$item.name}}</text>
             <text class="angle-deg">{{$item.deg}}</text>
@@ -282,6 +282,7 @@
 
   .result-list {
     width: 336px;
+    height: 410px;
     flex-grow: 1;
     display: flex;
     flex-direction: column;
@@ -566,8 +567,8 @@
       var self = this
       var map = function(p) {
         return {
-          l: pad + (p.x - minX) * scale,
-          t: (boxH - pad) - (p.y - minY) * scale
+          l: Math.round(pad + (p.x - minX) * scale),
+          t: Math.round((boxH - pad) - (p.y - minY) * scale)
         }
       }
 
@@ -589,8 +590,8 @@
       for (var i = 0; i <= n; i++) {
         var ratio = i / n
         dots.push({
-          l: p1.l + (p2.l - p1.l) * ratio,
-          t: p1.t + (p2.t - p1.t) * ratio
+          l: Math.round(p1.l + (p2.l - p1.l) * ratio),
+          t: Math.round(p1.t + (p2.t - p1.t) * ratio)
         })
       }
     },
