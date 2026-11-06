@@ -56,16 +56,16 @@
         <text class="header-title">三角形</text>
       </div>
 
-      <list class="result-list">
-        <list-item class="tri-item" type="tri">
-          <div class="tri-box">
-            <div class="tri-dot" for="{{triDots}}" style="left:{{$item.l}}px;top:{{$item.t}}px"></div>
-            <text class="vertex-tag" style="left:{{vA.l}}px;top:{{vA.t}}px">A</text>
-            <text class="vertex-tag" style="left:{{vB.l}}px;top:{{vB.t}}px">B</text>
-            <text class="vertex-tag" style="left:{{vC.l}}px;top:{{vC.t}}px">C</text>
-          </div>
-        </list-item>
+      <div class="tri-wrap">
+        <div class="tri-box">
+          <div class="tri-dot" for="{{triDots}}" style="left:{{$item.l}}px;top:{{$item.t}}px"></div>
+          <text class="vertex-tag" style="left:{{vA.l}}px;top:{{vA.t}}px">A</text>
+          <text class="vertex-tag" style="left:{{vB.l}}px;top:{{vB.t}}px">B</text>
+          <text class="vertex-tag" style="left:{{vC.l}}px;top:{{vC.t}}px">C</text>
+        </div>
+      </div>
 
+      <list class="result-list">
         <list-item class="angle-item" type="angle" for="{{angles}}">
           <div class="angle-head">
             <text class="angle-name">{{$item.name}}</text>
@@ -281,17 +281,19 @@
   }
 
   .result-list {
-    width: 336px;
-    height: 410px;
+    width: 320px;
     flex-grow: 1;
+    margin-top: 6px;
     display: flex;
     flex-direction: column;
     align-items: center;
   }
 
-  .tri-item {
-    width: 336px;
+  .tri-wrap {
+    width: 320px;
+    height: 192px;
     display: flex;
+    align-items: flex-start;
     justify-content: center;
   }
 
@@ -323,14 +325,14 @@
 
   .angle-item {
     width: 320px;
+    height: 92px;
     border-radius: 18px;
     background-color: rgba(128, 128, 128, 0.25);
     margin-top: 10px;
-    padding-top: 12px;
-    padding-bottom: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
   }
 
   .angle-head {
