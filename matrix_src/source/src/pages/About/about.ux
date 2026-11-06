@@ -1,60 +1,60 @@
 <template>
   <div class="page">
     <list class="about-list">
-      <list-item class="list-cell">
+      <list-item class="logo-cell" type="logo">
         <image class="app-logo" src="/Common/icon.png"></image>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="name-cell" type="name">
         <text class="app-name">矩阵计算器</text>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="ver-cell" type="ver">
         <text class="app-version">V5.2.1</text>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="sect-cell" type="sect">
         <text class="section-label">开发团队</text>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="card-cell" type="card">
         <div class="dev-card">
           <text class="person-text">@矩阵工作室</text>
         </div>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="sect-cell" type="sect">
         <text class="section-label">参与开发的人员</text>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="card-cell" type="card">
         <div class="dev-card">
           <text class="person-text">@jes_（Benjamin）</text>
         </div>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="card-cell" type="card">
         <div class="dev-card">
           <text class="person-text">@骷髅之凋</text>
         </div>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="card-cell" type="card">
         <div class="dev-card">
           <text class="person-text">@一滩魂魂</text>
         </div>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="llab-cell" type="llab">
         <text class="link-label">官方网站</text>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="ltxt-cell" type="ltxt">
         <text class="link-text">calculator.uzens.cc.cd</text>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="llab-cell" type="llab">
         <text class="link-label">官方Q群</text>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="ltxt-cell" type="ltxt">
         <text class="link-text">1128452332</text>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="llab-cell" type="llab">
         <text class="link-label">更多资源请访问</text>
       </list-item>
-      <list-item class="list-cell">
+      <list-item class="ltxt-cell" type="ltxt">
         <text class="link-text">bandbbs.cn</text>
       </list-item>
-      <list-item class="bottom-spacer">
+      <list-item class="space-cell" type="space">
         <text class="spacer-text"></text>
       </list-item>
     </list>
@@ -72,46 +72,77 @@
   }
 
   .about-list {
-    width: 100%;
+    width: 320px;
     flex-grow: 1;
+    margin-top: 6px;
     display: flex;
     flex-direction: column;
     align-items: center;
   }
 
-  .list-cell {
-    width: 336px;
+  .logo-cell {
+    width: 320px;
+    height: 104px;
     display: flex;
-    flex-direction: column;
     align-items: center;
+    justify-content: center;
   }
 
   .app-logo {
     width: 72px;
     height: 72px;
     border-radius: 18px;
-    margin-top: 20px;
+  }
+
+  .name-cell {
+    width: 320px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .app-name {
     color: #ffffff;
     font-size: 32px;
     font-weight: 800;
-    margin-top: 10px;
+  }
+
+  .ver-cell {
+    width: 320px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .app-version {
     color: #888888;
     font-size: 22px;
     font-weight: 700;
-    margin-top: 4px;
+  }
+
+  .sect-cell {
+    width: 320px;
+    height: 48px;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .section-label {
     color: #888888;
     font-size: 22px;
     font-weight: 800;
-    margin-top: 18px;
+  }
+
+  .card-cell {
+    width: 320px;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .dev-card {
@@ -119,7 +150,6 @@
     height: 60px;
     border-radius: 30px;
     background-color: #2a2a2a;
-    margin-top: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -131,22 +161,37 @@
     font-weight: 800;
   }
 
+  .llab-cell {
+    width: 320px;
+    height: 44px;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   .link-label {
     color: #888888;
     font-size: 22px;
     font-weight: 800;
-    margin-top: 16px;
+  }
+
+  .ltxt-cell {
+    width: 320px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .link-text {
     color: #ffffff;
     font-size: 22px;
     font-weight: 800;
-    margin-top: 4px;
   }
 
-  .bottom-spacer {
-    width: 336px;
+  .space-cell {
+    width: 320px;
     height: 30px;
   }
 
