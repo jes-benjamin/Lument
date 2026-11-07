@@ -40,17 +40,6 @@
       <div class="key-row">
         <div class="key key-op" onclick="pressChar(';')"><text class="num-text">;</text></div>
         <div class="key key-op" onclick="pressChar(',')"><text class="num-text">,</text></div>
-        <div class="key key-num" onclick="pressChar('.')"><text class="num-text">.</text></div>
-        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
-      </div>
-      <div class="key-row">
-        <div class="key key-equal" onclick="pressChar('=')"><text class="num-dark">=</text></div>
-        <div class="key key-op" onclick="pressChar('-')"><text class="num-text">&#8722;</text></div>
-        <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
-        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
-      </div>
-      <div class="key-row">
-        <div class="key-solve" onclick="solve"><text class="solve-text">计算</text></div>
       </div>
     </div>
   </div>

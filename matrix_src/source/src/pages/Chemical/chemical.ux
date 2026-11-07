@@ -40,23 +40,16 @@
         <div class="key key-num" onclick="pressKey('Fe')"><text class="elem-text">Fe</text></div>
         <div class="key key-num" onclick="pressKey('Cu')"><text class="elem-text">Cu</text></div>
         <div class="key key-num" onclick="pressKey('Zn')"><text class="elem-text">Zn</text></div>
-        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+        <div class="key key-num" onclick="pressKey('Al')"><text class="elem-text">Al</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key key-num" onclick="pressKey('Al')"><text class="elem-text">Al</text></div>
         <div class="key key-num" onclick="pressKey('Ca')"><text class="elem-text">Ca</text></div>
         <div class="key key-num" onclick="pressKey('Mg')"><text class="elem-text">Mg</text></div>
-        <div class="key key-op" onclick="pressPlus"><text class="num-text">+</text></div>
-      </list-item>
-      <list-item class="key-row">
         <div class="key key-num" onclick="pressKey('Ag')"><text class="elem-text">Ag</text></div>
         <div class="key key-num" onclick="pressKey('Au')"><text class="elem-text">Au</text></div>
-        <div class="key key-num" onclick="pressKey('Ba')"><text class="elem-text">Ba</text></div>
-        <div class="key key-equal" onclick="pressEqual"><text class="num-dark">=</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key-more" onclick="openMore"><text class="func-text">更多</text></div>
-        <div class="key-ac-half" onclick="clearAll"><text class="func-text">AC</text></div>
+        <div class="key key-num" onclick="pressKey('Ba')"><text class="elem-text">Ba</text></div>
       </list-item>
 
 
@@ -67,23 +60,16 @@
         <div class="key key-num" onclick="pressKey('0')"><text class="num-text">0</text></div>
         <div class="key key-num" onclick="pressKey('1')"><text class="num-text">1</text></div>
         <div class="key key-num" onclick="pressKey('2')"><text class="num-text">2</text></div>
-        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+        <div class="key key-num" onclick="pressKey('3')"><text class="num-text">3</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key key-num" onclick="pressKey('3')"><text class="num-text">3</text></div>
         <div class="key key-num" onclick="pressKey('4')"><text class="num-text">4</text></div>
         <div class="key key-num" onclick="pressKey('5')"><text class="num-text">5</text></div>
-        <div class="key key-op" onclick="pressPlus"><text class="num-text">+</text></div>
-      </list-item>
-      <list-item class="key-row">
         <div class="key key-num" onclick="pressKey('6')"><text class="num-text">6</text></div>
         <div class="key key-num" onclick="pressKey('7')"><text class="num-text">7</text></div>
-        <div class="key key-num" onclick="pressKey('8')"><text class="num-text">8</text></div>
-        <div class="key key-equal" onclick="pressEqual"><text class="num-dark">=</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key-more" onclick="openMore"><text class="func-text">更多</text></div>
-        <div class="key-ac-half" onclick="clearAll"><text class="func-text">AC</text></div>
+        <div class="key key-num" onclick="pressKey('8')"><text class="num-text">8</text></div>
       </list-item>
 
 
@@ -94,23 +80,16 @@
         <div class="key key-num" onclick="pressKey('Si')"><text class="elem-text">Si</text></div>
         <div class="key key-num" onclick="pressKey('Mn')"><text class="elem-text">Mn</text></div>
         <div class="key key-num" onclick="pressKey('Cr')"><text class="elem-text">Cr</text></div>
-        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+        <div class="key key-num" onclick="pressKey('Li')"><text class="elem-text">Li</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key key-num" onclick="pressKey('Li')"><text class="elem-text">Li</text></div>
         <div class="key key-num" onclick="pressKey('F')"><text class="elem-text">F</text></div>
         <div class="key key-num" onclick="pressKey('Br')"><text class="elem-text">Br</text></div>
-        <div class="key key-op" onclick="pressPlus"><text class="num-text">+</text></div>
-      </list-item>
-      <list-item class="key-row">
         <div class="key key-num" onclick="pressKey('I')"><text class="elem-text">I</text></div>
         <div class="key key-num" onclick="pressKey('(')"><text class="elem-text">(</text></div>
-        <div class="key key-num" onclick="pressKey(')')"><text class="elem-text">)</text></div>
-        <div class="key key-equal" onclick="pressEqual"><text class="num-dark">=</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key-more" onclick="openMore"><text class="func-text">更多</text></div>
-        <div class="key-ac-half" onclick="clearAll"><text class="func-text">AC</text></div>
+        <div class="key key-num" onclick="pressKey(')')"><text class="elem-text">)</text></div>
       </list-item>
 
 
@@ -121,23 +100,16 @@
         <div class="key key-num" onclick="pressKey('Pb')"><text class="elem-text">Pb</text></div>
         <div class="key key-num" onclick="pressKey('Sn')"><text class="elem-text">Sn</text></div>
         <div class="key key-num" onclick="pressKey('Co')"><text class="elem-text">Co</text></div>
-        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
+        <div class="key key-num" onclick="pressKey('Ni')"><text class="elem-text">Ni</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key key-num" onclick="pressKey('Ni')"><text class="elem-text">Ni</text></div>
         <div class="key key-num" onclick="pressKey('Ti')"><text class="elem-text">Ti</text></div>
         <div class="key key-num" onclick="pressKey('W')"><text class="elem-text">W</text></div>
-        <div class="key key-op" onclick="pressPlus"><text class="num-text">+</text></div>
-      </list-item>
-      <list-item class="key-row">
         <div class="key key-num" onclick="pressKey('Pt')"><text class="elem-text">Pt</text></div>
         <div class="key key-num" onclick="pressKey('Hg')"><text class="elem-text">Hg</text></div>
-        <div class="key key-num" onclick="pressKey('Bi')"><text class="elem-text">Bi</text></div>
-        <div class="key key-equal" onclick="pressEqual"><text class="num-dark">=</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key-more" onclick="openMore"><text class="func-text">更多</text></div>
-        <div class="key-ac-half" onclick="clearAll"><text class="func-text">AC</text></div>
+        <div class="key key-num" onclick="pressKey('Bi')"><text class="elem-text">Bi</text></div>
       </list-item>
     </list>
   </div>

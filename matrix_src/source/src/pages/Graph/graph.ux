@@ -41,22 +41,16 @@
         <div class="key key-op" onclick="appendToken('+')"><text class="num-text">+</text></div>
         <div class="key key-op" onclick="appendToken('-')"><text class="num-text">&#8722;</text></div>
         <div class="key key-op" onclick="appendToken('*')"><text class="num-text">&#215;</text></div>
-        <div class="key key-soft" onclick="deleteToken"><text class="func-text">DEL</text></div>
+        <div class="key key-op" onclick="appendToken('^')"><text class="num-text">^</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key key-op" onclick="appendToken('^')"><text class="num-text">^</text></div>
         <div class="key key-op" onclick="appendToken('(')"><text class="num-text">(</text></div>
         <div class="key key-op" onclick="appendToken(')')"><text class="num-text">)</text></div>
-        <div class="key key-soft" onclick="clearExpr"><text class="func-text">AC</text></div>
-      </list-item>
-      <list-item class="key-row">
         <div class="key key-num" onclick="appendToken('e')"><text class="num-text">e</text></div>
         <div class="key key-num" onclick="appendToken('&#960;')"><text class="num-text">&#960;</text></div>
-        <div class="key key-sci" onclick="appendToken(';')"><text class="num-text">;</text></div>
-        <div class="key key-op" onclick="appendToken('/')"><text class="num-text">&#247;</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key-solve" onclick="openResult"><text class="solve-text">绘制图像</text></div>
+        <div class="key key-sci" onclick="appendToken(';')"><text class="num-text">;</text></div>
       </list-item>
 
 
@@ -67,25 +61,18 @@
         <div class="key key-sci" onclick="setPreset('sin')"><text class="func-text">sin</text></div>
         <div class="key key-sci" onclick="setPreset('cos')"><text class="func-text">cos</text></div>
         <div class="key key-sci" onclick="setPreset('tan')"><text class="func-text">tan</text></div>
-        <div class="key key-soft" onclick="deleteToken"><text class="func-text">DEL</text></div>
+        <div class="key key-sci" onclick="setPreset('ln')"><text class="func-text">ln</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key key-sci" onclick="setPreset('ln')"><text class="func-text">ln</text></div>
         <div class="key key-sci" onclick="setPreset('log')"><text class="func-text">log</text></div>
         <div class="key key-sci" onclick="setPreset('lg')"><text class="func-text">lg</text></div>
-        <div class="key key-soft" onclick="clearExpr"><text class="func-text">AC</text></div>
-      </list-item>
-      <list-item class="key-row">
         <div class="key key-sci" onclick="setPreset('e^x')"><text class="func-text">e^x</text></div>
         <div class="key key-sci" onclick="setPreset('x^2')"><text class="func-text">x&#178;</text></div>
-        <div class="key key-sci" onclick="setPreset('x^3')"><text class="func-text">x&#179;</text></div>
-        <div class="key key-equal" onclick="openResult"><text class="num-dark">绘制</text></div>
       </list-item>
       <list-item class="key-row">
+        <div class="key key-sci" onclick="setPreset('x^3')"><text class="func-text">x&#179;</text></div>
         <div class="key key-sci" onclick="setPreset('sqrt')"><text class="func-text">&#8730;x</text></div>
         <div class="key key-sci" onclick="setPreset('abs')"><text class="func-text">|x|</text></div>
-        <div class="key key-num" onclick="appendToken('(')"><text class="num-text">(</text></div>
-        <div class="key key-num" onclick="appendToken(')')"><text class="num-text">)</text></div>
       </list-item>
     </list>
   </div>

@@ -44,8 +44,6 @@
         <div class="key key-soft" onclick="pressParen(')')"><text class="num-text">)</text></div>
       </list-item>
       <list-item class="key-row">
-        <div class="key key-soft" onclick="clearAll"><text class="func-text">清空</text></div>
-        <div class="key key-soft" onclick="deleteLast"><text class="func-text">删除</text></div>
         <div class="key key-soft" onclick="pressNumber('00')"><text class="num-text">00</text></div>
         <div class="key key-equal" onclick="calculate"><text class="num-dark">=</text></div>
       </list-item>

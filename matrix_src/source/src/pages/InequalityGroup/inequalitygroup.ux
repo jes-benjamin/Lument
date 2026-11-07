@@ -51,9 +51,6 @@
       </list-item>
       <list-item class="key-row">
         <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
-        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
-        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
-        <div class="key key-equal" onclick="solve"><text class="num-dark">=</text></div>
       </list-item>
 
       <list-item class="kb-section">
@@ -74,14 +71,6 @@
       <list-item class="key-row">
         <div class="key key-sci" onclick="pressChar('e^')"><text class="func-text">e^x</text></div>
         <div class="key key-sci" onclick="pressChar('π')"><text class="num-text">π</text></div>
-        <div class="key key-num" onclick="pressChar('(')"><text class="num-text">(</text></div>
-        <div class="key key-num" onclick="pressChar(')')"><text class="num-text">)</text></div>
-      </list-item>
-      <list-item class="key-row">
-        <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
-        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
-        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
-        <div class="key key-equal" onclick="solve"><text class="num-dark">=</text></div>
       </list-item>
 
       <list-item class="kb-section">
@@ -89,21 +78,7 @@
       </list-item>
       <list-item class="key-row">
         <div class="key key-sep" onclick="pressChar(';')"><text class="num-text">;</text></div>
-        <div class="key key-op" onclick="pressChar('(')"><text class="num-text">(</text></div>
-        <div class="key key-op" onclick="pressChar(')')"><text class="num-text">)</text></div>
-        <div class="key key-soft" onclick="deleteLast"><text class="func-text">DEL</text></div>
-      </list-item>
-      <list-item class="key-row">
         <div class="key key-num" onclick="pressChar('.')"><text class="num-text">.</text></div>
-        <div class="key key-num" onclick="pressChar('x')"><text class="num-text">x</text></div>
-        <div class="key key-op" onclick="pressChar('^')"><text class="num-text">^</text></div>
-        <div class="key key-soft" onclick="clearAll"><text class="func-text">AC</text></div>
-      </list-item>
-      <list-item class="key-row">
-        <div class="key key-num" onclick="pressChar('0')"><text class="num-text">0</text></div>
-        <div class="key key-num" onclick="pressChar('≥')"><text class="num-text">≥</text></div>
-        <div class="key key-num" onclick="pressChar('≤')"><text class="num-text">≤</text></div>
-        <div class="key key-equal" onclick="solve"><text class="num-dark">=</text></div>
       </list-item>
     </list>
   </div>

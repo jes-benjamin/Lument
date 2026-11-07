@@ -44,7 +44,6 @@
         <div class="key-row">
           <div class="key key-num" onclick="pressNum('.')"><text class="num-text">.</text></div>
           <div class="key key-num" onclick="pressNum('0')"><text class="num-text">0</text></div>
-          <div class="key key-solve" onclick="drawTriangle"><text class="solve-text">绘制三角形</text></div>
         </div>
       </div>
     </div>
