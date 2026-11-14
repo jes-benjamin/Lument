@@ -7,11 +7,11 @@
       <text class="eq-text">{{equation}}</text>
     </div>
     <list class="result-list">
-      <list-item class="result-item" type="result" for="{{analysisLines}}">
+      <list-item class="result-item" for="{{analysisLines}}">
         <text class="result-text">{{$item}}</text>
       </list-item>
       <list-item class="spacer-item">
-        <text></text>
+        <text class="spacer-text"></text>
       </list-item>
     </list>
   </div>
@@ -63,7 +63,7 @@
   }
 
   .result-list {
-    width: 100%;
+    width: 320px;
     flex-grow: 1;
     margin-top: 8px;
     display: flex;
@@ -73,6 +73,7 @@
 
   .result-item {
     width: 320px;
+    height: 40px;
     padding: 8px 12px;
     display: flex;
     flex-direction: column;
@@ -88,6 +89,10 @@
   .spacer-item {
     width: 320px;
     height: 40px;
+  }
+
+  .spacer-text {
+    font-size: 1px;
   }
 </style>
 
